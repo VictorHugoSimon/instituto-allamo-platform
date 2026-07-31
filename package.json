@@ -11,5 +11,8 @@
     "build": "npm run build --workspace=apps/web",
     "lint": "npm run lint --workspace=apps/web",
     "start": "npm run start --workspace=apps/web"
+  },
+  "devDependencies": {
+    "supabase": "^2.111.0"
   }
 }
