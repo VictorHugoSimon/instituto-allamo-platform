@@ -1,21 +1,8 @@
-﻿# Instituto Államo Platform
+﻿# Aplicação Web
 
-Plataforma de gestão estratégica, projetos, implementações e PMO do Instituto Államo.
+Aplicação web da Plataforma Instituto Államo.
 
-## Estrutura inicial
+## Execução local
 
-- apps/web: aplicação Next.js
-- docs: documentação do produto
-- supabase: banco de dados e migrations
-- packages: bibliotecas compartilhadas
-
-## Tecnologias
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- Supabase
-- PostgreSQL
-- Cloudflare
-- Docker
+npm install
+npm run dev
