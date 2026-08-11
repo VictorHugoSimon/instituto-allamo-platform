@@ -1,0 +1,9 @@
+name = "allamo-pmo"
+compatibility_date = "2026-08-01"
+pages_build_output_dir = "public"
+
+# Banco D1 — o id sai de: wrangler d1 create allamo-pmo
+[[d1_databases]]
+binding = "DB"
+database_name = "allamo-pmo"
+database_id = "COLE_AQUI_O_ID_DO_D1"

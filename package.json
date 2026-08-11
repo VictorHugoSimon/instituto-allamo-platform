@@ -1,15 +1,11 @@
 {
-  "name": "instituto-allamo-platform",
-  "version": "0.1.0",
+  "name": "allamo-pmo",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspace=apps/web",
-    "lint": "npm run lint --workspace=apps/web",
-    "start": "npm run start --workspace=apps/web"
-  }
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public",
+    "db:init": "wrangler d1 execute allamo-pmo --file=./schema.sql",
+    "db:seed": "wrangler d1 execute allamo-pmo --file=./seed.sql"
+  },
+  "devDependencies": { "wrangler": "^3.0.0" }
 }
