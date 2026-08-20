@@ -1,0 +1,33 @@
+name: Deploy STAGE to Cloudflare Pages
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'public/**'
+      - 'wrangler.toml'
+      - '.github/workflows/deploy-stage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: allamo-pmo-stage
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Deploy to Cloudflare Pages STAGE
+        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
