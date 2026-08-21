@@ -2,7 +2,7 @@ name: Work Management CI
 
 on:
   push:
-    branches: [feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu, fix/stage-live-verification]
+    branches: [develop, feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu, fix/stage-live-verification]
   pull_request:
     branches: [develop]
 
@@ -39,9 +39,12 @@ jobs:
           grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
           grep -q "data-allamo-work-menu" public/index.html
           grep -q "data-allamo-company-kpi" public/index.html
+          grep -q "data-allamo-company-count" public/index.html
           grep -q "allamo-boot-guard" public/index.html
           grep -q "window.__allamoApiPending" public/index.html
           grep -q "display:none!important" public/index.html
+          grep -q "\[loadData\] companies" public/index.html
+          if grep -q "mantém dados embutidos" public/index.html; then echo "Fallback demo ainda ativo"; exit 1; fi
           grep -q "allamo-pmo-v2" public/sw.js
 
   deploy-and-verify-stage:
