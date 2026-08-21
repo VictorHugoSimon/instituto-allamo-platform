@@ -38,15 +38,24 @@ const embeddedFallback = "} catch (e) { /* mantém dados embutidos */ }";
 const emptyFallback = "} catch (e) { console.error('[loadData] falha inesperada',e); this.companies=[]; this.projects=[]; this.issues=[]; this.viradas=[]; this.docs=[]; this.setState({gmud:[]}); this.forceUpdate(); }";
 if (html.includes(embeddedFallback)) html = html.replace(embeddedFallback, emptyFallback);
 
+// 5) Carteira vazia é estado válido.
+// O render antigo assumia que sempre existia uma empresa e acessava activeCo.status.
+const activeCompanyNeedle = "const activeCo = coMap[st.company] || this.companies[0];";
+const activeCompanySafe = "const activeCo = coMap[st.company] || this.companies[0] || { id:'', name:'', status:'', progress:0, own:false, system:'', summary:'', lead:'', city:'', pmo:'', statusText:'' };";
+if (html.includes(activeCompanyNeedle)) html = html.split(activeCompanyNeedle).join(activeCompanySafe);
+
 if (!html.includes('allamo-boot-guard') || !html.includes('display:none!important')) {
   throw new Error('Hardening incompleto: marcadores esperados não foram aplicados.');
 }
 if (!html.includes('[loadData] companies') || html.includes('mantém dados embutidos')) {
   throw new Error('Fallback demo ainda está ativo no portal live.');
 }
+if (!html.includes("this.companies[0] || { id:''")) {
+  throw new Error('Proteção de carteira vazia não foi aplicada ao renderVals.');
+}
 fs.writeFileSync(file, html);
 
-// 5) Regra de domínio: nenhum projeto novo pode existir sem empresa.
+// 6) Regra de domínio: nenhum projeto novo pode existir sem empresa.
 // Isso garante a relação Empresa 1:N Projetos e elimina novos cards "SEM EMPRESA".
 const workerFile = 'public/_worker.js';
 let worker = fs.readFileSync(workerFile, 'utf8');
@@ -58,4 +67,4 @@ if (worker.includes(projectNeedle) && !worker.includes("Selecione a empresa do p
 if (!worker.includes("Selecione a empresa do projeto")) throw new Error('Regra empresa obrigatória não aplicada ao Worker.');
 fs.writeFileSync(workerFile, worker);
 
-console.log('OK: anti-flash, fallback demo removido, KPI live e empresa obrigatória por projeto aplicados.');
+console.log('OK: anti-flash, fallback demo removido, carteira vazia segura, KPI live e empresa obrigatória por projeto aplicados.');
