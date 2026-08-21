@@ -29,7 +29,9 @@ jobs:
           node --check scripts/build-work-management.mjs
           node --check scripts/harden-portal-runtime.mjs
           node --check scripts/zero-static-executive-chart.mjs
+          node --check scripts/zero-live-state-before-fetch.mjs
           node --check scripts/optimize-portal-performance.mjs
+          node --check scripts/stamp-release.mjs
           node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json','user','scope','logEvent','env',fs.readFileSync('src/work-management-api.js','utf8'));console.log('work API fragment ok')"
           node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json','user','scope','logEvent','env',fs.readFileSync('src/report-management-list-api.js','utf8'));console.log('report list API fragment ok')"
           node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json','user','scope','logEvent','env',fs.readFileSync('src/report-management-api.js','utf8'));console.log('report API fragment ok')"
@@ -37,6 +39,7 @@ jobs:
           node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment ok')"
           node --check public/_worker.js
           node --check public/sw.js
+          grep -q "awm-stage-20260821-1015" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT LIST" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT MANAGEMENT" public/_worker.js
@@ -55,6 +58,7 @@ jobs:
           grep -q "allamo_session_token" public/index.html
           grep -q "+ Demanda" public/index.html
           grep -q "+ Tarefa" public/index.html
+          grep -q "\[allamo-live-reset\]" public/index.html
           grep -q "0 Em andamento — 0,0%" public/index.html
           grep -q "0 Backlog — 0,0%" public/index.html
           grep -q "Date.now()+1800" public/index.html
