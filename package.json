@@ -9,11 +9,12 @@
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
     "build": "npm run build --workspace=apps/web",
-    "build:work": "node scripts/build-work-management.mjs && node scripts/harden-portal-runtime.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs",
+    "build:work": "node scripts/build-work-management.mjs && node scripts/enforce-live-first-paint.mjs && node scripts/harden-portal-runtime.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs",
     "test:report-ai": "node scripts/validate-report-ai-dynamic.mjs && node scripts/verify-data-persistence.mjs",
     "test:ux": "node scripts/validate-responsive-usability.mjs",
     "test:series": "node scripts/validate-report-series.mjs",
     "test:tenant": "node scripts/validate-tenant-milestones.mjs",
+    "test:platform": "node scripts/validate-dynamic-tenant-platform.mjs && node scripts/verify-data-persistence.mjs",
     "lint": "npm run lint --workspace=apps/web",
     "start": "npm run start --workspace=apps/web"
   },
