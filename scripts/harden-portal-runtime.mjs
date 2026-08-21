@@ -36,7 +36,7 @@ const activeCompanySafe = "const activeCo = coMap[st.company] || this.companies[
 if (html.includes(activeCompanyNeedle)) html = html.split(activeCompanyNeedle).join(activeCompanySafe);
 
 // 6) Visão Executiva: troca cada KPI estático por cálculo sobre as coleções reais.
-// A troca é feita objeto a objeto para não depender das quebras/escapes do bundle empacotado.
+// Em primeira build substitui os objetos demo; em builds seguintes apenas valida o resultado já aplicado.
 const kpiReplacements = [
   ["{label:'Projetos', value:'7', note:'portfólio atual'}", "{label:'Empresas', value:String((this.companies||[]).filter(c=>st.company==='all'||String(c.id)===String(st.company)).length), note:'empresas cadastradas'}, {label:'Projetos', value:String((this.projects||[]).filter(p=>inScope(p.company_id)).length), note:'portfólio atual'}"],
   ["{label:'Demandas', value:'259', note:'não arquivadas'}", "{label:'Demandas', value:String((this.issues||[]).filter(i=>inScope(i.company_id)).length), note:'registradas'}"],
@@ -45,8 +45,7 @@ const kpiReplacements = [
   ["{label:'Completo', value:'1', note:'projeto'}", "{label:'Completo', value:String((this.projects||[]).filter(p=>inScope(p.company_id)&&(p.status==='Completo'||p.badge==='completed')).length), note:'projetos'}"],
   ["{label:'Cancelado', value:'1', note:'projeto'}", "{label:'Cancelado', value:String((this.projects||[]).filter(p=>inScope(p.company_id)&&(p.status==='Cancelado'||p.badge==='canceled')).length), note:'projetos'}"]
 ];
-let kpiChanges=0;
-for(const [oldValue,newValue] of kpiReplacements){if(html.includes(oldValue)){html=html.split(oldValue).join(newValue);kpiChanges++;}}
+for(const [oldValue,newValue] of kpiReplacements){if(html.includes(oldValue))html=html.split(oldValue).join(newValue);}
 
 // 7) Nenhum nome/achado da fotografia histórica pode permanecer no artefato live.
 const legacyText = [
@@ -66,9 +65,9 @@ for(const [oldValue,newValue] of legacyText) html=html.split(oldValue).join(newV
 if (!html.includes('allamo-boot-guard') || !html.includes('display:none!important')) throw new Error('Hardening incompleto: marcadores esperados não foram aplicados.');
 if (!html.includes('[loadData] companies') || html.includes('mantém dados embutidos')) throw new Error('Fallback demo ainda está ativo no portal live.');
 if (!html.includes("this.companies[0] || { id:''")) throw new Error('Proteção de carteira vazia não foi aplicada.');
-if (kpiChanges<6 || html.includes("{label:'Projetos', value:'7'") || html.includes("{label:'Demandas', value:'259'")) throw new Error('KPIs executivos ainda possuem dados hardcoded.');
+if (html.includes("{label:'Projetos', value:'7'") || html.includes("{label:'Demandas', value:'259'")) throw new Error('KPIs executivos ainda possuem dados hardcoded.');
 if (html.includes('DVOLV está em Backlog') || html.includes('Danicar está cancelado')) throw new Error('Achados demo ainda estão no bundle live.');
-if (!html.includes("{label:'Empresas', value:String((this.companies||[]).filter")) throw new Error('KPI Empresas dinâmico não foi aplicado.');
+if (!html.includes("{label:'Empresas', value:String((this.companies||[]).filter") || !html.includes("{label:'Projetos', value:String((this.projects||[]).filter")) throw new Error('KPIs executivos dinâmicos não foram aplicados.');
 fs.writeFileSync(file, html);
 
 // 8) Regra de domínio: projeto novo deve pertencer a uma empresa.
@@ -80,4 +79,4 @@ if (worker.includes(projectNeedle) && !worker.includes("Selecione a empresa do p
 if (!worker.includes("Selecione a empresa do projeto")) throw new Error('Regra empresa obrigatória não aplicada ao Worker.');
 fs.writeFileSync(workerFile, worker);
 
-console.log('OK: dados demo removidos, Visão Executiva live, carteira vazia segura e domínio Empresa 1:N Projetos aplicado.');
+console.log('OK: hardening idempotente, dados demo removidos e Visão Executiva live validada.');
