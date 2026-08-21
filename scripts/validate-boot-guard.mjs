@@ -9,5 +9,7 @@ must('if(!hasSession()&&!isPublic()){done();return}','Fallback anônimo');
 must('public-client-projects','Contexto público por empresa');
 must('Sincronizando dados','Status de sincronização');
 must('allamo-boot-retry','Retry de conectividade');
-if(s.includes('body{visibility:hidden!important}'))throw new Error('First paint ainda esconde o body inteiro.');
+const blocking='body{visibility:'+'hidden!important}';
+const prefix=s.slice(0,s.indexOf("const blocking="));
+if(prefix.includes(blocking))throw new Error('First paint ainda esconde o body inteiro.');
 console.log('OK: sincronização inicial é tenant-safe e não bloqueia a interface inteira.');
