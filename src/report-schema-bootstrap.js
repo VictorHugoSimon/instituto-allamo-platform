@@ -25,10 +25,12 @@ if (isAllamoStage) {
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_tenant_field_values_context ON tenant_field_values(company_id,project_id,entity_type,entity_id,archived_at)");
   await stageSafe("CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_field_defs_key ON tenant_field_definitions(company_id,COALESCE(project_id,0),entity_type,field_key) WHERE archived_at IS NULL");
 
-  // Arquivo multitenant: catálogo e retenção no D1; bytes no R2 DOCS.
+  // Arquivo multitenant: catálogo no D1; bytes em R2 quando disponível ou D1 chunked como fallback sem cartão.
   await stageSafe("CREATE TABLE IF NOT EXISTS tenant_files (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, entity_type TEXT NOT NULL DEFAULT 'PROJECT', entity_id TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'DOCUMENTO', title TEXT DEFAULT '', description TEXT DEFAULT '', object_key TEXT NOT NULL, file_name TEXT NOT NULL, mime_type TEXT DEFAULT '', size_bytes INTEGER NOT NULL DEFAULT 0, version_no INTEGER NOT NULL DEFAULT 1, client_visible INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'ACTIVE', created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), archived_at TEXT)");
+  await stageSafe("CREATE TABLE IF NOT EXISTS tenant_file_chunks (file_id TEXT NOT NULL, company_id TEXT NOT NULL, project_id INTEGER, chunk_no INTEGER NOT NULL, data_blob BLOB NOT NULL, size_bytes INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(file_id,chunk_no))");
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_tenant_files_context ON tenant_files(company_id,project_id,entity_type,entity_id,status,archived_at,created_at DESC)");
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_tenant_files_object ON tenant_files(object_key)");
+  await stageSafe("CREATE INDEX IF NOT EXISTS idx_tenant_file_chunks_context ON tenant_file_chunks(company_id,project_id,file_id,chunk_no)");
 
   // Detalhes e evidências por grande marco/fase do projeto.
   await stageSafe("CREATE TABLE IF NOT EXISTS project_milestone_details (company_id TEXT NOT NULL, project_id INTEGER NOT NULL, phase_key TEXT NOT NULL, milestone_key TEXT NOT NULL, phase_title TEXT DEFAULT '', milestone_title TEXT DEFAULT '', description TEXT DEFAULT '', subdescription TEXT DEFAULT '', phase_rank INTEGER NOT NULL DEFAULT 0, milestone_rank INTEGER NOT NULL DEFAULT 0, updated_by TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(company_id,project_id,phase_key,milestone_key))");
@@ -44,5 +46,5 @@ if (isAllamoStage) {
   await stageSafe("CREATE TABLE IF NOT EXISTS report_ai_runs (id TEXT PRIMARY KEY, scope_type TEXT NOT NULL, scope_id TEXT NOT NULL, company_id TEXT, project_id INTEGER, model TEXT NOT NULL, input_summary TEXT DEFAULT '', output_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'GENERATED', created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), applied_at TEXT)");
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_ai_runs_scope ON report_ai_runs(scope_type,scope_id,created_at DESC)");
 
-  await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES ('reports-persistent-schema',datetime('now'),'Reports, campos dinâmicos multitenant, arquivo R2 catalogado, séries, marcos/evidências, versões e Copiloto IA em modo persistente; nenhum reset automático')");
+  await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES ('reports-persistent-schema',datetime('now'),'Reports, campos dinâmicos multitenant, arquivos R2/D1, séries, marcos/evidências, versões e Copiloto IA em modo persistente; nenhum reset automático')");
 }

@@ -17,9 +17,10 @@ if(path==='public-published-reports'&&request.method==='GET'){
   return json(rows);
 }
 if(path.match(/^public-published-reports\/[^/]+$/)&&request.method==='GET'){
-  const cid=url.searchParams.get('company');if(!cid)return json({error:'Informe a empresa'},400);
+  const cid=url.searchParams.get('company'),pid=url.searchParams.get('project');if(!cid)return json({error:'Informe a empresa'},400);
   const id=decodeURIComponent(path.split('/')[1]);
   const r=await DB.prepare("SELECT * FROM report_records WHERE id=? AND company_id=? AND status='PUBLICADO' AND archived_at IS NULL").bind(id,cid).first();if(!r)return json({error:'Report publicado não encontrado'},404);
+  if(pid&&String(r.project_id||'')!==String(pid))return json({error:'Report não pertence ao projeto selecionado'},404);
   let data={};try{data=publicSanitizeReportData(JSON.parse(r.data_json||'{}'))}catch(_){}
   const company=await DB.prepare('SELECT id,name FROM companies WHERE id=?').bind(cid).first();if(!company)return json({error:'Empresa não encontrada'},404);
   const project=r.project_id?await DB.prepare('SELECT id,name,company_id FROM projects WHERE id=? AND company_id=?').bind(r.project_id,cid).first():null;if(r.project_id&&!project)return json({error:'Contexto do projeto inválido'},403);

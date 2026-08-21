@@ -3,6 +3,7 @@ const worker='public/_worker.js',index='public/index.html';
 const api=fs.readFileSync('src/work-management-api.js','utf8');
 const ui=fs.readFileSync('src/work-management-ui.js','utf8');
 const publicReportContextGuard=fs.readFileSync('src/public-report-context-guard.js','utf8');
+const publicClientPortalApi=fs.readFileSync('src/public-client-portal-api.js','utf8');
 const publicPublishedReportsApi=fs.readFileSync('src/public-published-reports-api.js','utf8');
 const publicMilestoneAssetsApi=fs.readFileSync('src/public-milestone-assets-api.js','utf8');
 const reportListApi=fs.readFileSync('src/report-management-list-api.js','utf8');
@@ -22,8 +23,11 @@ const reportAdminNavigation=fs.readFileSync('src/report-admin-navigation.js','ut
 const richReportViewer=fs.readFileSync('src/rich-report-viewer.js','utf8');
 const richReportEvidenceExtension=fs.readFileSync('src/rich-report-evidence-extension.js','utf8');
 const milestoneEvidenceUi=fs.readFileSync('src/project-milestone-evidence-ui.js','utf8');
+const milestoneUploadFallbackUi=fs.readFileSync('src/milestone-upload-fallback-ui.js','utf8');
 const milestoneFileOpen=fs.readFileSync('src/milestone-file-open.js','utf8');
 const reportContextualEditor=fs.readFileSync('src/report-contextual-editor.js','utf8');
+const publicClientPortal=fs.readFileSync('src/public-client-portal.js','utf8');
+const publicClientLayerFix=fs.readFileSync('src/public-client-layer-fix.js','utf8');
 const clientPublishedReports=fs.readFileSync('src/client-published-reports.js','utf8');
 const reportSeriesUi=fs.readFileSync('src/report-series-ui.js','utf8');
 const reportSeriesFlowVisual=fs.readFileSync('src/report-series-flow-visual.js','utf8');
@@ -51,6 +55,7 @@ const sync=(text,start,end,content,needle,indent='')=>{
 let w=fs.readFileSync(worker,'utf8');
 w=sync(w,'  // BEGIN ALLAMO STAGE RUNTIME','  // END ALLAMO STAGE RUNTIME',stage,"  try {\n    // REPORT PÚBLICO",'  ');
 w=sync(w,'    // BEGIN ALLAMO PUBLIC REPORT CONTEXT GUARD','    // END ALLAMO PUBLIC REPORT CONTEXT GUARD',publicReportContextGuard,"    // REPORT PÚBLICO (sem login) — link aberto do cliente",'    ');
+w=sync(w,'    // BEGIN ALLAMO PUBLIC CLIENT PORTAL','    // END ALLAMO PUBLIC CLIENT PORTAL',publicClientPortalApi,"    // REPORT PÚBLICO (sem login) — link aberto do cliente",'    ');
 w=sync(w,'    // BEGIN ALLAMO PUBLIC PUBLISHED REPORTS','    // END ALLAMO PUBLIC PUBLISHED REPORTS',publicPublishedReportsApi,"    // REPORT PÚBLICO (sem login) — link aberto do cliente",'    ');
 w=sync(w,'    // BEGIN ALLAMO PUBLIC MILESTONE ASSETS','    // END ALLAMO PUBLIC MILESTONE ASSETS',publicMilestoneAssetsApi,"    // REPORT PÚBLICO (sem login) — link aberto do cliente",'    ');
 w=sync(w,'    // BEGIN ALLAMO WORK MANAGEMENT','    // END ALLAMO WORK MANAGEMENT',api,"    if (path === 'projects' && request.method === 'GET')",'    ');
@@ -65,7 +70,7 @@ w=sync(w,'    // BEGIN ALLAMO LEGACY REPORT AI','    // END ALLAMO LEGACY REPORT
 fs.writeFileSync(worker,w);
 let h=fs.readFileSync(index,'utf8');
 const start='<!-- BEGIN ALLAMO WORK MANAGEMENT UI -->',end='<!-- END ALLAMO WORK MANAGEMENT UI -->';
-const runtime=`<script>\n${ui}\n</script>\n<script>\n${reportUi}\n</script>\n<script>\n${legacyReportAiUi}\n</script>\n<script>\n${legacyReportUiHotfix}\n</script>\n<script>\n${reportAiSimplifiedModal}\n</script>\n<script>\n${reportAdminNavigation}\n</script>\n<script>\n${richReportViewer}\n</script>\n<script>\n${richReportEvidenceExtension}\n</script>\n<script>\n${milestoneEvidenceUi}\n</script>\n<script>\n${milestoneFileOpen}\n</script>\n<script>\n${reportContextualEditor}\n</script>\n<script>\n${clientPublishedReports}\n</script>\n<script>\n${reportSeriesUi}\n</script>\n<script>\n${reportSeriesFlowVisual}\n</script>\n<script>\n${releaseHistoryUi}\n</script>\n<script>\n${interactionFeedback}\n</script>\n<script>\n${raciVisual}\n</script>\n<script>\n${responsiveUsability}\n</script>\n<script>\n${enhancements}\n</script>\n<script>\n${watchdog}\n</script>`;
+const runtime=`<script>\n${ui}\n</script>\n<script>\n${reportUi}\n</script>\n<script>\n${legacyReportAiUi}\n</script>\n<script>\n${legacyReportUiHotfix}\n</script>\n<script>\n${reportAiSimplifiedModal}\n</script>\n<script>\n${reportAdminNavigation}\n</script>\n<script>\n${richReportViewer}\n</script>\n<script>\n${richReportEvidenceExtension}\n</script>\n<script>\n${milestoneEvidenceUi}\n</script>\n<script>\n${milestoneUploadFallbackUi}\n</script>\n<script>\n${milestoneFileOpen}\n</script>\n<script>\n${reportContextualEditor}\n</script>\n<script>\n${publicClientPortal}\n</script>\n<script>\n${publicClientLayerFix}\n</script>\n<script>\n${clientPublishedReports}\n</script>\n<script>\n${reportSeriesUi}\n</script>\n<script>\n${reportSeriesFlowVisual}\n</script>\n<script>\n${releaseHistoryUi}\n</script>\n<script>\n${interactionFeedback}\n</script>\n<script>\n${raciVisual}\n</script>\n<script>\n${responsiveUsability}\n</script>\n<script>\n${enhancements}\n</script>\n<script>\n${watchdog}\n</script>`;
 h=sync(h,start,end,runtime,'</body>');
 fs.writeFileSync(index,h);
-console.log('OK: Work Management, isolamento multiempresa, banco dinâmico, arquivo multitenant, séries/fluxo, marcos/anexos, edição contextual, IA, RACI, responsividade e performance sincronizados.');
+console.log('OK: Work Management, portal público por projetos, isolamento multiempresa, banco dinâmico, arquivos R2/D1, séries/fluxo, marcos/anexos, edição contextual, IA, RACI, responsividade e performance sincronizados.');
