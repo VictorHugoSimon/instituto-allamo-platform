@@ -35,20 +35,30 @@ const activeCompanyNeedle = "const activeCo = coMap[st.company] || this.companie
 const activeCompanySafe = "const activeCo = coMap[st.company] || this.companies[0] || { id:'', name:'', status:'', progress:0, own:false, system:'', summary:'', lead:'', city:'', pmo:'', statusText:'' };";
 if (html.includes(activeCompanyNeedle)) html = html.split(activeCompanyNeedle).join(activeCompanySafe);
 
-// 6) Visão Executiva: remove os números 7/259/3/2/1/1 do protótipo.
-const execStatic = `const execKpis = [\n      {label:'Projetos', value:'7', note:'portfólio atual'},\n      {label:'Demandas', value:'259', note:'não arquivadas'},\n      {label:'Em andamento', value:'3', note:'projetos'},\n      {label:'Backlog', value:'2', note:'projetos'},\n      {label:'Completo', value:'1', note:'projeto'},\n      {label:'Cancelado', value:'1', note:'projeto'}\n    ];`;
-const execLive = `const scopedCompanies = (this.companies||[]).filter(c=>st.company==='all'||String(c.id)===String(st.company));\n    const scopedProjects = (this.projects||[]).filter(p=>inScope(p.company_id));\n    const pcount=(status,badge)=>scopedProjects.filter(p=>String(p.status||'')===status||String(p.badge||'')===badge).length;\n    const execKpis = [\n      {label:'Empresas', value:String(scopedCompanies.length), note:'empresas cadastradas'},\n      {label:'Projetos', value:String(scopedProjects.length), note:'portfólio atual'},\n      {label:'Demandas', value:String((this.issues||[]).filter(i=>inScope(i.company_id)).length), note:'registradas'},\n      {label:'Em andamento', value:String(pcount('Em andamento','started')), note:'projetos'},\n      {label:'Backlog', value:String(pcount('Backlog','backlog')), note:'projetos'},\n      {label:'Completo', value:String(pcount('Completo','completed')), note:'projetos'},\n      {label:'Cancelado', value:String(pcount('Cancelado','canceled')), note:'projetos'}\n    ];`;
-if (html.includes(execStatic)) html = html.split(execStatic).join(execLive);
+// 6) Visão Executiva: substitui o bloco hardcoded 7/259/3/2/1/1 por dados reais.
+const execOldMarker = "const execKpis = [\\\n      {label:'Projetos', value:'7'";
+const execLive = "const scopedCompanies = (this.companies||[]).filter(c=>st.company==='all'||String(c.id)===String(st.company));\\\n    const scopedProjects = (this.projects||[]).filter(p=>inScope(p.company_id));\\\n    const execKpis = [\\\n      {label:'Empresas', value:String(scopedCompanies.length), note:'empresas cadastradas'},\\\n      {label:'Projetos', value:String(scopedProjects.length), note:'portfólio atual'},\\\n      {label:'Demandas', value:String((this.issues||[]).filter(i=>inScope(i.company_id)).length), note:'registradas'},\\\n      {label:'Em andamento', value:String(scopedProjects.filter(p=>p.status==='Em andamento'||p.badge==='started').length), note:'projetos'},\\\n      {label:'Backlog', value:String(scopedProjects.filter(p=>p.status==='Backlog'||p.badge==='backlog').length), note:'projetos'},\\\n      {label:'Completo', value:String(scopedProjects.filter(p=>p.status==='Completo'||p.badge==='completed').length), note:'projetos'},\\\n      {label:'Cancelado', value:String(scopedProjects.filter(p=>p.status==='Cancelado'||p.badge==='canceled').length), note:'projetos'}\\\n    ];\\\n    ";
+let execReplaced=0;
+while(html.includes(execOldMarker)){
+  const markerAt=html.indexOf(execOldMarker),start=html.lastIndexOf('const execKpis = [',markerAt),end=html.indexOf('const findings = [',markerAt);
+  if(start<0||end<0)break;
+  html=html.slice(0,start)+execLive+html.slice(end);execReplaced++;
+}
 
-// 7) Remove achados antigos do protótipo (DVOLV, Danicar e issues históricas).
-const findingsStatic = `const findings = [\n      {title:'Divergência Projeto × Execução', desc:'DVOLV está em Backlog, mas possui múltiplas issues em andamento.', color:'#b42318'},\n      {title:'Projeto cancelado com backlog', desc:'Danicar está cancelado, porém mantém demandas abertas no Backlog.', color:'#b42318'},\n      {title:'Prazos antigos ainda abertos', desc:'Há issues de jan/fev/abr/mai/jun ainda marcadas como Em andamento.', color:'#b42318'},\n      {title:'Priorização incompleta', desc:'Grande quantidade de issues está como \\"Sem prioridade\\".', color:'#b7791f'},\n      {title:'Demandas sem projeto', desc:'Funcionalidades, bugs e melhorias sem associação a projeto/frente.', color:'#b7791f'}\n    ];`;
-if (html.includes(findingsStatic)) html = html.split(findingsStatic).join("const findings = [];");
+// 7) Remove completamente os achados antigos DVOLV/Danicar do código entregue.
+const findingsOldMarker = "const findings = [\\\n      {title:'Divergência Projeto × Execução'";
+let findingsReplaced=0;
+while(html.includes(findingsOldMarker)){
+  const markerAt=html.indexOf(findingsOldMarker),start=html.lastIndexOf('const findings = [',markerAt),end=html.indexOf('// empresas',markerAt);
+  if(start<0||end<0)break;
+  html=html.slice(0,start)+"const findings = [];\\\n    "+html.slice(end);findingsReplaced++;
+}
 
 if (!html.includes('allamo-boot-guard') || !html.includes('display:none!important')) throw new Error('Hardening incompleto: marcadores esperados não foram aplicados.');
 if (!html.includes('[loadData] companies') || html.includes('mantém dados embutidos')) throw new Error('Fallback demo ainda está ativo no portal live.');
 if (!html.includes("this.companies[0] || { id:''")) throw new Error('Proteção de carteira vazia não foi aplicada.');
-if (html.includes("{label:'Projetos', value:'7'")) throw new Error('KPI Projetos ainda está hardcoded em 7.');
-if (html.includes('DVOLV está em Backlog') || html.includes('Danicar está cancelado')) throw new Error('Achados demo ainda estão no bundle live.');
+if (execReplaced<1 || html.includes("{label:'Projetos', value:'7'")) throw new Error('KPI Projetos ainda está hardcoded em 7.');
+if (findingsReplaced<1 || html.includes('DVOLV está em Backlog') || html.includes('Danicar está cancelado')) throw new Error('Achados demo ainda estão no bundle live.');
 if (!html.includes("{label:'Empresas', value:String(scopedCompanies.length)")) throw new Error('KPI Empresas dinâmico não foi aplicado.');
 fs.writeFileSync(file, html);
 
