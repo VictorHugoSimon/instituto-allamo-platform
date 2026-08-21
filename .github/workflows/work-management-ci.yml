@@ -1,0 +1,32 @@
+name: Work Management CI
+
+on:
+  push:
+    branches: [feature/work-management-native]
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build Work Management
+        run: npm run build:work
+      - name: Validate syntax and integration markers
+        run: |
+          node --check src/work-management-ui.js
+          node --check scripts/build-work-management.mjs
+          node --check public/_worker.js
+          grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
+          grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
+          grep -q "CREATE TABLE IF NOT EXISTS work_items" migrations/2026-08-21-work-management.sql
+          grep -q "CREATE TABLE IF NOT EXISTS work_sprints" migrations/2026-08-21-work-management.sql
