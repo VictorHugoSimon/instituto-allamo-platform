@@ -11,6 +11,7 @@
     "build": "npm run build --workspace=apps/web",
     "build:work": "node scripts/build-work-management.mjs && node scripts/harden-portal-runtime.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs",
     "test:report-ai": "node scripts/validate-report-ai-dynamic.mjs && node scripts/verify-data-persistence.mjs",
+    "test:ux": "node scripts/validate-responsive-usability.mjs",
     "lint": "npm run lint --workspace=apps/web",
     "start": "npm run start --workspace=apps/web"
   },
