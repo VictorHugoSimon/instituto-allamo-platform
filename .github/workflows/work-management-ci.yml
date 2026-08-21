@@ -27,6 +27,7 @@ jobs:
           node --check src/report-management-ui.js
           node --check src/portal-enhancements.js
           node --check scripts/build-work-management.mjs
+          node --check scripts/enforce-live-first-paint.mjs
           node --check scripts/harden-portal-runtime.mjs
           node --check scripts/zero-static-executive-chart.mjs
           node --check scripts/zero-live-state-before-fetch.mjs
@@ -44,6 +45,8 @@ jobs:
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT LIST" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT MANAGEMENT" public/_worker.js
+          grep -q "BEGIN ALLAMO DYNAMIC TENANT FIELDS" public/_worker.js
+          grep -q "BEGIN ALLAMO TENANT FILES" public/_worker.js
           grep -q "report_records" public/_worker.js
           grep -q "report_versions" public/_worker.js
           grep -q "report_roadmap_items" public/_worker.js
@@ -62,8 +65,14 @@ jobs:
           grep -q "\[allamo-live-reset\]" public/index.html
           grep -q "0 Em andamento — 0,0%" public/index.html
           grep -q "0 Backlog — 0,0%" public/index.html
-          grep -q "Date.now()+1800" public/index.html
-          grep -q "now-quietSince>=120" public/index.html
+          grep -q "Date.now()+10000" public/index.html
+          grep -q "now-quietSince>=250" public/index.html
+          grep -q "window.__allamoBootSeen" public/index.html
+          grep -q "seen.companies&&!!seen.projects" public/index.html
+          grep -q "return !!seen.public" public/index.html
+          grep -q "Carregando dados do Portal PMO" public/index.html
+          if grep -q "Date.now()+1800" public/index.html; then echo "Guard rápido antigo pode expor fotografia demo"; exit 1; fi
+          if grep -q "now-quietSince>=120" public/index.html; then echo "Janela antiga de reveal ainda presente"; exit 1; fi
           if grep -q "Date.now()+6000" public/index.html; then echo "Boot antigo de 6s ainda presente"; exit 1; fi
           if grep -q "setInterval(tick,1200)" public/index.html; then echo "Polling executivo agressivo ainda presente"; exit 1; fi
           if grep -q "{label:'Projetos', value:'7'" public/index.html; then echo "KPI Projetos ainda hardcoded"; exit 1; fi
