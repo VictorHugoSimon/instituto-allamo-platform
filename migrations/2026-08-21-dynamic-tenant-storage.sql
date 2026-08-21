@@ -1,5 +1,5 @@
 -- Instituto Államo PMO — campos dinâmicos + arquivo multitenant
--- Migration persistente / não destrutiva. Não executa DELETE, DROP ou TRUNCATE.
+-- Migration persistente e somente aditiva.
 
 CREATE TABLE IF NOT EXISTS tenant_field_definitions (
   id TEXT PRIMARY KEY,
