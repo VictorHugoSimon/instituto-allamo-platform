@@ -4,7 +4,7 @@ const api=fs.readFileSync('src/work-management-api.js','utf8');
 const ui=fs.readFileSync('src/work-management-ui.js','utf8');
 const reportApi=fs.readFileSync('src/report-management-api.js','utf8');
 const reportUi=fs.readFileSync('src/report-management-ui.js','utf8');
-const stage=fs.readFileSync('src/stage-runtime-bootstrap.js','utf8');
+const stage=fs.readFileSync('src/stage-runtime-bootstrap.js','utf8')+'\n'+fs.readFileSync('src/report-schema-bootstrap.js','utf8');
 const enhancements=fs.readFileSync('src/portal-enhancements.js','utf8');
 const sync=(text,start,end,content,needle,indent='')=>{
  const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
