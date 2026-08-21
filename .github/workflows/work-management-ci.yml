@@ -32,7 +32,7 @@ jobs:
           node --check public/sw.js
           grep -q "BEGIN ALLAMO STAGE RUNTIME" public/_worker.js
           grep -q "clean-baseline-2026-08-21-v3" public/_worker.js
-          grep -q "awm-stage-20260820-2217" public/_worker.js
+          grep -q "awm-stage-20260820-2227" public/_worker.js
           grep -q "stage-health" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "Selecione a empresa do projeto" public/_worker.js
@@ -44,6 +44,7 @@ jobs:
           grep -q "window.__allamoApiPending" public/index.html
           grep -q "display:none!important" public/index.html
           grep -q "\[loadData\] companies" public/index.html
+          grep -Fq "this.companies[0] || { id:''" public/index.html
           if grep -q "mantém dados embutidos" public/index.html; then echo "Fallback demo ainda ativo"; exit 1; fi
           grep -q "allamo-pmo-v2" public/sw.js
 
@@ -98,7 +99,7 @@ jobs:
           const h=JSON.parse(fs.readFileSync('/tmp/health.json','utf8'));
           if(!h.ok) throw new Error('stage-health não retornou ok');
           if(h.environment!=='stage') throw new Error('ambiente incorreto: '+h.environment);
-          if(h.build!=='awm-stage-20260820-2217') throw new Error('build antigo em produção do Stage: '+h.build);
+          if(h.build!=='awm-stage-20260820-2227') throw new Error('build antigo em produção do Stage: '+h.build);
           for(const k of ['companies','projects','issues','work_items','work_sprints','plan_items']){
             if(h.counts[k]!==0) throw new Error(k+' deveria estar zerado e retornou '+h.counts[k]);
           }
