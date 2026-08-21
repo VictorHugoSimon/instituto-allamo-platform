@@ -1,0 +1,31 @@
+name: Report AI + Dynamic Editor CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+jobs:
+  validate-report-ai:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate source contracts
+        run: node scripts/validate-report-ai-dynamic.mjs
+      - name: Validate persistence policy
+        run: node scripts/verify-data-persistence.mjs
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate final artifact markers
+        run: |
+          grep -q "BEGIN ALLAMO LEGACY REPORT AI" public/_worker.js
+          grep -q "api.openai.com/v1/responses" public/_worker.js
+          grep -q "Gerar Status Report com IA" public/index.html
+          grep -q "+ Adicionar campo" public/index.html
+          grep -q "custom_sections" public/index.html
+          grep -q "hidden_standard_fields" public/index.html
