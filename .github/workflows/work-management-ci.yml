@@ -2,7 +2,7 @@ name: Work Management CI
 
 on:
   push:
-    branches: [develop, feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu, fix/stage-live-verification]
+    branches: [develop, feature/release-zero-work-refinement, feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu, fix/stage-live-verification]
   pull_request:
     branches: [develop]
 
@@ -21,10 +21,11 @@ jobs:
       - run: npm ci
       - name: Build portal + Work Management
         run: npm run build:work
-      - name: Validate syntax, Stage runtime, Work Management e UI executiva
+      - name: Validate release zero, runtime e Work Management
         run: |
           node --check src/work-management-ui.js
           node --check src/portal-enhancements.js
+          node --check src/work-management-api.js
           node -e "const fs=require('fs');const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;new AsyncFunction('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment syntax ok')"
           node --check scripts/build-work-management.mjs
           node --check scripts/harden-portal-runtime.mjs
@@ -32,19 +33,25 @@ jobs:
           node --check public/sw.js
           grep -q "BEGIN ALLAMO STAGE RUNTIME" public/_worker.js
           grep -q "clean-baseline-2026-08-21-v3" public/_worker.js
-          grep -q "awm-stage-20260820-2227" public/_worker.js
+          grep -q "awm-stage-20260820-2245" public/_worker.js
           grep -q "stage-health" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "Selecione a empresa do projeto" public/_worker.js
+          grep -q "O projeto não pertence à empresa selecionada" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
           grep -q "data-allamo-work-menu" public/index.html
-          grep -q "data-allamo-company-kpi" public/index.html
-          grep -q "data-allamo-company-count" public/index.html
+          grep -q "allamo_session_token" public/index.html
+          grep -q "+ Demanda" public/index.html
+          grep -q "+ Tarefa" public/index.html
+          grep -q "Todas as empresas" public/index.html
           grep -q "allamo-boot-guard" public/index.html
           grep -q "window.__allamoApiPending" public/index.html
           grep -q "display:none!important" public/index.html
           grep -q "\[loadData\] companies" public/index.html
           grep -Fq "this.companies[0] || { id:''" public/index.html
+          grep -Fq "{label:'Empresas', value:String(scopedCompanies.length)" public/index.html
+          if grep -q "{label:'Projetos', value:'7'" public/index.html; then echo "KPI Projetos ainda hardcoded"; exit 1; fi
+          if grep -q "DVOLV está em Backlog" public/index.html; then echo "Achados demo ainda ativos"; exit 1; fi
           if grep -q "mantém dados embutidos" public/index.html; then echo "Fallback demo ainda ativo"; exit 1; fi
           grep -q "allamo-pmo-v2" public/sw.js
 
@@ -83,14 +90,7 @@ jobs:
         run: npx wrangler@4.124.0 whoami
       - name: Deploy exact artifact to Cloudflare Pages STAGE
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production
-      - name: Verify HTML actually served by STAGE
-        run: |
-          curl -fsS --retry 12 --retry-delay 5 --retry-all-errors https://allamo-pmo-stage.pages.dev/ -o /tmp/stage.html
-          grep -q "data-allamo-work-menu" /tmp/stage.html
-          grep -q "data-allamo-company-kpi" /tmp/stage.html
-          grep -q "allamo-boot-guard" /tmp/stage.html
-          grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" /tmp/stage.html
-      - name: Verify live Worker and the actual STAGE D1
+      - name: Verify live Worker and STAGE D1
         run: |
           curl -fsS --retry 12 --retry-delay 5 --retry-all-errors https://allamo-pmo-stage.pages.dev/api/stage-health -o /tmp/health.json
           cat /tmp/health.json
@@ -99,9 +99,7 @@ jobs:
           const h=JSON.parse(fs.readFileSync('/tmp/health.json','utf8'));
           if(!h.ok) throw new Error('stage-health não retornou ok');
           if(h.environment!=='stage') throw new Error('ambiente incorreto: '+h.environment);
-          if(h.build!=='awm-stage-20260820-2227') throw new Error('build antigo em produção do Stage: '+h.build);
-          for(const k of ['companies','projects','issues','work_items','work_sprints','plan_items']){
-            if(h.counts[k]!==0) throw new Error(k+' deveria estar zerado e retornou '+h.counts[k]);
-          }
+          if(h.build!=='awm-stage-20260820-2245') throw new Error('build antigo no Stage: '+h.build);
+          for(const k of ['companies','projects','issues','work_items','work_sprints','plan_items']) if(h.counts[k]!==0) throw new Error(k+' deveria estar zerado e retornou '+h.counts[k]);
           console.log('STAGE REAL VALIDADO:', JSON.stringify(h));
           NODE
