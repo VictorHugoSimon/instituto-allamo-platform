@@ -1,0 +1,30 @@
+name: Post Unpack Runtime CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-post-unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --check src/post-unpack-watchdog.js
+      - run: npm run build:work
+      - name: Validate watchdog in final artifact
+        run: |
+          grep -q "AllamoPostUnpackTick" public/index.html
+          grep -q "data-allamo-work-menu" public/index.html
+          grep -q "data-allamo-reports-menu" public/index.html
+          grep -q "setInterval(tick,750)" public/index.html
+          grep -q "AllamoRefreshExecutive" public/index.html
+          if grep -q "DVOLV está em Backlog" public/index.html; then exit 1; fi
+          if grep -q "{label:'Projetos', value:'7'" public/index.html; then exit 1; fi
