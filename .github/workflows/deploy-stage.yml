@@ -6,8 +6,10 @@ on:
     paths:
       - 'public/**'
       - 'src/work-management-*.js'
+      - 'src/stage-runtime-bootstrap.js'
+      - 'src/portal-enhancements.js'
       - 'scripts/build-work-management.mjs'
-      - 'migrations/2026-08-21-work-management.sql'
+      - 'scripts/harden-portal-runtime.mjs'
       - 'package.json'
       - 'package-lock.json'
       - 'wrangler.toml'
@@ -37,21 +39,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build native Work Management
+      - name: Build portal + Work Management
         run: npm run build:work
 
-      - name: Validate generated Worker
+      - name: Validate generated portal
         run: |
           node --check public/_worker.js
+          node --check public/sw.js
+          grep -q "BEGIN ALLAMO STAGE RUNTIME" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
+          grep -q "data-allamo-work-menu" public/index.html
+          grep -q "data-allamo-company-kpi" public/index.html
+          grep -q "allamo-boot-guard" public/index.html
 
-      - name: Apply idempotent Work Management migration to STAGE D1
-        run: npx wrangler@4.124.0 d1 execute DB --env production --remote --file=./migrations/2026-08-21-work-management.sql
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
+      # IMPORTANTE: não executar D1 com --env production no pipeline de STAGE.
+      # O bootstrap runtime usa exatamente o binding DB do projeto allamo-pmo-stage
+      # e aplica schema/reset uma única vez, somente no hostname de homologação.
       - name: Deploy to Cloudflare Pages STAGE
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production
         env:
