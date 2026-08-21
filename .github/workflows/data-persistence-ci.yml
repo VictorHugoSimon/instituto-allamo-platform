@@ -1,0 +1,31 @@
+name: Data Persistence CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  persistence-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify data persistence policy
+        run: node scripts/verify-data-persistence.mjs
+      - name: Build portal
+        run: npm run build:work
+      - name: Verify persistence markers in final artifact
+        run: |
+          grep -q "DATA_PERSISTENCE_MODE = 'persistent'" public/_worker.js
+          grep -q "reset_disabled: true" public/_worker.js
+          grep -q "data-persistence-enabled" public/_worker.js
+          node scripts/verify-data-persistence.mjs
