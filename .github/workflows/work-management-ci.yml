@@ -2,7 +2,7 @@ name: Work Management CI
 
 on:
   push:
-    branches: [develop, feature/reports-roadmap-production, feature/release-zero-work-refinement, feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu, fix/stage-live-verification]
+    branches: [develop, feature/reports-roadmap-production, feature/release-zero-work-refinement, feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu, fix/stage-live-verification, fix/stage-v4-release]
   pull_request:
     branches: [develop, main]
 
@@ -39,7 +39,8 @@ jobs:
           node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment ok')"
           node --check public/_worker.js
           node --check public/sw.js
-          grep -q "awm-stage-20260821-1015" public/_worker.js
+          grep -q "awm-stage-20260821-1021" public/_worker.js
+          grep -q "clean-baseline-2026-08-21-v4" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT LIST" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT MANAGEMENT" public/_worker.js
