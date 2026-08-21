@@ -23,12 +23,30 @@ if (html.includes(babelNeedle) && !html.includes("typeof window.__allamoRevealWh
   html = html.replace(babelNeedle, babelReplacement);
 }
 
+// 4) Em ambiente live, cada coleção deve refletir sua própria API.
+// Uma falha em GMUD/Documentos/etc. nunca mais pode ressuscitar os dados demo embutidos.
+if (!html.includes('[loadData] companies')) {
+  const loadLine1 = "this.api('companies'), this.api('projects'), this.api('issues'+qs),";
+  const loadLine1Fixed = "this.api('companies').catch(e=>{console.error('[loadData] companies',e);return [];}), this.api('projects').catch(e=>{console.error('[loadData] projects',e);return [];}), this.api('issues'+qs).catch(e=>{console.error('[loadData] issues',e);return [];}),";
+  const loadLine2 = "this.api('gmud'+qs), this.api('releases'+qs), this.api('documents'+qs)";
+  const loadLine2Fixed = "this.api('gmud'+qs).catch(e=>{console.error('[loadData] gmud',e);return [];}), this.api('releases'+qs).catch(e=>{console.error('[loadData] releases',e);return [];}), this.api('documents'+qs).catch(e=>{console.error('[loadData] documents',e);return [];})";
+  if (!html.includes(loadLine1) || !html.includes(loadLine2)) throw new Error('Bloco loadData não encontrado para correção.');
+  html = html.replace(loadLine1, loadLine1Fixed).replace(loadLine2, loadLine2Fixed);
+}
+
+const embeddedFallback = "} catch (e) { /* mantém dados embutidos */ }";
+const emptyFallback = "} catch (e) { console.error('[loadData] falha inesperada',e); this.companies=[]; this.projects=[]; this.issues=[]; this.viradas=[]; this.docs=[]; this.setState({gmud:[]}); this.forceUpdate(); }";
+if (html.includes(embeddedFallback)) html = html.replace(embeddedFallback, emptyFallback);
+
 if (!html.includes('allamo-boot-guard') || !html.includes('display:none!important')) {
   throw new Error('Hardening incompleto: marcadores esperados não foram aplicados.');
 }
+if (!html.includes('[loadData] companies') || html.includes('mantém dados embutidos')) {
+  throw new Error('Fallback demo ainda está ativo no portal live.');
+}
 fs.writeFileSync(file, html);
 
-// 4) Regra de domínio: nenhum projeto novo pode existir sem empresa.
+// 5) Regra de domínio: nenhum projeto novo pode existir sem empresa.
 // Isso garante a relação Empresa 1:N Projetos e elimina novos cards "SEM EMPRESA".
 const workerFile = 'public/_worker.js';
 let worker = fs.readFileSync(workerFile, 'utf8');
@@ -40,4 +58,4 @@ if (worker.includes(projectNeedle) && !worker.includes("Selecione a empresa do p
 if (!worker.includes("Selecione a empresa do projeto")) throw new Error('Regra empresa obrigatória não aplicada ao Worker.');
 fs.writeFileSync(workerFile, worker);
 
-console.log('OK: anti-flash, overlay técnico oculto e empresa obrigatória por projeto aplicados.');
+console.log('OK: anti-flash, fallback demo removido, KPI live e empresa obrigatória por projeto aplicados.');
