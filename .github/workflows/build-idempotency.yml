@@ -1,0 +1,31 @@
+name: Build Idempotency
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  repeat-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: First build
+        run: npm run build:work
+      - name: Second build on same generated files
+        run: npm run build:work
+      - name: Validate final artifact
+        run: |
+          node --check public/_worker.js
+          grep -q "awm-stage-20260821-1021" public/_worker.js
+          grep -q "clean-baseline-2026-08-21-v4" public/_worker.js
+          grep -q "Reports & Roadmap" public/index.html
+          if grep -q "{label:'Projetos', value:'7'" public/index.html; then exit 1; fi
+          if grep -q "{label:'Demandas', value:'259'" public/index.html; then exit 1; fi

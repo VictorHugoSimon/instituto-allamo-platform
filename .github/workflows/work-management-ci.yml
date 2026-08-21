@@ -1,0 +1,77 @@
+name: Work Management CI
+
+on:
+  push:
+    branches: [develop, feature/reports-roadmap-production, feature/release-zero-work-refinement, feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu, fix/stage-live-verification, fix/stage-v4-release]
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build portal + módulos nativos
+        run: npm run build:work
+      - name: Validate release zero, reports, roadmap e performance
+        run: |
+          node --check src/work-management-ui.js
+          node --check src/report-management-ui.js
+          node --check src/portal-enhancements.js
+          node --check scripts/build-work-management.mjs
+          node --check scripts/harden-portal-runtime.mjs
+          node --check scripts/zero-static-executive-chart.mjs
+          node --check scripts/zero-live-state-before-fetch.mjs
+          node --check scripts/optimize-portal-performance.mjs
+          node --check scripts/stamp-release.mjs
+          node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json','user','scope','logEvent','env',fs.readFileSync('src/work-management-api.js','utf8'));console.log('work API fragment ok')"
+          node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json','user','scope','logEvent','env',fs.readFileSync('src/report-management-list-api.js','utf8'));console.log('report list API fragment ok')"
+          node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json','user','scope','logEvent','env',fs.readFileSync('src/report-management-api.js','utf8'));console.log('report API fragment ok')"
+          node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json','isAllamoStage','stageSafe',fs.readFileSync('src/report-schema-bootstrap.js','utf8'));console.log('report schema fragment ok')"
+          node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment ok')"
+          node --check public/_worker.js
+          node --check public/sw.js
+          grep -q "awm-stage-20260821-1021" public/_worker.js
+          grep -q "clean-baseline-2026-08-21-v4" public/_worker.js
+          grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
+          grep -q "BEGIN ALLAMO REPORT LIST" public/_worker.js
+          grep -q "BEGIN ALLAMO REPORT MANAGEMENT" public/_worker.js
+          grep -q "report_records" public/_worker.js
+          grep -q "report_versions" public/_worker.js
+          grep -q "report_roadmap_items" public/_worker.js
+          grep -q "responsible_party" public/_worker.js
+          grep -q "work_item_id" public/_worker.js
+          grep -q "Reports & Roadmap" public/index.html
+          grep -q "Histórico · Roadmap · Trabalho" public/index.html
+          grep -q "+ Novo report" public/index.html
+          grep -q "+ Item do roadmap" public/index.html
+          grep -q "CLIENTE" public/index.html
+          grep -q "TERCEIRO" public/index.html
+          grep -q "data-allamo-reports-menu" public/index.html
+          grep -q "allamo_session_token" public/index.html
+          grep -q "+ Demanda" public/index.html
+          grep -q "+ Tarefa" public/index.html
+          grep -q "\[allamo-live-reset\]" public/index.html
+          grep -q "0 Em andamento — 0,0%" public/index.html
+          grep -q "0 Backlog — 0,0%" public/index.html
+          grep -q "Date.now()+1800" public/index.html
+          grep -q "now-quietSince>=120" public/index.html
+          if grep -q "Date.now()+6000" public/index.html; then echo "Boot antigo de 6s ainda presente"; exit 1; fi
+          if grep -q "setInterval(tick,1200)" public/index.html; then echo "Polling executivo agressivo ainda presente"; exit 1; fi
+          if grep -q "{label:'Projetos', value:'7'" public/index.html; then echo "KPI Projetos ainda hardcoded"; exit 1; fi
+          if grep -q "{label:'Demandas', value:'259'" public/index.html; then echo "KPI Demandas ainda hardcoded"; exit 1; fi
+          if grep -q "3 Em andamento — 42,9%" public/index.html; then echo "Gráfico executivo ainda contém valores históricos"; exit 1; fi
+          if grep -q "DVOLV está em Backlog" public/index.html; then echo "Achados demo ainda ativos"; exit 1; fi
+          if grep -q "mantém dados embutidos" public/index.html; then echo "Fallback demo ainda ativo"; exit 1; fi
+          grep -q "CREATE TABLE IF NOT EXISTS report_records" migrations/2026-08-21-report-history-roadmap.sql
+          grep -q "CREATE TABLE IF NOT EXISTS report_versions" migrations/2026-08-21-report-history-roadmap.sql
+          grep -q "CREATE TABLE IF NOT EXISTS report_roadmap_items" migrations/2026-08-21-report-history-roadmap.sql
+          grep -q "allamo-pmo-v2" public/sw.js
