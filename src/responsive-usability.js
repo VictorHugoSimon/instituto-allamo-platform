@@ -97,5 +97,7 @@ main,section,article,aside,form,div{min-width:0}
   function wrapWideTables(){[...document.querySelectorAll('table')].forEach(t=>{if(t.closest('.allamo-scroll-x'))return;const r=t.getBoundingClientRect();if(r.width>Math.max(360,window.innerWidth-24)){const w=document.createElement('div');w.className='allamo-scroll-x';t.parentNode.insertBefore(w,t);w.appendChild(t)}})}
   function removeFloatingLaunchers(){document.getElementById('awm-launcher')?.remove();document.getElementById('arm-launcher')?.remove()}
   function tick(){ensureViewport();ensureStyle();enhanceReportEditor();wrapWideTables();removeFloatingLaunchers()}
-  tick();setInterval(tick,700);window.addEventListener('resize',tick);window.addEventListener('allamo:data-changed',tick);document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
+  let timer=0;const schedule=()=>{clearTimeout(timer);timer=setTimeout(()=>tick(),180)};
+  const start=()=>{tick();const mo=new MutationObserver(()=>schedule());mo.observe(document.body,{childList:true,subtree:true});window.addEventListener('resize',schedule);window.addEventListener('allamo:data-changed',schedule);document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule()})};
+  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start):start();
 })();

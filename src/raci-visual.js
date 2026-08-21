@@ -23,5 +23,7 @@
     [...document.querySelectorAll('h2,h3,h4,strong')].forEach(h=>{if(norm(h.textContent)!=='matriz raci')return;if(h.closest('form'))return;const host=h.parentElement;if(!host||host.querySelector('[data-allamo-raci-visual]'))return;let raw='';for(const x of [...host.querySelectorAll('p,pre,div')]){if(x===h||x.children.length>3)continue;const tx=(x.innerText||x.textContent||'').trim();if(tx&&tx!==h.textContent&&tx.length>2){raw=tx;break}}const box=document.createElement('div');box.setAttribute('data-allamo-raci-visual','viewer');box.className='allamo-raci-preview';box.innerHTML=preview(raw);host.appendChild(box)})
   }
   function tick(){try{enhanceEditor();enhanceReadOnly()}catch(e){console.warn('[raci-visual]',e)}}
-  tick();setInterval(tick,650);window.addEventListener('allamo:data-changed',tick);
+  let timer=0;const schedule=()=>{if(timer)return;timer=setTimeout(()=>{timer=0;tick()},180)};
+  const start=()=>{tick();const mo=new MutationObserver(()=>schedule());mo.observe(document.body,{childList:true,subtree:true});window.addEventListener('allamo:data-changed',schedule)};
+  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start):start();
 })();
