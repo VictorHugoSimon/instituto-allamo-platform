@@ -2,7 +2,7 @@ name: Work Management CI
 
 on:
   push:
-    branches: [feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu]
+    branches: [feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu, fix/stage-live-verification]
   pull_request:
     branches: [develop]
 
@@ -25,13 +25,15 @@ jobs:
         run: |
           node --check src/work-management-ui.js
           node --check src/portal-enhancements.js
-          node --check src/stage-runtime-bootstrap.js
+          node -e "const fs=require('fs');const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;new AsyncFunction('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment syntax ok')"
           node --check scripts/build-work-management.mjs
           node --check scripts/harden-portal-runtime.mjs
           node --check public/_worker.js
           node --check public/sw.js
           grep -q "BEGIN ALLAMO STAGE RUNTIME" public/_worker.js
-          grep -q "clean-baseline-2026-08-21-v2" public/_worker.js
+          grep -q "clean-baseline-2026-08-21-v3" public/_worker.js
+          grep -q "awm-stage-20260820-2151" public/_worker.js
+          grep -q "stage-health" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "Selecione a empresa do projeto" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
@@ -41,3 +43,61 @@ jobs:
           grep -q "window.__allamoApiPending" public/index.html
           grep -q "display:none!important" public/index.html
           grep -q "allamo-pmo-v2" public/sw.js
+
+  deploy-and-verify-stage:
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/stage-live-verification' }}
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build exact artifact that will be deployed
+        run: npm run build:work
+      - name: Sanitize Cloudflare credentials without exposing secrets
+        shell: bash
+        env:
+          CF_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_RAW: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          python - <<'PY'
+          import os
+          token=(os.environ.get('CF_TOKEN_RAW') or '').strip().strip('"').strip("'")
+          if token.lower().startswith('bearer '): token=token[7:].strip()
+          account=(os.environ.get('CF_ACCOUNT_RAW') or '').strip().strip('"').strip("'")
+          if not token: raise SystemExit('CLOUDFLARE_API_TOKEN está vazio')
+          if not account: raise SystemExit('CLOUDFLARE_ACCOUNT_ID está vazio')
+          with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as f:
+              f.write('CLOUDFLARE_API_TOKEN='+token+'\n')
+              f.write('CLOUDFLARE_ACCOUNT_ID='+account+'\n')
+          print('Credenciais Cloudflare sanitizadas. Token não exibido.')
+          PY
+      - name: Verify Cloudflare token before deploy
+        run: npx wrangler@4.124.0 whoami
+      - name: Deploy exact artifact to Cloudflare Pages STAGE
+        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production
+      - name: Verify HTML actually served by STAGE
+        run: |
+          curl -fsS --retry 12 --retry-delay 5 --retry-all-errors https://allamo-pmo-stage.pages.dev/ -o /tmp/stage.html
+          grep -q "data-allamo-work-menu" /tmp/stage.html
+          grep -q "data-allamo-company-kpi" /tmp/stage.html
+          grep -q "allamo-boot-guard" /tmp/stage.html
+          grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" /tmp/stage.html
+      - name: Verify live Worker and the actual STAGE D1
+        run: |
+          curl -fsS --retry 12 --retry-delay 5 --retry-all-errors https://allamo-pmo-stage.pages.dev/api/stage-health -o /tmp/health.json
+          cat /tmp/health.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const h=JSON.parse(fs.readFileSync('/tmp/health.json','utf8'));
+          if(!h.ok) throw new Error('stage-health não retornou ok');
+          if(h.environment!=='stage') throw new Error('ambiente incorreto: '+h.environment);
+          if(h.build!=='awm-stage-20260820-2151') throw new Error('build antigo em produção do Stage: '+h.build);
+          for(const k of ['companies','projects','issues','work_items','work_sprints','plan_items']){
+            if(h.counts[k]!==0) throw new Error(k+' deveria estar zerado e retornou '+h.counts[k]);
+          }
+          console.log('STAGE REAL VALIDADO:', JSON.stringify(h));
+          NODE

@@ -1,11 +1,16 @@
 // STAGE runtime bootstrap — usa exatamente o D1 vinculado ao Pages STAGE.
 // Nunca executa em produção: hostname precisa conter allamo-pmo-stage.pages.dev.
+const STAGE_BUILD = 'awm-stage-20260820-2151';
 const stageHost = (url.hostname || '').toLowerCase();
 const isAllamoStage = stageHost === 'allamo-pmo-stage.pages.dev' || stageHost.endsWith('.allamo-pmo-stage.pages.dev');
 
 const stageSafe = async (sql, ...args) => {
   try { await DB.prepare(sql).bind(...args).run(); return true; }
   catch (e) { console.warn('[stage-bootstrap]', sql.slice(0,80), String(e)); return false; }
+};
+const stageCount = async (table) => {
+  try { const r = await DB.prepare('SELECT COUNT(*) AS n FROM ' + table).first(); return Number(r?.n || 0); }
+  catch (e) { return null; }
 };
 
 if (isAllamoStage) {
@@ -23,7 +28,7 @@ if (isAllamoStage) {
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_sprints_company_project ON work_sprints(company_id,project_id,status)");
 
   // Baseline limpo solicitado para homologação. Executa UMA única vez neste D1 de STAGE.
-  const resetKey = 'clean-baseline-2026-08-21-v2';
+  const resetKey = 'clean-baseline-2026-08-21-v3';
   let resetApplied = null;
   try { resetApplied = await DB.prepare('SELECT key FROM stage_runtime_flags WHERE key=?').bind(resetKey).first(); } catch (e) {}
   if (!resetApplied) {
@@ -41,5 +46,25 @@ if (isAllamoStage) {
     await stageSafe('DELETE FROM audit_log');
     await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES (?,datetime('now'),?)", resetKey, 'Stage zerado pelo runtime bound D1; produção não afetada');
     console.log('[stage-bootstrap] baseline limpo aplicado ao D1 do Stage');
+  }
+
+  // Health-check público APENAS no hostname de homologação. Serve para comprovar
+  // a versão realmente publicada e o banco realmente lido pelo Pages STAGE.
+  if (path === 'stage-health' && request.method === 'GET') {
+    return json({
+      ok: true,
+      environment: 'stage',
+      build: STAGE_BUILD,
+      host: stageHost,
+      counts: {
+        companies: await stageCount('companies'),
+        projects: await stageCount('projects'),
+        issues: await stageCount('issues'),
+        work_items: await stageCount('work_items'),
+        work_sprints: await stageCount('work_sprints'),
+        plan_items: await stageCount('plan_items')
+      },
+      reset_key: resetKey
+    });
   }
 }
