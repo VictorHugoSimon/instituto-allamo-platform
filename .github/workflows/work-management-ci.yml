@@ -29,6 +29,7 @@ jobs:
           node -e "const fs=require('fs');const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;new AsyncFunction('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment syntax ok')"
           node --check scripts/build-work-management.mjs
           node --check scripts/harden-portal-runtime.mjs
+          node --check scripts/zero-static-executive-chart.mjs
           node --check public/_worker.js
           node --check public/sw.js
           grep -q "BEGIN ALLAMO STAGE RUNTIME" public/_worker.js
@@ -50,8 +51,12 @@ jobs:
           grep -q "\[loadData\] companies" public/index.html
           grep -Fq "this.companies[0] || { id:''" public/index.html
           grep -Fq "{label:'Empresas', value:String((this.companies||[]).filter" public/index.html
+          grep -q "0 Em andamento — 0,0%" public/index.html
+          grep -q "0 Backlog — 0,0%" public/index.html
           if grep -q "{label:'Projetos', value:'7'" public/index.html; then echo "KPI Projetos ainda hardcoded"; exit 1; fi
           if grep -q "{label:'Demandas', value:'259'" public/index.html; then echo "KPI Demandas ainda hardcoded"; exit 1; fi
+          if grep -q "3 Em andamento — 42,9%" public/index.html; then echo "Gráfico executivo ainda contém valores históricos"; exit 1; fi
+          if grep -q "2 Backlog — 28,6%" public/index.html; then echo "Gráfico executivo ainda contém backlog histórico"; exit 1; fi
           if grep -q "DVOLV está em Backlog" public/index.html; then echo "Achados demo ainda ativos"; exit 1; fi
           if grep -q "mantém dados embutidos" public/index.html; then echo "Fallback demo ainda ativo"; exit 1; fi
           grep -q "allamo-pmo-v2" public/sw.js
