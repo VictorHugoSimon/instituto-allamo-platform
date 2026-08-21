@@ -5,7 +5,8 @@ const reportSchema = fs.readFileSync('src/report-schema-bootstrap.js','utf8');
 const resetMigration = fs.readFileSync('migrations/2026-08-21-reset-stage.sql','utf8');
 const reportAiMigration = fs.readFileSync('migrations/2026-08-21-report-ai-dynamic.sql','utf8');
 
-const destructive = /^\s*(DELETE\s+FROM|DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE\b)/im;
+// Procura comandos destrutivos em qualquer posição, inclusive dentro de stageSafe("...")/strings JS.
+const destructive = /\b(DELETE\s+FROM|DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE(?:\s+TABLE)?)\b/i;
 for (const [name,content] of [
   ['bootstrap de Stage',stage],
   ['bootstrap de Reports',reportSchema],
