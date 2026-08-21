@@ -2,6 +2,8 @@ import fs from 'node:fs';
 const worker='public/_worker.js',index='public/index.html';
 const api=fs.readFileSync('src/work-management-api.js','utf8');
 const ui=fs.readFileSync('src/work-management-ui.js','utf8');
+const stage=fs.readFileSync('src/stage-runtime-bootstrap.js','utf8');
+const enhancements=fs.readFileSync('src/portal-enhancements.js','utf8');
 const sync=(text,start,end,content,needle,indent='')=>{
  const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
  if(text.includes(start)){
@@ -13,11 +15,12 @@ const sync=(text,start,end,content,needle,indent='')=>{
  return text.replace(needle,block+'\n'+needle);
 };
 let w=fs.readFileSync(worker,'utf8');
+w=sync(w,'  // BEGIN ALLAMO STAGE RUNTIME','  // END ALLAMO STAGE RUNTIME',stage,"  try {\n    // REPORT PÚBLICO",'  ');
 w=sync(w,'    // BEGIN ALLAMO WORK MANAGEMENT','    // END ALLAMO WORK MANAGEMENT',api,"    if (path === 'projects' && request.method === 'GET')",'    ');
 fs.writeFileSync(worker,w);
 let h=fs.readFileSync(index,'utf8');
 const start='<!-- BEGIN ALLAMO WORK MANAGEMENT UI -->',end='<!-- END ALLAMO WORK MANAGEMENT UI -->';
-const launcher=`<script>\n${ui}\n</script>\n<script>(()=>{const add=()=>{if(document.getElementById('awm-launcher'))return;const b=document.createElement('button');b.id='awm-launcher';b.textContent='Trabalho';b.title='Gestão de tarefas e demandas';b.style.cssText='position:fixed;right:20px;bottom:86px;z-index:99980;border:0;border-radius:999px;padding:11px 16px;background:#242321;color:white;font-weight:700;box-shadow:0 4px 18px #0003;cursor:pointer';b.onclick=()=>window.AllamoWork.open();document.body.appendChild(b)};document.readyState==='loading'?document.addEventListener('DOMContentLoaded',add):add()})();</script>`;
+const launcher=`<script>\n${ui}\n</script>\n<script>\n${enhancements}\n</script>\n<script>(()=>{const add=()=>{if(document.getElementById('awm-launcher'))return;const b=document.createElement('button');b.id='awm-launcher';b.textContent='Trabalho';b.title='Gestão de tarefas e demandas';b.style.cssText='position:fixed;right:20px;bottom:86px;z-index:99980;border:0;border-radius:999px;padding:11px 16px;background:#242321;color:white;font-weight:700;box-shadow:0 4px 18px #0003;cursor:pointer';b.onclick=()=>window.AllamoWork.open();document.body.appendChild(b)};document.readyState==='loading'?document.addEventListener('DOMContentLoaded',add):add()})();</script>`;
 h=sync(h,start,end,launcher,'</body>');
 fs.writeFileSync(index,h);
-console.log('OK: Work Management sincronizado no Worker e UI.');
+console.log('OK: Work Management, Stage runtime e melhorias executivas sincronizados.');
