@@ -2,6 +2,7 @@ import fs from 'node:fs';
 const worker='public/_worker.js',index='public/index.html';
 const api=fs.readFileSync('src/work-management-api.js','utf8');
 const ui=fs.readFileSync('src/work-management-ui.js','utf8');
+const publicPublishedReportsApi=fs.readFileSync('src/public-published-reports-api.js','utf8');
 const reportListApi=fs.readFileSync('src/report-management-list-api.js','utf8');
 const reportClientApiGuard=fs.readFileSync('src/report-client-api-guard.js','utf8');
 const reportApi=fs.readFileSync('src/report-management-api.js','utf8');
@@ -35,6 +36,7 @@ const sync=(text,start,end,content,needle,indent='')=>{
 };
 let w=fs.readFileSync(worker,'utf8');
 w=sync(w,'  // BEGIN ALLAMO STAGE RUNTIME','  // END ALLAMO STAGE RUNTIME',stage,"  try {\n    // REPORT PÚBLICO",'  ');
+w=sync(w,'    // BEGIN ALLAMO PUBLIC PUBLISHED REPORTS','    // END ALLAMO PUBLIC PUBLISHED REPORTS',publicPublishedReportsApi,"    // REPORT PÚBLICO (sem login) — link aberto do cliente",'    ');
 w=sync(w,'    // BEGIN ALLAMO WORK MANAGEMENT','    // END ALLAMO WORK MANAGEMENT',api,"    if (path === 'projects' && request.method === 'GET')",'    ');
 w=sync(w,'    // BEGIN ALLAMO REPORT LIST','    // END ALLAMO REPORT LIST',reportListApi,"    if (path === 'projects' && request.method === 'GET')",'    ');
 w=sync(w,'    // BEGIN ALLAMO REPORT CLIENT GUARD','    // END ALLAMO REPORT CLIENT GUARD',reportClientApiGuard,"    if (path === 'projects' && request.method === 'GET')",'    ');
@@ -46,4 +48,4 @@ const start='<!-- BEGIN ALLAMO WORK MANAGEMENT UI -->',end='<!-- END ALLAMO WORK
 const runtime=`<script>\n${ui}\n</script>\n<script>\n${reportUi}\n</script>\n<script>\n${legacyReportAiUi}\n</script>\n<script>\n${legacyReportUiHotfix}\n</script>\n<script>\n${reportAiSimplifiedModal}\n</script>\n<script>\n${reportAdminNavigation}\n</script>\n<script>\n${clientPublishedReports}\n</script>\n<script>\n${releaseHistoryUi}\n</script>\n<script>\n${raciVisual}\n</script>\n<script>\n${responsiveUsability}\n</script>\n<script>\n${enhancements}\n</script>\n<script>\n${watchdog}\n</script>`;
 h=sync(h,start,end,runtime,'</body>');
 fs.writeFileSync(index,h);
-console.log('OK: Work Management, Central visual de Reports, publicação no painel da empresa, histórico de Viradas/Versões, RACI, responsividade e performance sincronizados.');
+console.log('OK: Work Management, Central visual de Reports, publicação autenticada/pública, histórico de Viradas/Versões, RACI, responsividade e performance sincronizados.');
