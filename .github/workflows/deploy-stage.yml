@@ -56,6 +56,7 @@ jobs:
       # IMPORTANTE: não executar D1 com --env production no pipeline de STAGE.
       # O bootstrap runtime usa exatamente o binding DB do projeto allamo-pmo-stage
       # e aplica schema/reset uma única vez, somente no hostname de homologação.
+      # Redeploy forçado após validação completa do pacote de homologação.
       - name: Deploy to Cloudflare Pages STAGE
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production
         env:
