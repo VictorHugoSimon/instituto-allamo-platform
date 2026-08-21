@@ -1,0 +1,25 @@
+name: Responsive Usability CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  responsive-usability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate persistence and report AI
+        run: npm run test:report-ai
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate responsive usability contracts
+        run: npm run test:ux
