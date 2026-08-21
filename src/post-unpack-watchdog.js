@@ -31,5 +31,5 @@
     const now=Date.now();if(executiveVisible()&&typeof window.AllamoRefreshExecutive==='function'&&(changed||now-lastExecRefresh>10000)){lastExecRefresh=now;window.AllamoRefreshExecutive()}
   }
   window.AllamoPostUnpackTick=tick;
-  setInterval(tick,750);setTimeout(tick,0);
+  setInterval(tick,2000);setTimeout(tick,0);
 })();
