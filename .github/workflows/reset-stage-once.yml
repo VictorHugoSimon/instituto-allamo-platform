@@ -1,12 +1,12 @@
 name: Reset controlado do STAGE
 
 on:
-  push:
-    branches: [develop]
-    paths:
-      - 'migrations/2026-08-21-reset-stage.sql'
-      - '.github/workflows/reset-stage-once.yml'
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite ZERAR_STAGE para confirmar o reset do ambiente de homologação'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   reset-stage:
+    if: ${{ inputs.confirm == 'ZERAR_STAGE' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
