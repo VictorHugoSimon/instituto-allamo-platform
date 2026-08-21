@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+const file='public/index.html';
+let html=fs.readFileSync(file,'utf8');
+const before=html;
+html=html.split('var quietSince=0,max=Date.now()+6000').join('var quietSince=0,max=Date.now()+1800');
+html=html.split('now-quietSince>=700').join('now-quietSince>=120');
+html=html.split('setTimeout(tick,75)').join('setTimeout(tick,30)');
+if(html===before) throw new Error('Marcadores de performance do boot não encontrados.');
+if(html.includes('Date.now()+6000')||html.includes('now-quietSince>=700')) throw new Error('Boot guard antigo ainda presente.');
+fs.writeFileSync(file,html);
+console.log('OK: boot guard otimizado (reveal rápido, sem espera artificial de 6s).');
