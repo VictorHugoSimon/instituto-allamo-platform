@@ -25,7 +25,7 @@ jobs:
         run: |
           node --check src/work-management-ui.js
           node --check src/portal-enhancements.js
-          node --check src/work-management-api.js
+          node -e "const fs=require('fs');const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;new AsyncFunction('request','DB','url','path','json','user','scope','logEvent','env',fs.readFileSync('src/work-management-api.js','utf8'));console.log('work management API fragment syntax ok')"
           node -e "const fs=require('fs');const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;new AsyncFunction('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment syntax ok')"
           node --check scripts/build-work-management.mjs
           node --check scripts/harden-portal-runtime.mjs
@@ -49,8 +49,9 @@ jobs:
           grep -q "display:none!important" public/index.html
           grep -q "\[loadData\] companies" public/index.html
           grep -Fq "this.companies[0] || { id:''" public/index.html
-          grep -Fq "{label:'Empresas', value:String(scopedCompanies.length)" public/index.html
+          grep -Fq "{label:'Empresas', value:String((this.companies||[]).filter" public/index.html
           if grep -q "{label:'Projetos', value:'7'" public/index.html; then echo "KPI Projetos ainda hardcoded"; exit 1; fi
+          if grep -q "{label:'Demandas', value:'259'" public/index.html; then echo "KPI Demandas ainda hardcoded"; exit 1; fi
           if grep -q "DVOLV está em Backlog" public/index.html; then echo "Achados demo ainda ativos"; exit 1; fi
           if grep -q "mantém dados embutidos" public/index.html; then echo "Fallback demo ainda ativo"; exit 1; fi
           grep -q "allamo-pmo-v2" public/sw.js
