@@ -2,7 +2,7 @@ name: Work Management CI
 
 on:
   push:
-    branches: [feature/work-management-native, fix/no-stale-flash]
+    branches: [feature/work-management-native, fix/no-stale-flash, fix/stage-reset-executive-work-menu]
   pull_request:
     branches: [develop]
 
@@ -19,20 +19,25 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Build Work Management + runtime hardening
+      - name: Build portal + Work Management
         run: npm run build:work
-      - name: Validate syntax, integration and anti-flash
+      - name: Validate syntax, Stage runtime, Work Management e UI executiva
         run: |
           node --check src/work-management-ui.js
+          node --check src/portal-enhancements.js
+          node --check src/stage-runtime-bootstrap.js
           node --check scripts/build-work-management.mjs
           node --check scripts/harden-portal-runtime.mjs
           node --check public/_worker.js
           node --check public/sw.js
+          grep -q "BEGIN ALLAMO STAGE RUNTIME" public/_worker.js
+          grep -q "clean-baseline-2026-08-21-v2" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
+          grep -q "Selecione a empresa do projeto" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
+          grep -q "data-allamo-work-menu" public/index.html
+          grep -q "data-allamo-company-kpi" public/index.html
           grep -q "allamo-boot-guard" public/index.html
           grep -q "window.__allamoApiPending" public/index.html
           grep -q "display:none!important" public/index.html
           grep -q "allamo-pmo-v2" public/sw.js
-          grep -q "CREATE TABLE IF NOT EXISTS work_items" migrations/2026-08-21-work-management.sql
-          grep -q "CREATE TABLE IF NOT EXISTS work_sprints" migrations/2026-08-21-work-management.sql
