@@ -1,8 +1,12 @@
 // STAGE runtime bootstrap — usa exatamente o D1 vinculado ao Pages STAGE.
 // Nunca executa em produção: hostname precisa conter allamo-pmo-stage.pages.dev.
+// MODO PERSISTENTE: deploy nunca apaga dados cadastrados.
 const STAGE_BUILD = 'awm-stage-20260821-1021';
 const stageHost = (url.hostname || '').toLowerCase();
 const isAllamoStage = stageHost === 'allamo-pmo-stage.pages.dev' || stageHost.endsWith('.allamo-pmo-stage.pages.dev');
+const DATA_PERSISTENCE_MODE = 'persistent';
+// Mantido apenas para rastreabilidade histórica/compatibilidade de release. NÃO é executado.
+const legacyResetKey = 'clean-baseline-2026-08-21-v4';
 
 const stageSafe = async (sql, ...args) => {
   try { await DB.prepare(sql).bind(...args).run(); return true; }
@@ -16,7 +20,7 @@ const stageCount = async (table) => {
 if (isAllamoStage) {
   await stageSafe("CREATE TABLE IF NOT EXISTS stage_runtime_flags (key TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')), detail TEXT)");
 
-  // Work Management nativo.
+  // Work Management nativo — apenas criação idempotente de estrutura, sem limpeza de dados.
   await stageSafe("CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, project TEXT, parent_id TEXT, sprint_id TEXT, item_type TEXT NOT NULL DEFAULT 'TASK', title TEXT NOT NULL, description TEXT DEFAULT '', acceptance_criteria TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'BACKLOG', priority TEXT NOT NULL DEFAULT 'Média', owner TEXT DEFAULT '', reporter TEXT DEFAULT '', start_date TEXT, due_date TEXT, story_points REAL, estimate_hours REAL, rank REAL NOT NULL DEFAULT 0, labels TEXT DEFAULT '[]', blocked INTEGER NOT NULL DEFAULT 0, blocked_reason TEXT DEFAULT '', created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), archived_at TEXT)");
   await stageSafe("CREATE TABLE IF NOT EXISTS work_sprints (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, name TEXT NOT NULL, goal TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'PLANEJADA', start_date TEXT, end_date TEXT, capacity_points REAL, capacity_hours REAL, created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), started_at TEXT, completed_at TEXT)");
   await stageSafe("CREATE TABLE IF NOT EXISTS work_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT NOT NULL, work_item_id TEXT NOT NULL, author TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT, deleted_at TEXT)");
@@ -27,7 +31,7 @@ if (isAllamoStage) {
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(company_id,status,rank)");
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_sprints_company_project ON work_sprints(company_id,project_id,status)");
 
-  // Reports, histórico e Roadmap devem existir ANTES do reset e do stage-health.
+  // Reports, histórico e Roadmap — somente criação idempotente de estrutura.
   await stageSafe("CREATE TABLE IF NOT EXISTS report_records (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, title TEXT NOT NULL, reference TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'RASCUNHO', executive_summary TEXT DEFAULT '', data_json TEXT DEFAULT '{}', created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), published_at TEXT, archived_at TEXT)");
   await stageSafe("CREATE TABLE IF NOT EXISTS report_versions (id INTEGER PRIMARY KEY AUTOINCREMENT, report_id TEXT NOT NULL, company_id TEXT NOT NULL, project_id INTEGER, version_no INTEGER NOT NULL, snapshot_json TEXT NOT NULL, change_note TEXT DEFAULT '', created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(report_id,version_no))");
   await stageSafe("CREATE TABLE IF NOT EXISTS report_roadmap_items (id TEXT PRIMARY KEY, report_id TEXT NOT NULL, company_id TEXT NOT NULL, project_id INTEGER, title TEXT NOT NULL, description TEXT DEFAULT '', responsible_party TEXT NOT NULL DEFAULT 'DEV', responsible_name TEXT DEFAULT '', external_party TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'PLANEJADO', start_date TEXT, due_date TEXT, progress INTEGER NOT NULL DEFAULT 0, work_item_id TEXT, rank REAL NOT NULL DEFAULT 0, created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), archived_at TEXT)");
@@ -37,27 +41,8 @@ if (isAllamoStage) {
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_roadmap_report ON report_roadmap_items(report_id,archived_at,rank)");
   await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_roadmap_work ON report_roadmap_items(work_item_id,archived_at)");
 
-  // Baseline limpo solicitado para homologação. v4 inclui Work + Reports/Roadmap.
-  const resetKey = 'clean-baseline-2026-08-21-v4';
-  let resetApplied = null;
-  try { resetApplied = await DB.prepare('SELECT key FROM stage_runtime_flags WHERE key=?').bind(resetKey).first(); } catch (e) {}
-  if (!resetApplied) {
-    const tables = [
-      'report_roadmap_items','report_versions','report_records','project_reports_p','project_updates',
-      'work_comments','work_checklist','work_links','work_events','work_items','work_sprints',
-      'plan_items','issues','gmud','releases','documents','notifications','project_reports','report_snapshots','projects',
-      'horas_import','sync_state','email_outbox'
-    ];
-    for (const t of tables) await stageSafe('DELETE FROM ' + t);
-    // Preserva somente contas internas e remove qualquer vínculo com cliente.
-    await stageSafe("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE company_id IS NOT NULL OR role IN ('gestor','usuario'))");
-    await stageSafe("DELETE FROM users WHERE company_id IS NOT NULL OR role IN ('gestor','usuario')");
-    await stageSafe("UPDATE users SET company_id=NULL WHERE role IN ('admin','pmo','techlead')");
-    await stageSafe('DELETE FROM companies');
-    await stageSafe('DELETE FROM audit_log');
-    await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES (?,datetime('now'),?)", resetKey, 'Stage v4 zerado: carteira, Work Management, Reports, histórico e Roadmap; produção não afetada');
-    console.log('[stage-bootstrap] baseline v4 limpo aplicado ao D1 do Stage');
-  }
+  // IMPORTANTE: o antigo baseline v4 foi desativado. Nenhum DELETE/reset acontece no deploy.
+  await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES (?,datetime('now'),?)", 'data-persistence-enabled', 'Deploy persistente: nenhum reset automático; chave histórica '+legacyResetKey+' desativada');
 
   // Health-check público APENAS no hostname de homologação.
   if (path === 'stage-health' && request.method === 'GET') {
@@ -66,6 +51,8 @@ if (isAllamoStage) {
       environment: 'stage',
       build: STAGE_BUILD,
       host: stageHost,
+      data_persistence: DATA_PERSISTENCE_MODE,
+      reset_disabled: true,
       counts: {
         companies: await stageCount('companies'),
         projects: await stageCount('projects'),
@@ -77,7 +64,8 @@ if (isAllamoStage) {
         report_versions: await stageCount('report_versions'),
         report_roadmap_items: await stageCount('report_roadmap_items')
       },
-      reset_key: resetKey
+      reset_key: null,
+      legacy_reset_key: legacyResetKey
     });
   }
 }
