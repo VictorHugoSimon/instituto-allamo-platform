@@ -62,7 +62,10 @@ if (isAllamoStage) {
         issues: await stageCount('issues'),
         work_items: await stageCount('work_items'),
         work_sprints: await stageCount('work_sprints'),
-        plan_items: await stageCount('plan_items')
+        plan_items: await stageCount('plan_items'),
+        report_records: await stageCount('report_records'),
+        report_versions: await stageCount('report_versions'),
+        report_roadmap_items: await stageCount('report_roadmap_items')
       },
       reset_key: resetKey
     });

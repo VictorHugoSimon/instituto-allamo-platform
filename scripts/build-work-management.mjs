@@ -5,7 +5,12 @@ const ui=fs.readFileSync('src/work-management-ui.js','utf8');
 const reportListApi=fs.readFileSync('src/report-management-list-api.js','utf8');
 const reportApi=fs.readFileSync('src/report-management-api.js','utf8');
 const reportUi=fs.readFileSync('src/report-management-ui.js','utf8');
-const stage=fs.readFileSync('src/stage-runtime-bootstrap.js','utf8')+'\n'+fs.readFileSync('src/report-schema-bootstrap.js','utf8');
+const stageBase=fs.readFileSync('src/stage-runtime-bootstrap.js','utf8');
+const reportSchema=fs.readFileSync('src/report-schema-bootstrap.js','utf8');
+const stageHealthNeedle='  // Health-check público APENAS no hostname de homologação.';
+if(!stageBase.includes(stageHealthNeedle)) throw new Error('Ponto do health-check de Stage não encontrado.');
+// O schema de Reports precisa existir antes de /api/stage-health responder.
+const stage=stageBase.replace(stageHealthNeedle,reportSchema+'\n\n'+stageHealthNeedle);
 const enhancements=fs.readFileSync('src/portal-enhancements.js','utf8');
 const sync=(text,start,end,content,needle,indent='')=>{
  const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
