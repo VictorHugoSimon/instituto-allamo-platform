@@ -10,7 +10,10 @@ const clientApi=fs.readFileSync('src/report-client-api-guard.js','utf8');
 const publicApi=fs.readFileSync('src/public-published-reports-api.js','utf8');
 const build=fs.readFileSync('scripts/build-work-management.mjs','utf8');
 const index=fs.readFileSync('public/index.html','utf8');
-new Function(responsive);new Function(admin);new Function(raci);new Function(watchdog);new Function(clientReports);new Function(releases);new Function(feedback);new Function(clientApi);new Function(publicApi);
+new Function(responsive);new Function(admin);new Function(raci);new Function(watchdog);new Function(clientReports);new Function(releases);new Function(feedback);
+// Os arquivos API são fragmentos injetados dentro de handleApi (async), não scripts standalone.
+new Function('return async function(){'+clientApi+'}');
+new Function('return async function(){'+publicApi+'}');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
 for(const [n,l] of [
   ['width=device-width','viewport responsivo'],['100dvh','altura móvel segura'],['allamo-report-editor','editor de report responsivo'],['allamo-responsive-modal-box','modal responsivo'],['overflow-x:auto','scroll horizontal controlado'],['@media(max-width:767px)','breakpoint mobile'],['@media(max-width:1023px)','breakpoint tablet'],['removeFloatingLaunchers','remoção defensiva dos launchers'],['allamo-raci-r','cor R'],['allamo-raci-a','cor A'],['allamo-raci-c','cor C'],['allamo-raci-i','cor I'],['#awm','Work Management responsivo'],['#arm','Central de Reports responsiva']
