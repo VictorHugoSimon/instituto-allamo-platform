@@ -4,14 +4,18 @@ const stage = fs.readFileSync('src/stage-runtime-bootstrap.js','utf8');
 const reportSchema = fs.readFileSync('src/report-schema-bootstrap.js','utf8');
 const resetMigration = fs.readFileSync('migrations/2026-08-21-reset-stage.sql','utf8');
 const reportAiMigration = fs.readFileSync('migrations/2026-08-21-report-ai-dynamic.sql','utf8');
+const dynamicTenantMigration = fs.readFileSync('migrations/2026-08-21-dynamic-tenant-storage.sql','utf8');
+const milestoneMigration = fs.readFileSync('migrations/2026-08-21-milestone-evidence.sql','utf8');
 
-// Procura comandos destrutivos em qualquer posição, inclusive dentro de stageSafe("...")/strings JS.
+// Procura comandos SQL destrutivos em qualquer posição, inclusive dentro de strings JS.
 const destructive = /\b(DELETE\s+FROM|DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE(?:\s+TABLE)?)\b/i;
 for (const [name,content] of [
   ['bootstrap de Stage',stage],
   ['bootstrap de Reports',reportSchema],
   ['migration legada de reset',resetMigration],
-  ['migration Reports IA',reportAiMigration]
+  ['migration Reports IA',reportAiMigration],
+  ['migration campos/arquivos multitenant',dynamicTenantMigration],
+  ['migration marcos/evidências',milestoneMigration]
 ]) {
   if (destructive.test(content)) throw new Error(`Falha de governança: ${name} contém SQL destrutivo. Deploy deve preservar dados.`);
 }
@@ -30,5 +34,11 @@ if (!reportSchema.includes('MODO PERSISTENTE')) {
 if (!reportAiMigration.includes('CREATE-ONLY')) {
   throw new Error('Migration de Reports IA precisa permanecer explicitamente create-only.');
 }
+if (!dynamicTenantMigration.includes('somente aditiva')) {
+  throw new Error('Migration multitenant deve permanecer explicitamente aditiva.');
+}
+if (!reportSchema.includes('tenant_field_definitions') || !reportSchema.includes('tenant_files')) {
+  throw new Error('Schema persistente não contempla campos dinâmicos/arquivos multitenant.');
+}
 
-console.log('OK: política de persistência cobre Stage, Reports, histórico IA e migrations; nenhum reset automático ou SQL destrutivo permitido.');
+console.log('OK: política de persistência cobre Stage, Reports, IA, campos dinâmicos, arquivos e marcos; nenhum reset automático ou SQL destrutivo permitido.');
