@@ -24,7 +24,7 @@ jobs:
           grep -q "AllamoPostUnpackTick" public/index.html
           grep -q "data-allamo-work-menu" public/index.html
           grep -q "data-allamo-reports-menu" public/index.html
-          grep -q "setInterval(tick,750)" public/index.html
+          grep -q "setInterval(tick,2000)" public/index.html
           grep -q "AllamoRefreshExecutive" public/index.html
           if grep -q "DVOLV está em Backlog" public/index.html; then exit 1; fi
           if grep -q "{label:'Projetos', value:'7'" public/index.html; then exit 1; fi
