@@ -2,6 +2,7 @@ import fs from 'node:fs';
 const worker='public/_worker.js',index='public/index.html';
 const api=fs.readFileSync('src/work-management-api.js','utf8');
 const ui=fs.readFileSync('src/work-management-ui.js','utf8');
+const reportListApi=fs.readFileSync('src/report-management-list-api.js','utf8');
 const reportApi=fs.readFileSync('src/report-management-api.js','utf8');
 const reportUi=fs.readFileSync('src/report-management-ui.js','utf8');
 const stage=fs.readFileSync('src/stage-runtime-bootstrap.js','utf8')+'\n'+fs.readFileSync('src/report-schema-bootstrap.js','utf8');
@@ -19,6 +20,7 @@ const sync=(text,start,end,content,needle,indent='')=>{
 let w=fs.readFileSync(worker,'utf8');
 w=sync(w,'  // BEGIN ALLAMO STAGE RUNTIME','  // END ALLAMO STAGE RUNTIME',stage,"  try {\n    // REPORT PÚBLICO",'  ');
 w=sync(w,'    // BEGIN ALLAMO WORK MANAGEMENT','    // END ALLAMO WORK MANAGEMENT',api,"    if (path === 'projects' && request.method === 'GET')",'    ');
+w=sync(w,'    // BEGIN ALLAMO REPORT LIST','    // END ALLAMO REPORT LIST',reportListApi,"    if (path === 'projects' && request.method === 'GET')",'    ');
 w=sync(w,'    // BEGIN ALLAMO REPORT MANAGEMENT','    // END ALLAMO REPORT MANAGEMENT',reportApi,"    if (path === 'projects' && request.method === 'GET')",'    ');
 fs.writeFileSync(worker,w);
 let h=fs.readFileSync(index,'utf8');
