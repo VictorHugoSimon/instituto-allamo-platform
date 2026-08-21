@@ -1,0 +1,28 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(p,'utf8');
+const runtime=read('src/data-freshness-runtime.js');
+const worker=read('public/_worker.js');
+const sw=read('public/sw.js');
+const index=read('public/index.html');
+const pkg=JSON.parse(read('package.json'));
+const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+
+must(runtime,"cache:'no-store'",'Fetch de API usa no-store');
+must(runtime,"credentials:'same-origin'",'Credenciais same-origin preservadas');
+must(runtime,"e.key==='allamo_session'",'Mudança de sessão entre abas invalida contexto');
+must(runtime,"e.persisted",'BFCache é revalidado');
+must(runtime,"visibility",'Retorno à aba revalida dados');
+must(runtime,"allamo:context-changed",'Mudança empresa/projeto emite invalidação');
+must(runtime,"getRegistration().then(r=>r?.update())",'Service Worker procura atualização');
+must(worker,"'cache-control':'no-store, no-cache, must-revalidate, max-age=0'",'APIs respondem no-store');
+must(worker,"request.mode === 'navigate'",'HTML recebe política no-store');
+must(worker,"url.pathname === '/sw.js'",'SW recebe revalidação');
+must(sw,"u.pathname.startsWith('/api/')",'SW nunca cacheia API');
+must(sw,"e.request.mode==='navigate'",'SW nunca cacheia navegação HTML');
+must(sw,"cache:'no-store'",'SW força rede para dados sensíveis');
+must(sw,"cache:'no-cache'",'Assets revalidam na rede');
+must(index,'__allamoDataFreshnessLoaded','Runtime de freshness está no artefato final');
+must(index,'__allamoBootGuardStarted','Boot guard final auto-inicia');
+must(index,'allamo-boot-retry','Falha de conectividade permite retry');
+if(!String(pkg.scripts['build:work']).includes('harden-portal-runtime.mjs && node scripts/enforce-live-first-paint.mjs && node scripts/harden-data-freshness.mjs'))throw new Error('Ordem do build pode reintroduzir boot guard/cache antigo.');
+console.log('OK: cache, sessão, BFCache, Service Worker, APIs e contexto multiempresa são revalidados sem reutilizar dados antigos.');
