@@ -1,6 +1,6 @@
 // STAGE runtime bootstrap — usa exatamente o D1 vinculado ao Pages STAGE.
 // Nunca executa em produção: hostname precisa conter allamo-pmo-stage.pages.dev.
-const STAGE_BUILD = 'awm-stage-20260820-2227';
+const STAGE_BUILD = 'awm-stage-20260820-2245';
 const stageHost = (url.hostname || '').toLowerCase();
 const isAllamoStage = stageHost === 'allamo-pmo-stage.pages.dev' || stageHost.endsWith('.allamo-pmo-stage.pages.dev');
 
