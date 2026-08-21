@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const api=fs.readFileSync('src/legacy-report-ai-api.js','utf8');
 const cloudflare=fs.readFileSync('src/legacy-report-ai-cloudflare.js','utf8');
 const ui=fs.readFileSync('src/legacy-report-ai-ui.js','utf8');
+const uiHotfix=fs.readFileSync('src/legacy-report-ui-hotfix.js','utf8');
 const build=fs.readFileSync('scripts/build-work-management.mjs','utf8');
 const schema=fs.readFileSync('src/report-schema-bootstrap.js','utf8');
 const migration=fs.readFileSync('migrations/2026-08-21-report-ai-dynamic.sql','utf8');
@@ -11,6 +12,7 @@ const migration=fs.readFileSync('migrations/2026-08-21-report-ai-dynamic.sql','u
 new Function(`return async function __reportAiCloudflareSyntax(){${cloudflare}\n}`)();
 new Function(`return async function __reportAiApiSyntax(){${api}\n}`)();
 new Function(ui);
+new Function(uiHotfix);
 
 const must=(content,needle,label)=>{if(!content.includes(needle))throw new Error(`Ausente: ${label} (${needle})`)};
 for(const [needle,label] of [
@@ -45,12 +47,20 @@ for(const [needle,label] of [
   ['hidden_standard_fields','campos padrão opcionais'],
   ['ai_audit','rastreabilidade']
 ]) must(ui,needle,label);
-for(const needle of ['legacy-report-ai-cloudflare.js','legacy-report-ai-api.js','legacy-report-ai-ui.js','BEGIN ALLAMO LEGACY REPORT AI']) must(build,needle,'injeção no build');
+for(const [needle,label] of [
+  ['Assistente de Status Report','título intuitivo'],
+  ['Atualizar Report com IA','ação principal clara'],
+  ['1 · Reunião','fluxo guiado'],
+  ["document.addEventListener('click',capture,true)",'captura de cliques pós-unpack'],
+  ['ensureStyle()','restauração visual pós-unpack'],
+  ['Gerar rascunho do Report','CTA intuitivo']
+]) must(uiHotfix,needle,label);
+for(const needle of ['legacy-report-ai-cloudflare.js','legacy-report-ai-api.js','legacy-report-ai-ui.js','legacy-report-ui-hotfix.js','BEGIN ALLAMO LEGACY REPORT AI']) must(build,needle,'injeção no build');
 
-if(ui.includes('OPENAI_API_KEY'))throw new Error('Segredo não pode aparecer no frontend.');
+if(ui.includes('OPENAI_API_KEY')||uiHotfix.includes('OPENAI_API_KEY'))throw new Error('Segredo não pode aparecer no frontend.');
 const destructive=/^\s*(DELETE\s+FROM|DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE\b)/im;
 if(destructive.test(schema)||destructive.test(migration))throw new Error('Reports IA contém SQL destrutivo.');
 if(!migration.includes('CREATE-ONLY'))throw new Error('Migration precisa continuar declarada create-only.');
 if(!api.includes('approval_required:true')||!cloudflare.includes('approval_required:true'))throw new Error('Todos os provedores devem declarar aprovação humana obrigatória.');
 
-console.log('OK: Reports dinâmicos + Copiloto PMO IA validados com Cloudflare Workers AI gratuito e OpenAI opcional.');
+console.log('OK: Reports dinâmicos + Copiloto PMO IA intuitivo validados; cliques pós-unpack, histórico, Cloudflare gratuito e OpenAI opcional ativos.');
