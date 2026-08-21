@@ -20,7 +20,9 @@ must(series,"String(project.company_id)!==String(s.company_id)",'Série valida p
 must(series,"WHERE company_id=? AND project_id=? ORDER BY phase_rank,milestone_rank",'Snapshot busca detalhes somente no projeto correto');
 must(series,"WHERE company_id=? AND project_id=? AND archived_at IS NULL",'Snapshot busca anexos somente no projeto correto');
 must(api,"String(p.company_id)!==String(companyId)",'Evidência valida projeto dentro da empresa');
-must(api,"key=`${company}/${project}/${id}/${safeName}`",'R2 usa namespace empresa/projeto');
+must(api,"key=`${company}/${project}/MILESTONE/${id}/${safeName}`",'R2 usa namespace empresa/projeto/marco');
+must(api,'INSERT INTO tenant_files','Arquivo de marco entra no catálogo multitenant');
+forbid(api,/DOCS\.delete\s*\(/,'Arquivamento de marco não apaga R2');
 must(pub,"id=? AND company_id=? AND client_visible=1",'Arquivo público exige empresa e visibilidade');
 must(pub,"String(p.company_id)!==String(company)",'Arquivo público revalida projeto/empresa');
 must(pubReports,"id=? AND company_id=? AND status='PUBLICADO'",'Report público exige empresa e publicado');
@@ -29,9 +31,10 @@ must(pubReports,"f?.client_visible!==false",'API pública remove campos internos
 must(pubReports,"data.client=company.name",'API pública força identidade real da empresa');
 must(ctxGuard,"data.client=co.name",'Contexto público força identidade da empresa');
 must(ui,'Marcos, entregáveis & evidências','Editor de marcos presente');
-must(ui,'Editar detalhes','Subdescrição/detalhes presentes');
+must(ui,'✎ Descrição / subdescrição','Descrição/subdescrição presente dentro das fases');
 must(ui,'＋ Link','Anexo de link presente');
-must(ui,'📎 Arquivo','Upload de arquivo presente');
+must(ui,'📎 Anexar arquivo','Upload de arquivo presente');
+must(ui,'data-me-inline','Controles de evidência ficam na visualização das fases');
 must(viewer,"function publicMode(){return !!new URLSearchParams(location.search).get('cliente')}",'Viewer força modo público pela URL');
 must(viewer,'Exportar / PDF','Exportação disponível');
 must(viewer,'_milestone_evidence','Viewer usa snapshot de evidências');
@@ -41,4 +44,4 @@ must(worker,'BEGIN ALLAMO MILESTONE EVIDENCE','API de evidências no worker fina
 must(worker,'BEGIN ALLAMO PUBLIC MILESTONE ASSETS','API pública isolada no worker final');
 must(index,'Marcos, entregáveis & evidências','UI de evidências no artefato final');
 must(index,'FLUXO DE REPORTS','Fluxo de Reports no artefato final');
-console.log('OK: isolamento empresa/projeto, sanitização pública, marcos, links/arquivos, snapshots recorrentes, exportação e fluxo de Reports validados.');
+console.log('OK: isolamento empresa/projeto, sanitização pública, marcos inline, links/arquivos arquiváveis, snapshots recorrentes, exportação e fluxo de Reports validados.');
