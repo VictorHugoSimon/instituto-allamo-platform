@@ -41,10 +41,13 @@ if(path==='project-milestone-assets/upload'&&request.method==='POST'){
   if(!meWrite)return json({error:'Sem permissão'},403);if(!env.DOCS)return json({error:'Armazenamento de arquivos ainda não configurado. Configure o binding R2 DOCS; links já podem ser usados.'},503);
   const form=await request.formData();const company=form.get('company_id'),project=form.get('project_id');const ctx=await meContext(company,project);if(ctx.error)return json({error:ctx.error},ctx.status);
   const file=form.get('file');if(!file||typeof file.arrayBuffer!=='function')return json({error:'Selecione um arquivo'},400);const max=20*1024*1024;if(Number(file.size||0)>max)return json({error:'Arquivo excede 20 MB'},413);
-  const id=meNew('MEA'),safeName=String(file.name||'arquivo').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-160),key=`${company}/${project}/${id}/${safeName}`;
-  await env.DOCS.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type||'application/octet-stream'},customMetadata:{company_id:String(company),project_id:String(project),asset_id:id}});
+  const id=meNew('MEA'),safeName=String(file.name||'arquivo').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-160),key=`${company}/${project}/MILESTONE/${id}/${safeName}`;
+  const milestoneKey=meSafe(form.get('milestone_key'),180),phaseKey=meSafe(form.get('phase_key'),180),title=meSafe(form.get('title')||file.name,500),description=meSafe(form.get('description'),5000),visible=String(form.get('client_visible')||'1')==='0'?0:1;
+  await env.DOCS.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type||'application/octet-stream'},customMetadata:{company_id:String(company),project_id:String(project),asset_id:id,entity_type:'MILESTONE',entity_id:milestoneKey}});
   await DB.prepare('INSERT INTO project_milestone_assets(id,company_id,project_id,phase_key,milestone_key,phase_title,milestone_title,asset_type,title,description,object_key,file_name,mime_type,size_bytes,client_visible,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .bind(id,company,project,meSafe(form.get('phase_key'),180),meSafe(form.get('milestone_key'),180),meSafe(form.get('phase_title'),500),meSafe(form.get('milestone_title'),500),'FILE',meSafe(form.get('title')||file.name,500),meSafe(form.get('description'),5000),key,meSafe(file.name,500),meSafe(file.type,200),Number(file.size||0),String(form.get('client_visible')||'1')==='0'?0:1,user.name).run();
+    .bind(id,company,project,phaseKey,milestoneKey,meSafe(form.get('phase_title'),500),meSafe(form.get('milestone_title'),500),'FILE',title,description,key,meSafe(file.name,500),meSafe(file.type,200),Number(file.size||0),visible,user.name).run();
+  await DB.prepare('INSERT INTO tenant_files(id,company_id,project_id,entity_type,entity_id,category,title,description,object_key,file_name,mime_type,size_bytes,version_no,client_visible,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(id,company,project,'MILESTONE',milestoneKey,'MARCO',title,description,key,meSafe(file.name,500),meSafe(file.type,200),Number(file.size||0),1,visible,'ACTIVE',user.name).run();
   await logEvent(env,user,'marco:arquivo',id,meSafe(file.name,500));return json({ok:true,id,file_name:file.name},201);
 }
 
@@ -58,5 +61,8 @@ if(path.match(/^public-milestone-assets\/[^/]+\/content$/)&&request.method==='GE
 }
 
 if(path.match(/^project-milestone-assets\/[^/]+$/)&&request.method==='DELETE'){
-  if(!meWrite)return json({error:'Sem permissão'},403);const id=decodeURIComponent(path.split('/')[1]),a=await meAsset(id);if(!a)return json({error:'Item não encontrado'},404);if(!meScope(a.company_id))return json({error:'Fora do escopo'},403);const ctx=await meContext(a.company_id,a.project_id);if(ctx.error)return json({error:ctx.error},ctx.status);await DB.prepare("UPDATE project_milestone_assets SET archived_at=datetime('now') WHERE id=?").bind(id).run();if(a.object_key&&env.DOCS)try{await env.DOCS.delete(a.object_key)}catch(_){}await logEvent(env,user,'marco:evidencia-remover',id,a.title||a.file_name||'');return json({ok:true});
+  if(!meWrite)return json({error:'Sem permissão'},403);const id=decodeURIComponent(path.split('/')[1]),a=await meAsset(id);if(!a)return json({error:'Item não encontrado'},404);if(!meScope(a.company_id))return json({error:'Fora do escopo'},403);const ctx=await meContext(a.company_id,a.project_id);if(ctx.error)return json({error:ctx.error},ctx.status);
+  // Exclusão funcional = arquivamento. O objeto R2 é preservado para histórico/auditoria.
+  await DB.prepare("UPDATE project_milestone_assets SET archived_at=datetime('now') WHERE id=?").bind(id).run();if(a.asset_type==='FILE')try{await DB.prepare("UPDATE tenant_files SET status='ARCHIVED',archived_at=COALESCE(archived_at,datetime('now')) WHERE id=?").bind(id).run()}catch(_){}
+  await logEvent(env,user,'marco:evidencia-arquivar',id,a.title||a.file_name||'');return json({ok:true,archived:true});
 }
