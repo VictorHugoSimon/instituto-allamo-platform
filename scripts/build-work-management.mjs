@@ -15,6 +15,7 @@ const reportAiSimplifiedModal=fs.readFileSync('src/report-ai-simplified-modal.js
 const reportAdminNavigation=fs.readFileSync('src/report-admin-navigation.js','utf8');
 const clientPublishedReports=fs.readFileSync('src/client-published-reports.js','utf8');
 const releaseHistoryUi=fs.readFileSync('src/release-history-ui.js','utf8');
+const interactionFeedback=fs.readFileSync('src/interaction-feedback.js','utf8');
 const raciVisual=fs.readFileSync('src/raci-visual.js','utf8');
 const responsiveUsability=fs.readFileSync('src/responsive-usability.js','utf8');
 const stageBase=fs.readFileSync('src/stage-runtime-bootstrap.js','utf8');
@@ -45,7 +46,7 @@ w=sync(w,'    // BEGIN ALLAMO LEGACY REPORT AI','    // END ALLAMO LEGACY REPORT
 fs.writeFileSync(worker,w);
 let h=fs.readFileSync(index,'utf8');
 const start='<!-- BEGIN ALLAMO WORK MANAGEMENT UI -->',end='<!-- END ALLAMO WORK MANAGEMENT UI -->';
-const runtime=`<script>\n${ui}\n</script>\n<script>\n${reportUi}\n</script>\n<script>\n${legacyReportAiUi}\n</script>\n<script>\n${legacyReportUiHotfix}\n</script>\n<script>\n${reportAiSimplifiedModal}\n</script>\n<script>\n${reportAdminNavigation}\n</script>\n<script>\n${clientPublishedReports}\n</script>\n<script>\n${releaseHistoryUi}\n</script>\n<script>\n${raciVisual}\n</script>\n<script>\n${responsiveUsability}\n</script>\n<script>\n${enhancements}\n</script>\n<script>\n${watchdog}\n</script>`;
+const runtime=`<script>\n${ui}\n</script>\n<script>\n${reportUi}\n</script>\n<script>\n${legacyReportAiUi}\n</script>\n<script>\n${legacyReportUiHotfix}\n</script>\n<script>\n${reportAiSimplifiedModal}\n</script>\n<script>\n${reportAdminNavigation}\n</script>\n<script>\n${clientPublishedReports}\n</script>\n<script>\n${releaseHistoryUi}\n</script>\n<script>\n${interactionFeedback}\n</script>\n<script>\n${raciVisual}\n</script>\n<script>\n${responsiveUsability}\n</script>\n<script>\n${enhancements}\n</script>\n<script>\n${watchdog}\n</script>`;
 h=sync(h,start,end,runtime,'</body>');
 fs.writeFileSync(index,h);
-console.log('OK: Work Management, Central visual de Reports, publicação autenticada/pública, histórico de Viradas/Versões, RACI, responsividade e performance sincronizados.');
+console.log('OK: Work Management, Central visual de Reports, publicação autenticada/pública, histórico de Viradas/Versões, feedback de ações, RACI, responsividade e performance sincronizados.');
