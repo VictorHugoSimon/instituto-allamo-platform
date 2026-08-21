@@ -6,10 +6,14 @@ on:
     paths:
       - 'public/**'
       - 'src/work-management-*.js'
+      - 'src/report-*.js'
       - 'src/stage-runtime-bootstrap.js'
       - 'src/portal-enhancements.js'
       - 'scripts/build-work-management.mjs'
       - 'scripts/harden-portal-runtime.mjs'
+      - 'scripts/zero-static-executive-chart.mjs'
+      - 'scripts/optimize-portal-performance.mjs'
+      - 'migrations/2026-08-21-report-history-roadmap.sql'
       - 'package.json'
       - 'package-lock.json'
       - 'wrangler.toml'
@@ -29,34 +33,33 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Build portal + Work Management
+      - name: Build portal + módulos nativos
         run: npm run build:work
-
       - name: Validate generated portal
         run: |
           node --check public/_worker.js
           node --check public/sw.js
           grep -q "BEGIN ALLAMO STAGE RUNTIME" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
+          grep -q "BEGIN ALLAMO REPORT MANAGEMENT" public/_worker.js
+          grep -q "report_records" public/_worker.js
+          grep -q "report_roadmap_items" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
           grep -q "data-allamo-work-menu" public/index.html
-          grep -q "data-allamo-company-kpi" public/index.html
-          grep -q "allamo-boot-guard" public/index.html
+          grep -q "data-allamo-reports-menu" public/index.html
+          grep -q "Reports & Roadmap" public/index.html
+          grep -q "Date.now()+1800" public/index.html
+          if grep -q "Date.now()+6000" public/index.html; then exit 1; fi
 
-      # IMPORTANTE: não executar D1 com --env production no pipeline de STAGE.
-      # O bootstrap runtime usa exatamente o binding DB do projeto allamo-pmo-stage
-      # e aplica schema/reset uma única vez, somente no hostname de homologação.
-      # Redeploy forçado após validação completa do pacote de homologação.
+      # Nunca usar --env production no Stage.
+      # O runtime do Stage cria as tabelas nativas no DB realmente vinculado ao projeto Stage.
       - name: Deploy to Cloudflare Pages STAGE
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production
         env:
