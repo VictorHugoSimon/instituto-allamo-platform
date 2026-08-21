@@ -19,6 +19,7 @@ const reportAdminNavigation=fs.readFileSync('src/report-admin-navigation.js','ut
 const richReportViewer=fs.readFileSync('src/rich-report-viewer.js','utf8');
 const richReportEvidenceExtension=fs.readFileSync('src/rich-report-evidence-extension.js','utf8');
 const milestoneEvidenceUi=fs.readFileSync('src/project-milestone-evidence-ui.js','utf8');
+const milestoneFileOpen=fs.readFileSync('src/milestone-file-open.js','utf8');
 const clientPublishedReports=fs.readFileSync('src/client-published-reports.js','utf8');
 const reportSeriesUi=fs.readFileSync('src/report-series-ui.js','utf8');
 const releaseHistoryUi=fs.readFileSync('src/release-history-ui.js','utf8');
@@ -56,7 +57,7 @@ w=sync(w,'    // BEGIN ALLAMO LEGACY REPORT AI','    // END ALLAMO LEGACY REPORT
 fs.writeFileSync(worker,w);
 let h=fs.readFileSync(index,'utf8');
 const start='<!-- BEGIN ALLAMO WORK MANAGEMENT UI -->',end='<!-- END ALLAMO WORK MANAGEMENT UI -->';
-const runtime=`<script>\n${ui}\n</script>\n<script>\n${reportUi}\n</script>\n<script>\n${legacyReportAiUi}\n</script>\n<script>\n${legacyReportUiHotfix}\n</script>\n<script>\n${reportAiSimplifiedModal}\n</script>\n<script>\n${reportAdminNavigation}\n</script>\n<script>\n${richReportViewer}\n</script>\n<script>\n${richReportEvidenceExtension}\n</script>\n<script>\n${milestoneEvidenceUi}\n</script>\n<script>\n${clientPublishedReports}\n</script>\n<script>\n${reportSeriesUi}\n</script>\n<script>\n${releaseHistoryUi}\n</script>\n<script>\n${interactionFeedback}\n</script>\n<script>\n${raciVisual}\n</script>\n<script>\n${responsiveUsability}\n</script>\n<script>\n${enhancements}\n</script>\n<script>\n${watchdog}\n</script>`;
+const runtime=`<script>\n${ui}\n</script>\n<script>\n${reportUi}\n</script>\n<script>\n${legacyReportAiUi}\n</script>\n<script>\n${legacyReportUiHotfix}\n</script>\n<script>\n${reportAiSimplifiedModal}\n</script>\n<script>\n${reportAdminNavigation}\n</script>\n<script>\n${richReportViewer}\n</script>\n<script>\n${richReportEvidenceExtension}\n</script>\n<script>\n${milestoneEvidenceUi}\n</script>\n<script>\n${milestoneFileOpen}\n</script>\n<script>\n${clientPublishedReports}\n</script>\n<script>\n${reportSeriesUi}\n</script>\n<script>\n${releaseHistoryUi}\n</script>\n<script>\n${interactionFeedback}\n</script>\n<script>\n${raciVisual}\n</script>\n<script>\n${responsiveUsability}\n</script>\n<script>\n${enhancements}\n</script>\n<script>\n${watchdog}\n</script>`;
 h=sync(h,start,end,runtime,'</body>');
 fs.writeFileSync(index,h);
 console.log('OK: Work Management, isolamento multiempresa, séries recorrentes, marcos/evidências, exportação, IA, publicação, RACI, responsividade e performance sincronizados.');
