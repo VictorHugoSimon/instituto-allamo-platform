@@ -21,6 +21,14 @@
     item.insertAdjacentElement('afterend',clone);
   }
 
+  function selectedCompanyId(){
+    const selects=Array.from(document.querySelectorAll('select'));
+    const s=selects.find(el=>Array.from(el.options||[]).some(o=>/todas as empresas/i.test(o.textContent||'')));
+    if(!s)return 'all';
+    const v=String(s.value||'').trim();
+    return !v||v==='all'?'all':v;
+  }
+
   function setCard(label,value,note){
     const labels=exact(label).filter(e=>{const r=e.getBoundingClientRect();return r.left>250&&r.top>130&&r.top<560});
     const l=labels[0];if(!l)return;
@@ -37,14 +45,55 @@
     const h=Array.from(document.querySelectorAll('h2')).find(e=>e.textContent.trim()==='Distribuição do portfólio');if(!h)return;
     const panel=h.parentElement;if(!panel)return;
     const counts={started:0,backlog:0,completed:0,canceled:0};
-    projects.forEach(p=>{const b=String(p.badge||'').toLowerCase(),s=String(p.status||'').toLowerCase();if(b==='started'||s==='em andamento')counts.started++;else if(b==='completed'||s==='completo')counts.completed++;else if(b==='canceled'||s==='cancelado')counts.canceled++;else counts.backlog++});
+    projects.forEach(p=>{
+      const b=String(p.badge||'').toLowerCase(),s=String(p.status||'').toLowerCase();
+      if(b==='started'||s==='em andamento')counts.started++;
+      else if(b==='completed'||s==='completo'||s==='concluído'||s==='concluido')counts.completed++;
+      else if(b==='canceled'||s==='cancelado')counts.canceled++;
+      else counts.backlog++;
+    });
     const total=projects.length;
-    const center=Array.from(panel.querySelectorAll('div')).find(d=>d.querySelector('span')&&/projetos/i.test(d.textContent)&&/^\s*\d+/.test(d.textContent.trim()));
-    if(center){const text=Array.from(center.childNodes).find(n=>n.nodeType===3);if(text)text.nodeValue=String(total);const sp=center.querySelector('span');if(sp)sp.textContent='projetos'}
-    const donut=Array.from(panel.querySelectorAll('div')).find(d=>(d.style.borderRadius==='50%'||getComputedStyle(d).borderRadius==='50%')&&d.style.background.includes('conic-gradient'));
-    if(donut){if(!total)donut.style.background='#e5e7eb';else{const a=counts.started/total*100,b=a+counts.backlog/total*100,c=b+counts.completed/total*100;donut.style.background=`conic-gradient(#2f67a5 0 ${a}%,#98a2b3 ${a}% ${b}%,#16865c ${b}% ${c}%,#b42318 ${c}% 100%)`}}
+
+    const centers=Array.from(panel.querySelectorAll('div')).filter(d=>{
+      const directSpan=Array.from(d.children).find(c=>c.tagName==='SPAN'&&/^projetos?$/i.test(c.textContent.trim()));
+      const directText=Array.from(d.childNodes).find(n=>n.nodeType===3&&/^\s*\d+\s*$/.test(n.nodeValue||''));
+      return !!directSpan&&!!directText;
+    });
+    const center=centers[0];
+    if(center){
+      const text=Array.from(center.childNodes).find(n=>n.nodeType===3&&/^\s*\d+\s*$/.test(n.nodeValue||''));
+      if(text)text.nodeValue=String(total);
+      const sp=Array.from(center.children).find(c=>c.tagName==='SPAN'&&/^projetos?$/i.test(c.textContent.trim()));
+      if(sp)sp.textContent=total===1?'projeto':'projetos';
+    }
+
+    let donut=panel.querySelector('[data-allamo-portfolio-donut]');
+    if(!donut){
+      donut=Array.from(panel.querySelectorAll('div')).find(d=>{
+        const r=d.getBoundingClientRect();
+        const br=d.style.borderRadius||getComputedStyle(d).borderRadius;
+        return r.width>=160&&r.width<=200&&r.height>=160&&r.height<=200&&br==='50%';
+      });
+      if(donut)donut.setAttribute('data-allamo-portfolio-donut','1');
+    }
+    if(donut){
+      if(!total)donut.style.background='#e5e7eb';
+      else{
+        const a=counts.started/total*100,b=a+counts.backlog/total*100,c=b+counts.completed/total*100;
+        donut.style.background=`conic-gradient(#2f67a5 0 ${a}%,#98a2b3 ${a}% ${b}%,#16865c ${b}% ${c}%,#b42318 ${c}% 100%)`;
+      }
+    }
+
     const map=[['Em andamento',counts.started],['Backlog',counts.backlog],['Completo',counts.completed],['Cancelado',counts.canceled]];
-    for(const [name,count] of map){const el=Array.from(panel.querySelectorAll('*')).find(e=>e.children.length===0&&e.textContent.includes(name)&&e.textContent.includes('—'));if(el){const pct=total?((count/total)*100).toFixed(1).replace('.',','):'0,0';el.textContent=`${count} ${name} — ${pct}%`}}
+    for(const [name,count] of map){
+      const el=Array.from(panel.querySelectorAll('span')).find(e=>e.textContent.includes(name)&&e.textContent.includes('—'));
+      if(!el)continue;
+      const dot=el.querySelector('i');
+      const pct=total?((count/total)*100).toFixed(1).replace('.',','):'0,0';
+      el.textContent='';
+      if(dot){el.appendChild(dot);dot.style.marginRight='9px'}
+      el.appendChild(document.createTextNode(`${count} ${name} — ${pct}%`));
+    }
   }
 
   function clearLegacyFindings(totalProjects,totalWork){
@@ -52,28 +101,39 @@
     const panel=h.parentElement;if(!panel||panel.dataset.allamoLiveFindings==='1')return;
     panel.dataset.allamoLiveFindings='1';
     const p=panel.querySelector('p');
-    Array.from(panel.children).forEach((c,i)=>{if(c!==h&&c!==p)c.remove()});
+    Array.from(panel.children).forEach(c=>{if(c!==h&&c!==p)c.remove()});
     const d=document.createElement('div');d.style.cssText='margin-top:18px;padding:18px;border:1px dashed #cbd5e1;border-radius:12px;color:#64748b;background:#fafafa';
     d.textContent=(totalProjects===0&&totalWork===0)?'Nenhum achado PMO: a carteira está vazia.':'Achados automáticos serão calculados somente a partir dos dados reais cadastrados.';
     panel.appendChild(d);
   }
 
   async function executiveSync(){
-    if(!token())return;const now=Date.now();if(loading||now-refreshAt<2500)return;refreshAt=now;loading=true;
+    if(!token())return;const now=Date.now();if(loading||now-refreshAt<1200)return;refreshAt=now;loading=true;
     try{
       const [companies,projects,work]=await Promise.all([api('companies'),api('projects'),api('work-items')]);
       const cs=Array.isArray(companies)?companies:[],ps=Array.isArray(projects)?projects:[],ws=Array.isArray(work)?work:[];
-      const started=ps.filter(p=>p.badge==='started'||p.status==='Em andamento').length;
-      const backlog=ps.filter(p=>p.badge==='backlog'||p.status==='Backlog').length;
-      const complete=ps.filter(p=>p.badge==='completed'||p.status==='Completo').length;
-      const canceled=ps.filter(p=>p.badge==='canceled'||p.status==='Cancelado').length;
-      setCard('Empresas',cs.length,'empresas cadastradas');setCard('Projetos',ps.length,'portfólio atual');setCard('Demandas',ws.filter(i=>i.item_type==='DEMANDA').length,'demandas ativas');setCard('Em andamento',started,'projetos');setCard('Backlog',backlog,'projetos');setCard('Completo',complete,'projetos');setCard('Cancelado',canceled,'projetos');
-      updateDistribution(ps);clearLegacyFindings(ps.length,ws.length);
+      const companyId=selectedCompanyId();
+      const scopedCompanies=companyId==='all'?cs:cs.filter(c=>String(c.id)===companyId);
+      const scopedProjects=companyId==='all'?ps:ps.filter(p=>String(p.company_id||'')===companyId);
+      const scopedWork=companyId==='all'?ws:ws.filter(i=>String(i.company_id||'')===companyId);
+      const started=scopedProjects.filter(p=>p.badge==='started'||p.status==='Em andamento').length;
+      const backlog=scopedProjects.filter(p=>p.badge==='backlog'||p.status==='Backlog').length;
+      const complete=scopedProjects.filter(p=>p.badge==='completed'||p.status==='Completo'||p.status==='Concluído'||p.status==='Concluido').length;
+      const canceled=scopedProjects.filter(p=>p.badge==='canceled'||p.status==='Cancelado').length;
+      setCard('Empresas',scopedCompanies.length,'empresas cadastradas');
+      setCard('Projetos',scopedProjects.length,'portfólio atual');
+      setCard('Demandas',scopedWork.filter(i=>i.item_type==='DEMANDA').length,'demandas ativas');
+      setCard('Em andamento',started,'projetos');
+      setCard('Backlog',backlog,'projetos');
+      setCard('Completo',complete,'projetos');
+      setCard('Cancelado',canceled,'projetos');
+      updateDistribution(scopedProjects);
+      clearLegacyFindings(scopedProjects.length,scopedWork.length);
     }catch(e){console.error('[executive-sync]',e)}finally{loading=false}
   }
 
   function tick(){workMenu();executiveSync()}
   const obs=new MutationObserver(()=>tick());
-  const start=()=>{obs.observe(document.documentElement,{subtree:true,childList:true});tick();setInterval(tick,1500)};
+  const start=()=>{obs.observe(document.documentElement,{subtree:true,childList:true});tick();setInterval(tick,1200)};
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start):start();
 })();
