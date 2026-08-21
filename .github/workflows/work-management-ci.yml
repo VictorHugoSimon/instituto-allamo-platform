@@ -71,13 +71,15 @@ jobs:
           grep -q "now-quietSince>=200" public/index.html
           grep -q "window.__allamoBootSeen" public/index.html
           grep -q "window.__allamoBootGuardStarted" public/index.html
+          grep -q "window.__allamoBootNonBlocking=true" public/index.html
           grep -q "seen.companies&&!!seen.projects" public/index.html
           grep -q "return !!seen.publicClient" public/index.html
           grep -q "public-client-projects" public/index.html
-          grep -q "Carregando dados do Portal PMO" public/index.html
+          grep -q "Sincronizando dados" public/index.html
           grep -q "allamo-boot-retry" public/index.html
           grep -q "__allamoDataFreshnessLoaded" public/index.html
           grep -q "no-store, no-cache, must-revalidate" public/_worker.js
+          if grep -q "body{visibility:hidden!important}" public/index.html; then echo "First paint ainda bloqueia o body inteiro"; exit 1; fi
           if grep -q "Date.now()+1800" public/index.html; then echo "Guard rápido antigo pode expor fotografia demo"; exit 1; fi
           if grep -q "now-quietSince>=120" public/index.html; then echo "Janela antiga de reveal ainda presente"; exit 1; fi
           if grep -q "Date.now()+6000" public/index.html; then echo "Boot antigo de 6s ainda presente"; exit 1; fi
