@@ -2,7 +2,7 @@ name: Work Management CI
 
 on:
   push:
-    branches: [feature/work-management-native]
+    branches: [feature/work-management-native, fix/no-stale-flash]
   pull_request:
     branches: [develop]
 
@@ -19,14 +19,20 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Build Work Management
+      - name: Build Work Management + runtime hardening
         run: npm run build:work
-      - name: Validate syntax and integration markers
+      - name: Validate syntax, integration and anti-flash
         run: |
           node --check src/work-management-ui.js
           node --check scripts/build-work-management.mjs
+          node --check scripts/harden-portal-runtime.mjs
           node --check public/_worker.js
+          node --check public/sw.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
+          grep -q "allamo-boot-guard" public/index.html
+          grep -q "window.__allamoApiPending" public/index.html
+          grep -q "display:none!important" public/index.html
+          grep -q "allamo-pmo-v2" public/sw.js
           grep -q "CREATE TABLE IF NOT EXISTS work_items" migrations/2026-08-21-work-management.sql
           grep -q "CREATE TABLE IF NOT EXISTS work_sprints" migrations/2026-08-21-work-management.sql
