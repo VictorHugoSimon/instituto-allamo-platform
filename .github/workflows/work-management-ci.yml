@@ -25,7 +25,7 @@ jobs:
         run: |
           node --check src/work-management-ui.js
           node --check src/portal-enhancements.js
-          node --check src/stage-runtime-bootstrap.js
+          node -e "const fs=require('fs');const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;new AsyncFunction('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment syntax ok')"
           node --check scripts/build-work-management.mjs
           node --check scripts/harden-portal-runtime.mjs
           node --check public/_worker.js
