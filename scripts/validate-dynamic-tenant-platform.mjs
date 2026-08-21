@@ -20,7 +20,7 @@ must(dyn,'Projeto não pertence à empresa informada','Campos validam empresa/pr
 must(dyn,'Campo pertence a outra empresa','Valor não cruza empresa');
 must(dyn,"archived_at=COALESCE(archived_at,datetime('now'))",'Exclusão de campo é arquivamento');
 must(files,'Projeto não pertence à empresa','Arquivo valida empresa/projeto');
-must(files,'${company}/${project||\'_company\'}/${entityType}/${entityId}/${id}/${safeName}','Namespace R2 por tenant e entidade');
+must(files,"${company}/${project||'_company'}/${entityType}/${entityId}/${id}/${safeName}",'Namespace R2 por tenant e entidade');
 must(files,"status='ARCHIVED'",'Arquivo possui arquivamento lógico');
 forbid(files,/DOCS\.delete\s*\(/,'arquivo não pode ser apagado fisicamente no fluxo normal');
 must(milestones,'INSERT INTO tenant_files','Upload de marco entra no catálogo de arquivos');
