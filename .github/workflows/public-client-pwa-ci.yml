@@ -1,0 +1,26 @@
+name: Public Client PWA CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  public-client-pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate public tenant PWA
+        run: npm run test:pwa
+      - name: Validate tenant isolation
+        run: npm run test:tenant
+      - name: Validate session stability
+        run: npm run test:session
