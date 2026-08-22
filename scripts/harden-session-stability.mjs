@@ -83,9 +83,10 @@ if(!template.includes("this.api('session-status').then")) throw new Error('resto
 if(!template.includes('validação temporariamente indisponível')) throw new Error('Sessão ainda pode ser apagada por falha temporária.');
 if(!template.includes("this.apiBase()+'/logout'")) throw new Error('Logout servidor não aplicado.');
 
-const serialized=JSON.stringify(template);
+// Segurança para JSON embutido em <script>: evita que conteúdo interno </script> feche a tag hospedeira.
+const serialized=JSON.stringify(template).replace(/<\//g,'<\\u002F');
 JSON.parse(serialized);
 html=html.slice(0,jsonStart)+serialized+html.slice(jsonEnd);
 fs.writeFileSync(indexFile,html);
 
-console.log('OK: sessão de 7 dias aplicada com template JSON reserializado de forma segura.');
+console.log('OK: sessão de 7 dias aplicada com template JSON/HTML reserializado de forma segura.');
