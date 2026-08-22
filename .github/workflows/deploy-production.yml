@@ -1,0 +1,86 @@
+name: Release PRODUCTION - Manual Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite DEPLOY-PRODUCTION para liberar a publicação após homologação do Stage'
+        required: true
+        type: string
+      reason:
+        description: 'Motivo / referência da homologação aprovada'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: allamo-pmo-production-release
+  cancel-in-progress: false
+
+jobs:
+  release-production:
+    if: ${{ inputs.confirm == 'DEPLOY-PRODUCTION' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout da main homologada
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências travadas
+        run: npm ci
+
+      - name: Gerar um único artefato de release
+        run: npm run build:work
+
+      - name: Gate consolidado da plataforma
+        run: npm run test:release
+
+      - name: Preflight Cloudflare
+        run: npx wrangler@4.124.0 whoami
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Materializar configuração exclusiva de Produção
+        run: |
+          cp wrangler.production.toml wrangler.toml
+          grep -F 'name = "allamo-pmo"' wrangler.toml
+
+      - name: Backup obrigatório do D1 produtivo
+        run: npx wrangler@4.124.0 d1 export DB --remote --output="backup-production-${GITHUB_SHA}.sql"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Guardar backup da Produção
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-production-backup-${{ github.sha }}
+          path: backup-production-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publicar exatamente o artefato validado em PRODUÇÃO
+        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo --branch main --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Resumo da release
+        if: always()
+        run: |
+          echo "### Release PRODUÇÃO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Motivo: ${{ inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch obrigatória: main" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup D1: obrigatório antes do deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Config Cloudflare: wrangler.production.toml materializada temporariamente como wrangler.toml" >> "$GITHUB_STEP_SUMMARY"
+          echo "- D1 reset/migration destrutiva: NÃO EXECUTADO" >> "$GITHUB_STEP_SUMMARY"
