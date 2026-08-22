@@ -1,0 +1,44 @@
+name: Sallamos AI POC
+
+on:
+  push:
+    branches: [sallamos-ai-poc]
+    paths:
+      - 'sallamos-ai/**'
+      - '.github/workflows/sallamos-ai-poc.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sallamos-ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm install
+      - name: Validate Cloudflare config
+        run: npx wrangler --version
+
+  deploy-cloudflare:
+    needs: validate
+    if: ${{ github.event_name == 'workflow_dispatch' && secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sallamos-ai
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Deploy
+        run: npm run deploy
