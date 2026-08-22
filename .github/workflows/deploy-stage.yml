@@ -1,5 +1,4 @@
 name: Release STAGE - Manual Gate
-# ONE-SHOT RELEASE MARKER: awm-stage-20260822-1845
 
 on:
   workflow_dispatch:
@@ -12,10 +11,6 @@ on:
         description: 'Motivo da release / referência da homologação'
         required: false
         type: string
-  push:
-    branches: [develop]
-    paths:
-      - '.github/workflows/deploy-stage.yml'
 
 permissions:
   contents: read
@@ -27,7 +22,7 @@ concurrency:
 
 jobs:
   release-stage:
-    if: ${{ github.event_name == 'push' || inputs.confirm == 'DEPLOY-STAGE' }}
+    if: ${{ inputs.confirm == 'DEPLOY-STAGE' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -59,10 +54,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-gates -f description='Build e gate consolidado aprovados'
 
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
       - name: Preflight Cloudflare
         run: npx wrangler@4.124.0 whoami
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Registrar autenticação Cloudflare aprovada
@@ -83,7 +85,6 @@ jobs:
       - name: Publicar exatamente o artefato validado no STAGE
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production --commit-dirty=true
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Registrar sucesso do deploy no commit
@@ -105,5 +106,6 @@ jobs:
           echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
           echo "- Motivo: ${{ inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Config Cloudflare: wrangler.stage.toml materializada temporariamente como wrangler.toml" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Deploy automático por push: TEMPORÁRIO PARA ESTA RELEASE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy automático por push: DESATIVADO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Autenticação: API Token ou Global API Key + e-mail" >> "$GITHUB_STEP_SUMMARY"
           echo "- D1 reset/migration destrutiva: NÃO EXECUTADO" >> "$GITHUB_STEP_SUMMARY"
