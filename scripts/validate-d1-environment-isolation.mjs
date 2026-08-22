@@ -8,6 +8,7 @@ const deployCmd=read('scripts/deploy-stage-safe.cmd');
 const deployWorkflow=read('.github/workflows/deploy-stage.yml');
 const must=(text,needle,label)=>{if(!text.includes(needle))throw new Error(`Ausente: ${label} (${needle})`)};
 const forbid=(text,needle,label)=>{if(text.includes(needle))throw new Error(`Proibido: ${label} (${needle})`)};
+const forbidEnvStage=(text,label)=>{if(/^\s*\[env\.stage\]\s*$/m.test(text))throw new Error(`Proibido: ${label} ([env.stage])`)};
 
 const STAGE_ID='72e2f6a0-3d22-4d65-a820-4a9b9ea88321';
 const PROD_ID='361c63ba-b9f8-409d-9a46-9609914da8b7';
@@ -18,7 +19,7 @@ if(STAGE_ID===PROD_ID) throw new Error('Stage e Produção não podem usar o mes
 must(root,'name = "allamo-pmo-config-guard"','wrangler raiz em modo guard');
 forbid(root,'database_id','wrangler raiz não pode possuir UUID D1');
 forbid(root,'d1_databases','wrangler raiz não pode possuir binding D1');
-forbid(root,'[env.stage]','Cloudflare Pages não suporta ambiente nomeado stage');
+forbidEnvStage(root,'Cloudflare Pages não suporta ambiente nomeado stage');
 
 // Stage: arquivo dedicado e compatível com os únicos environments aceitos pelo Pages.
 must(stage,'name = "allamo-pmo-stage"','projeto Pages oficial de Stage');
@@ -26,14 +27,14 @@ must(stage,'[env.production]','environment production do projeto Stage');
 must(stage,'[env.preview]','environment preview do projeto Stage');
 must(stage,'database_name = "allamo-pmo-stage"','nome oficial do banco Stage');
 must(stage,`database_id = "${STAGE_ID}"`,'UUID oficial do banco Stage');
-forbid(stage,'[env.stage]','ambiente stage inválido no Pages');
+forbidEnvStage(stage,'ambiente stage inválido no Pages');
 forbid(stage,PROD_ID,'config de Stage contaminada com UUID de Produção');
 
 // Produção: top-level/production usam PROD; preview é explicitamente não produtivo.
 must(prod,'name = "allamo-pmo"','projeto Pages oficial de Produção');
 must(prod,'[env.production]','environment production do projeto de Produção');
 must(prod,'[env.preview]','environment preview explicitamente isolado');
-forbid(prod,'[env.stage]','ambiente stage inválido no Pages');
+forbidEnvStage(prod,'ambiente stage inválido no Pages');
 
 const prodTop=prod.split('[env.production]')[0]||'';
 const afterProd=prod.split('[env.production]')[1]||'';
