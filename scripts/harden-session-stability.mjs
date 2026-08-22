@@ -27,15 +27,15 @@ fs.writeFileSync(workerFile,worker);
 let html=fs.readFileSync(indexFile,'utf8');
 const restoreStart=html.indexOf('restoreSession() {');
 if(restoreStart<0) throw new Error('restoreSession não encontrado no portal.');
-const restoreEnd=Math.min(html.length,restoreStart+3500);
+const restoreEnd=Math.min(html.length,restoreStart+4200);
 let restore=html.slice(restoreStart,restoreEnd);
 
 restore=restore.replace("this.api('companies').then(() => {","this.api('session-status').then(() => {");
 restore=restore.replace('}).catch(() => {','}).catch((err) => {');
 
-const oldLogout="try { localStorage.removeItem('allamo_session'); } catch(e){}\\\n        this.setState({ screen:'login', token:null, live:false, role:null });";
-const stableLogout="const sessionMsg=String((err&&err.message)||err||'');\\\n        const authInvalid=/Não autenticado|HTTP 401|HTTP 403|Credenciais inválidas/i.test(sessionMsg);\\\n        if(authInvalid){ try { localStorage.removeItem('allamo_session'); } catch(e){} this.setState({ screen:'login', token:null, live:false, role:null }); }\\\n        else { console.warn('[session] validação temporariamente indisponível; sessão local preservada',sessionMsg); this.setState({ sessionWarning:'Conexão instável. Mantendo sua sessão e tentando sincronizar os dados.' }); setTimeout(()=>{ try{ this.loadData(); }catch(e){} },1200); }";
-if(restore.includes(oldLogout)) restore=restore.replace(oldLogout,stableLogout);
+const destructive=/try \{ localStorage\.removeItem\('allamo_session'\); \} catch\(e\)\{\}[\\\s]*this\.setState\(\{ screen:'login', token:null, live:false, role:null \}\);/;
+const stableLogout="const sessionMsg=String((err&&err.message)||err||''); const authInvalid=/Não autenticado|HTTP 401|HTTP 403|Credenciais inválidas/i.test(sessionMsg); if(authInvalid){ try { localStorage.removeItem('allamo_session'); } catch(e){} this.setState({ screen:'login', token:null, live:false, role:null }); } else { console.warn('[session] validação temporariamente indisponível; sessão local preservada',sessionMsg); this.setState({ sessionWarning:'Conexão instável. Mantendo sua sessão e tentando sincronizar os dados.' }); setTimeout(()=>{ try{ this.loadData(); }catch(e){} },1200); }";
+if(destructive.test(restore)) restore=restore.replace(destructive,stableLogout);
 else if(!restore.includes('validação temporariamente indisponível')) throw new Error('Catch destrutivo de restoreSession não encontrado.');
 
 html=html.slice(0,restoreStart)+restore+html.slice(restoreEnd);
