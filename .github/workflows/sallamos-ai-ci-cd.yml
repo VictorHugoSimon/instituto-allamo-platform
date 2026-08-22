@@ -39,6 +39,7 @@ jobs:
           node --check scripts/smoke.mjs
           node --check scripts/preflight.mjs
           node --check scripts/prepare-cloudflare-auth.mjs
+          node --check tests/cloudflare-auth.test.mjs
           node --check scripts/build-production-dataset.mjs
           node --check scripts/validate-eval-readiness.mjs
           node --check scripts/validate-eval-candidates.mjs
@@ -48,6 +49,8 @@ jobs:
           node --check sdk/runtime-evidence-client.mjs
           node --check evals/runner.mjs
           node --check public/app.js
+      - name: Cloudflare auth contract tests
+        run: npm run test:cloudflare-auth
       - name: Validate candidate eval backlog
         run: npm run evals:candidates
       - name: Validate migrations and stage seed
