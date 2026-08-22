@@ -4,38 +4,43 @@
 Produção só é liberada quando **infraestrutura, conhecimento e comportamento do agente** estiverem homologados. Nenhum gate deve ser contornado para cumprir prazo.
 
 ## 2. Estratégia da primeira release
-A primeira release é **document-first**. O código-fonte atual do Sallamos ainda não foi localizado nas integrações acessíveis. Quando for disponibilizado, entra como nova fonte read-only e segue o mesmo fluxo de homologação.
+A primeira release é **runtime-evidence-first**. Não há dependência de busca de POPs no Google Drive. O conhecimento será construído a partir do comportamento real do Sallamos/STAGE, APIs, erros resolvidos, fluxos executados e feedback homologado. Código-fonte privado poderá entrar depois como fonte read-only adicional.
 
 ## 3. STAGE — configuração
 No GitHub Environment `sallamos-ai-stage`, configurar:
-- `CLOUDFLARE_API_TOKEN` — token válido, menor privilégio, com permissões suficientes para os recursos usados pelo Worker/D1/Vectorize/R2;
+- `CLOUDFLARE_API_TOKEN`;
 - `CLOUDFLARE_ACCOUNT_ID`;
-- `SALLAMOS_SESSION_SECRET` e `ADMIN_TOKEN` quando a equipe quiser gerenciá-los externamente; o provisionador preserva secrets existentes;
-- opcionais enquanto a integração real não estiver pronta: `SALLAMOS_API_BASE`, `SALLAMOS_AUTH_VALIDATE_URL`, `SALLAMOS_API_TOKEN`, `REPO_READ_TOKEN`;
-- variável `SYNC_KNOWLEDGE=false` até existir fonte automatizada validada.
+- `SALLAMOS_SESSION_SECRET` e `ADMIN_TOKEN` quando gerenciados externamente;
+- `EVIDENCE_INGEST_TOKEN` para a integração de evidências reais;
+- quando disponíveis: `SALLAMOS_API_BASE`, `SALLAMOS_AUTH_VALIDATE_URL`, `SALLAMOS_API_TOKEN`;
+- `REPO_READ_TOKEN` somente quando houver repositório privado acessível e read-only.
 
 Executar/confirmar:
 1. `node scripts/preflight.mjs stage`;
 2. `npx wrangler whoami`;
 3. `npm run provision:stage`;
-4. smoke automático `/health/live`, `/health/ready`, sessão controlada, overview e consulta Valkíria;
+4. smoke automático `/health/live`, `/health/ready`, proteção do endpoint de evidência, sessão, overview e consulta Valkíria;
 5. registrar a URL publicada como `SALLAMOS_AI_STAGE_URL` no Environment de produção.
 
-## 4. Conhecimento
+## 4. Conhecimento por evidência real
 Fluxo obrigatório:
-`fonte interna → sanitização → rascunho → revisão humana → homologado → reindex → retrieval`.
+`evento real → sanitização → rascunho → revisão humana → homologado → reindex → retrieval`.
+
+Endpoint: `POST /api/ai/evidence/runtime`.
 
 Prioridade recomendada:
-1. localizar/exportar a versão aprovada dos POPs financeiros 2026;
-2. homologar o mapa funcional de processos somente para capacidades ainda vigentes;
-3. localizar/exportar POPs de clientes/parceiros/produtos;
-4. documentar Open Finance/OFX a partir da versão homologada atual;
-5. manter manual Beta legado e API Petstore fora de produção.
+1. requests/responses reais das APIs dos módulos prioritários;
+2. erros reais com resolução confirmada;
+3. fluxos completos executados com sucesso no STAGE;
+4. permissões observadas por perfil;
+5. integrações e telemetria relevantes;
+6. casos de suporte encerrados como resolvidos;
+7. código privado, quando disponibilizado, seguindo o mesmo processo de homologação.
 
-Nunca enviar documento interno diretamente para o repositório público. Usar o endpoint administrativo de importação, que sanitiza e grava em D1/R2 como rascunho.
+Nunca usar ocorrência específica de cliente como regra global sem revisão. Nunca incluir segredo, token ou PII deliberadamente no payload. Ver `docs/RUNTIME_EVIDENCE.md`.
 
 ## 5. Dataset de homologação
-`eval-data/candidates.jsonl` contém cenários **candidatos**, não respostas oficiais.
+`eval-data/candidates.jsonl` contém cenários candidatos, não respostas oficiais.
 
 Para promover um cenário a `eval-data/dataset.jsonl`, um homologador deve preencher:
 - `dataset_type: production-real`;
@@ -61,21 +66,21 @@ Antes de produção, o workflow executa contra o STAGE homologado:
 - p95 <= 12 s;
 - zero erros HTTP/rede.
 
-O resultado é salvo como artifact `sallamos-ai-production-eval`.
-
 ## 7. Integração Sallamos real
 Configurar no Environment de produção:
 - `SALLAMOS_AUTH_VALIDATE_URL` HTTPS;
 - `SALLAMOS_API_BASE` HTTPS;
-- `SALLAMOS_API_TOKEN` se o contrato exigir;
-- `REPO_READ_TOKEN` somente quando houver fonte de código privada e sempre read-only.
+- `SALLAMOS_API_TOKEN` se exigido;
+- `EVIDENCE_INGEST_TOKEN` exclusivo da integração de evidências;
+- `REPO_READ_TOKEN` somente se existir fonte privada read-only.
 
 Validar obrigatoriamente:
 - sessão válida devolve usuário, tenant, perfil, permissões e versão;
-- sessão de tenant A não acessa tenant B;
+- tenant A não acessa tenant B;
 - indisponibilidade do auth falha fechada;
 - indisponibilidade de contexto reduz confiança/escala, sem invenção;
-- endpoints read-only não retornam PII bloqueada.
+- endpoint de runtime evidence rejeita chamada sem token;
+- evidência importada fica em rascunho até homologação.
 
 ## 8. Testes de Go/No-Go
 Executar no STAGE:
@@ -87,7 +92,7 @@ Executar no STAGE:
 - pergunta sem evidência → clarificação/escalonamento;
 - pergunta de alto risco → escalonamento;
 - fallback humano;
-- admin knowledge import/approve/reject;
+- runtime evidence import → rascunho → approve/reject → reindex;
 - retenção;
 - rollback para versão anterior;
 - `/health/ready` estável.
@@ -96,14 +101,14 @@ Executar no STAGE:
 Somente após os testes:
 1. manter Issue de Go-Live com todas as evidências;
 2. definir `PRODUCTION_GO_LIVE=true` deliberadamente;
-3. abrir/revisar PR da árvore atual de `develop` para `main`;
+3. revisar PR da árvore atual de `develop` para `main`;
 4. production-gate revalida dataset e STAGE em tempo real;
 5. deploy provisiona recursos isolados;
 6. smoke produtivo exige readiness;
-7. se smoke falhar, executar rollback e reabrir gate.
+7. se smoke falhar, rollback e No-Go.
 
 ## 10. Rollback
-Rollback do Worker não reverte automaticamente D1/R2/Vectorize. Migrations devem permanecer backward-compatible. Mudança destrutiva de schema/dados exige plano separado, backup e aprovação explícita.
+Rollback do Worker não reverte automaticamente D1/R2/Vectorize. Migrations devem permanecer backward-compatible. Mudança destrutiva exige plano separado, backup e aprovação explícita.
 
 ## 11. Critério de finalização técnica
-A engenharia é considerada pronta quando todos os gates automatizáveis existem e passam. Go-live só é considerado finalizado quando credenciais externas, endpoints Sallamos, fontes homologadas e aprovação funcional humana também estiverem concluídos.
+A engenharia é pronta quando os gates automatizáveis passam. Go-live só é finalizado quando credenciais externas, endpoints Sallamos, evidências homologadas, dataset real e aprovação funcional humana estiverem concluídos.

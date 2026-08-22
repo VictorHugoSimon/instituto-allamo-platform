@@ -16,12 +16,22 @@ const readyRes = await fetchJson('/health/ready');
 if (environment === 'production') {
   assert(readyRes.status === 200, `produção não está ready (HTTP ${readyRes.status})`);
   assert(readyRes.body.ok === true, 'produção ready=false');
+} else {
+  assert(readyRes.status === 200, `stage readiness HTTP ${readyRes.status}`);
+  assert(readyRes.body.ok === true, 'stage ready=false');
+}
+
+const evidenceNoToken = await fetchJson('/api/ai/evidence/runtime', {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ kind:'error', module:'smoke', version:'smoke', owner:'smoke', summary:'unauthorized smoke check' })
+});
+assert([401,503].includes(evidenceNoToken.status), `runtime evidence deve falhar fechado sem token; HTTP ${evidenceNoToken.status}`);
+
+if (environment === 'production') {
+  console.log(JSON.stringify({smoke:'ok',environment,readiness:readyRes.body,runtimeEvidenceUnauthorized:evidenceNoToken.status},null,2));
   console.log('PRODUCTION_READINESS_OK');
   process.exit(0);
 }
-
-assert(readyRes.status === 200, `stage readiness HTTP ${readyRes.status}`);
-assert(readyRes.body.ok === true, 'stage ready=false');
 
 const demoRes = await fetchJson('/api/ai/demo/session', { method: 'POST' });
 assert(demoRes.status === 200 && demoRes.body.token, 'sessão demo de stage indisponível');
@@ -44,6 +54,7 @@ if (queryRes.body.status === 'answered') assert((queryRes.body.evidence || []).l
 console.log(JSON.stringify({
   smoke: 'ok', environment,
   readiness: readyRes.body,
+  runtimeEvidenceUnauthorized: evidenceNoToken.status,
   supportDecision: queryRes.body.status,
   confidence: queryRes.body.confidence,
   evidence: (queryRes.body.evidence || []).length
