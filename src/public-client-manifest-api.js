@@ -5,7 +5,6 @@ if(path==='public-client-manifest'&&request.method==='GET'){
   if(!requested)return new Response(JSON.stringify({error:'Informe a empresa'}),{status:400,headers:{'content-type':'application/json','cache-control':'no-store'}});
 
   const token=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
-  const slug=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
   let co=await DB.prepare('SELECT * FROM companies WHERE CAST(id AS TEXT)=? OR lower(CAST(id AS TEXT))=lower(?) LIMIT 1').bind(requested,requested).first();
   if(!co){
     const wanted=token(requested);
@@ -18,13 +17,12 @@ if(path==='public-client-manifest'&&request.method==='GET'){
 
   const canonicalId=String(co.id);
   const displayName=String(co.name||co.company_name||co.nome_fantasia||canonicalId);
-  const publicSlug=slug(co.public_slug||co.slug||co.client_slug||displayName)||slug(canonicalId);
   const manifest={
     id:'/?cliente_app='+encodeURIComponent(canonicalId),
     name:'Portal PMO · '+displayName,
     short_name:displayName.length>24?displayName.slice(0,24):displayName,
     description:'Acompanhamento de projetos e Reports · Instituto Államo',
-    start_url:'/?cliente='+encodeURIComponent(publicSlug)+'&source=pwa',
+    start_url:'/?cliente='+encodeURIComponent(canonicalId)+'&source=pwa',
     scope:'/',
     display:'standalone',
     display_override:['standalone','minimal-ui'],
