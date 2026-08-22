@@ -1,0 +1,33 @@
+name: Portal Baseline CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  portal-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build portal completo
+        run: npm run build:work
+      - name: Validar baseline funcional
+        run: npm run test:baseline
+      - name: Validar empresa + projeto + report
+        run: npm run test:report-scope
+      - name: Validar PWA público multitenant
+        run: npm run test:pwa
+      - name: Validar portal público sem login
+        run: npm run test:public
+      - name: Validar isolamento de tenant e marcos
+        run: npm run test:tenant
