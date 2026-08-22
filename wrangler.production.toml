@@ -24,7 +24,16 @@ database_id = "361c63ba-b9f8-409d-9a46-9609914da8b7"
 [env.production.ai]
 binding = "AI"
 
-# Preview do projeto de producao fica deliberadamente sem D1.
-# Isso impede que um preview acidental escreva no banco de producao.
+# Preview do projeto de producao usa deliberadamente o D1 nao produtivo.
+# Assim um preview acidental nunca escreve no banco oficial de Producao.
+# Quando houver um terceiro D1 exclusivo de preview, substituir este binding.
 [env.preview]
 compatibility_date = "2026-08-20"
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "allamo-pmo-stage"
+database_id = "72e2f6a0-3d22-4d65-a820-4a9b9ea88321"
+
+[env.preview.ai]
+binding = "AI"
