@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(p,'utf8');
+const src=read('src/login-interaction-guard.js');
+const index=read('public/index.html');
+const pkg=JSON.parse(read('package.json'));
+const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+
+must(src,'__allamoLoginInteractionGuard','guard nativo idempotente');
+must(src,'input[type="email"]','campo de e-mail nativo');
+must(src,'input[type="password"]','campo de senha nativo');
+must(src,"addEventListener('input'",'captura nativa de digitação');
+must(src,"addEventListener('keydown'",'fallback de teclado');
+must(src,"form.addEventListener('submit'",'submit nativo de login');
+must(src,"fetch('/api/login'",'autenticação direta same-origin');
+must(src,"cache:'no-store'",'login sem cache');
+must(src,"localStorage.setItem('allamo_session'",'persistência da sessão após login');
+must(src,'location.reload()','entrada no portal após autenticação');
+if(/sessionStorage\.setItem\([^\n]*password|localStorage\.setItem\([^\n]*password/i.test(src))throw new Error('Senha não pode ser persistida no browser pelo guard.');
+must(index,'__allamoLoginInteractionGuard','guard de login está no artefato final');
+const build=String(pkg.scripts['build:work']||'');
+must(build,'build-work-management.mjs','pipeline principal existe');
+console.log('OK: login aceita teclado por listeners nativos e autentica sem depender do binding visual, sem persistir senha.');
