@@ -45,6 +45,7 @@ jobs:
       - name: JavaScript syntax
         run: |
           node --check scripts/provision.mjs
+          node --check scripts/smoke.mjs
           node --check scripts/ingest-docs.mjs
           node --check scripts/ingest-repo.mjs
           node --check scripts/sync-sallamos-api.mjs
@@ -103,6 +104,7 @@ jobs:
       SALLAMOS_AUTH_VALIDATE_URL: ${{ secrets.SALLAMOS_AUTH_VALIDATE_URL }}
       SALLAMOS_API_TOKEN: ${{ secrets.SALLAMOS_API_TOKEN }}
       REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
+      SALLAMOS_AI_BASE_URL: ${{ vars.SALLAMOS_AI_BASE_URL }}
       SYNC_KNOWLEDGE: ${{ vars.SYNC_KNOWLEDGE || 'false' }}
     steps:
       - uses: actions/checkout@v4
@@ -116,9 +118,18 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo 'CLOUDFLARE_ACCOUNT_ID ausente' && exit 1)
           npx wrangler whoami
       - name: Provision and deploy stage
+        id: deploy
         run: npm run provision:stage
+      - name: Smoke test stage
+        run: |
+          BASE="${{ steps.deploy.outputs.url }}"
+          if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
+          node scripts/smoke.mjs --base "$BASE" --env stage
       - name: Deployment summary
-        run: echo "### Sallamos AI STAGE publicado automaticamente" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "### Sallamos AI STAGE publicado e validado" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smoke test: OK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
 
   deploy-production:
     needs: validate
@@ -137,6 +148,7 @@ jobs:
       SALLAMOS_AUTH_VALIDATE_URL: ${{ secrets.SALLAMOS_AUTH_VALIDATE_URL }}
       SALLAMOS_API_TOKEN: ${{ secrets.SALLAMOS_API_TOKEN }}
       REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
+      SALLAMOS_AI_BASE_URL: ${{ vars.SALLAMOS_AI_BASE_URL }}
       SYNC_KNOWLEDGE: ${{ vars.SYNC_KNOWLEDGE || 'false' }}
     steps:
       - uses: actions/checkout@v4
@@ -154,6 +166,15 @@ jobs:
           test -n "$SALLAMOS_AUTH_VALIDATE_URL" || (echo 'SALLAMOS_AUTH_VALIDATE_URL obrigatório em produção' && exit 1)
           test -n "$SALLAMOS_API_BASE" || (echo 'SALLAMOS_API_BASE obrigatório em produção' && exit 1)
       - name: Provision and deploy production
+        id: deploy
         run: npm run provision:production
+      - name: Smoke test production
+        run: |
+          BASE="${{ steps.deploy.outputs.url }}"
+          if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
+          node scripts/smoke.mjs --base "$BASE" --env production
       - name: Deployment summary
-        run: echo "### Sallamos AI PRODUCTION publicado automaticamente" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "### Sallamos AI PRODUCTION publicado e validado" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Readiness: OK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
