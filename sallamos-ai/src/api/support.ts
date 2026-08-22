@@ -98,13 +98,18 @@ export async function handleQuery(req: Request, env: Env) {
 }
 
 async function generate(env: Env, question: string, hits: any[], ctx: any, tenantContext: any): Promise<ModelOutput> {
-  const res = await env.AI.run(env.ANSWER_MODEL, {
+  const input = {
     messages: [
       { role: 'system', content: buildSystemPrompt() },
       { role: 'user', content: buildUserPrompt(question, hits, ctx, tenantContext) }
     ],
     max_tokens: 900
-  }, { gateway: { id: env.AI_GATEWAY_ID || 'default', skipCache: false } });
+  };
+
+  const gatewayId = (env.AI_GATEWAY_ID ?? '').trim();
+  const res = gatewayId
+    ? await env.AI.run(env.ANSWER_MODEL, input, { gateway: { id: gatewayId, skipCache: false } })
+    : await env.AI.run(env.ANSWER_MODEL, input);
 
   return parseOutput(res.response ?? res.result ?? '');
 }
