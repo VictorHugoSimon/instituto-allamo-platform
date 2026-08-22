@@ -7,7 +7,7 @@ if(path==='public-client-projects'&&request.method==='GET'){
   if(!cid)return json({error:'Informe a empresa'},400);
 
   // IDs internos continuam sendo a chave canônica. Links antigos/amigáveis também podem usar um slug
-  // EXATO do nome da empresa. Nunca usa LIKE, aproximação, primeira empresa ou contexto de sessão.
+  // EXATO do nome da empresa. Nunca usa busca parcial, aproximação, primeira empresa ou contexto de sessão.
   const pcToken=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
   const pcSlug=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
   let co=await DB.prepare('SELECT * FROM companies WHERE CAST(id AS TEXT)=? OR lower(CAST(id AS TEXT))=lower(?) LIMIT 1').bind(cid,cid).first();
