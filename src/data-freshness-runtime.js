@@ -25,12 +25,16 @@
     });
   };
 
-  // Mudança de sessão em outra aba não pode manter tenant antigo renderizado.
+  // O localStorage é compartilhado entre abas. Alterar somente tab/company não pode
+  // recarregar outras abas nem derrubar edições em andamento. Só troca real do token
+  // (novo login) ou remoção da sessão (logout) exige reload entre abas.
+  const sessionToken=value=>{try{return String(JSON.parse(value||'{}')?.token||'')}catch(_){return ''}};
   window.addEventListener('storage',e=>{
-    if(e.key==='allamo_session'&&e.oldValue!==e.newValue){
-      try{sessionStorage.removeItem('allamo_last_context')}catch(_){}
-      location.reload();
-    }
+    if(e.key!=='allamo_session'||e.oldValue===e.newValue)return;
+    const oldToken=sessionToken(e.oldValue),newToken=sessionToken(e.newValue);
+    if(oldToken===newToken)return;
+    try{sessionStorage.removeItem('allamo_last_context')}catch(_){}
+    location.reload();
   });
 
   // BFCache pode restaurar uma tela inteira antiga. Mantém shell, mas força revalidação live.
