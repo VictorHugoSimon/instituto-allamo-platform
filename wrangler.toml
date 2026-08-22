@@ -1,28 +1,14 @@
-name = "allamo-pmo-stage"
+name = "allamo-pmo-config-guard"
 pages_build_output_dir = "public"
 compatibility_date = "2026-08-20"
 
-# IMPORTANTE: operações D1 remotas devem declarar --env stage ou --env production.
-# Não existe binding D1 top-level de propósito, para evitar atingir um banco por engano.
-
-[env.stage]
-compatibility_date = "2026-08-20"
-
-[[env.stage.d1_databases]]
-binding = "DB"
-database_name = "allamo-pmo-stage"
-database_id = "72e2f6a0-3d22-4d65-a820-4a9b9ea88321"
-
-[env.stage.ai]
-binding = "AI"
-
-[env.production]
-compatibility_date = "2026-08-01"
-
-[[env.production.d1_databases]]
-binding = "DB"
-database_name = "allamo-pmo"
-database_id = "361c63ba-b9f8-409d-9a46-9609914da8b7"
-
-[env.production.ai]
-binding = "AI"
+# GUARD DE SEGURANCA
+# Este arquivo NAO possui binding D1 nem Workers AI de proposito.
+# Deploys e operacoes remotas devem escolher explicitamente:
+#   STAGE     -> --config wrangler.stage.toml
+#   PRODUCAO  -> --config wrangler.production.toml
+#
+# Motivo: Cloudflare Pages aceita apenas os ambientes nomeados
+# "preview" e "production". Usar [env.stage] faz o Pages rejeitar o deploy.
+# Separar os projetos por arquivo evita que o Pages de Stage receba
+# acidentalmente o binding D1 da producao (ou vice-versa).
