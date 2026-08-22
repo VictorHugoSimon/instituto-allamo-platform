@@ -9,14 +9,15 @@
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
     "build": "npm run build --workspace=apps/web",
-    "build:work": "node scripts/build-work-management.mjs && node scripts/harden-portal-runtime.mjs && node scripts/harden-session-stability.mjs && node scripts/enforce-live-first-paint.mjs && node scripts/harden-data-freshness.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs",
+    "build:work": "node scripts/build-work-management.mjs && node scripts/harden-portal-runtime.mjs && node scripts/enforce-live-first-paint.mjs && node scripts/harden-data-freshness.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs && node scripts/harden-session-stability.mjs && node scripts/validate-bundle-json.mjs",
     "test:report-ai": "node scripts/validate-report-ai-dynamic.mjs && node scripts/verify-data-persistence.mjs",
     "test:ux": "node scripts/validate-responsive-usability.mjs",
     "test:series": "node scripts/validate-report-series.mjs",
     "test:tenant": "node scripts/validate-tenant-milestones.mjs",
     "test:platform": "node scripts/validate-dynamic-tenant-platform.mjs && node scripts/verify-data-persistence.mjs",
     "test:freshness": "node scripts/validate-boot-guard.mjs && node scripts/validate-data-freshness.mjs",
-    "test:session": "node scripts/validate-session-stability.mjs",
+    "test:session": "node scripts/validate-session-stability.mjs && node scripts/validate-bundle-json.mjs",
+    "test:bundle": "node scripts/validate-bundle-json.mjs",
     "lint": "npm run lint --workspace=apps/web",
     "start": "npm run start --workspace=apps/web"
   },
