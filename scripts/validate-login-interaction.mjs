@@ -17,6 +17,24 @@ must(src,"localStorage.setItem('allamo_session'",'persistência da sessão após
 must(src,'location.reload()','entrada no portal após autenticação');
 if(/sessionStorage\.setItem\([^\n]*password|localStorage\.setItem\([^\n]*password/i.test(src))throw new Error('Senha não pode ser persistida no browser pelo guard.');
 must(index,'__allamoLoginInteractionGuard','guard de login está no artefato final');
+
+const open='<script type="__bundler/template">';
+const a=index.indexOf(open);
+if(a<0)throw new Error('Template do bundler não encontrado.');
+const start=a+open.length;
+const end=index.indexOf('</script>',start);
+if(end<0)throw new Error('Fechamento do template do bundler não encontrado.');
+let template;
+try{template=JSON.parse(index.slice(start,end));}
+catch(err){throw new Error('Template do bundler inválido: '+String(err&&err.message||err));}
+if(template.includes('value="{{ emailVal }}"'))throw new Error('Campo de e-mail ainda pode exibir {{ emailVal }} literalmente.');
+if(template.includes('value="{{ passwordVal }}"'))throw new Error('Campo de senha ainda pode exibir {{ passwordVal }} literalmente.');
+must(template,'autocomplete="username"','autocomplete nativo de e-mail');
+must(template,'autocomplete="current-password"','autocomplete nativo de senha');
+must(template,'sc-camel-on-input="{{ onEmail }}"','handler visual de e-mail preservado');
+must(template,'sc-camel-on-input="{{ onPassword }}"','handler visual de senha preservado');
+
 const build=String(pkg.scripts['build:work']||'');
 must(build,'build-work-management.mjs','pipeline principal existe');
-console.log('OK: login aceita teclado por listeners nativos e autentica sem depender do binding visual, sem persistir senha.');
+must(build,'harden-login-form.mjs','hardening visual do login roda em todo build');
+console.log('OK: login aceita teclado, não expõe bindings {{...}}, autentica sem depender do binding visual e não persiste senha.');
