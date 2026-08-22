@@ -44,7 +44,9 @@ must(contextual,'Frentes de trabalho','Editor contextual cobre frentes');
 
 must(publicClientApi,"path==='public-client-projects'",'API pública dedicada da empresa');
 must(publicClientApi,'WHERE p.company_id=?','Projetos públicos filtrados pela empresa');
-must(publicClientApi,"r.company_id=p.company_id",'Contagem de Reports mantém tenant');
+must(publicClientApi,"WHERE company_id=? AND status='PUBLICADO'",'Contagem de Reports continua filtrada pelo tenant');
+must(publicClientApi,'statsByProject','Estatísticas são associadas somente pelo projeto já carregado no tenant');
+must(publicClientApi,'schema_compatible:true','Painel público tolera evolução de schema');
 must(publicClientUi,"params.get('cliente')",'URL pública define empresa');
 must(publicClientUi,'Projetos','Painel público lista projetos');
 must(publicClientUi,'Instalar aplicativo','Painel público possui instalação PWA');
@@ -67,4 +69,4 @@ must(index,'Instalar aplicativo','Botão de instalar no artefato final');
 must(index,'EDIÇÃO DIRETA','Editor contextual no artefato final');
 must(index,'Descrição / subdescrição','Controles de marco no artefato final');
 must(index,'window.__allamoBootSeen','Boot guard final usa APIs críticas');
-console.log('OK: multitenancy, portal público por projetos, Reports segregados, PWA, arquivos R2/D1, fases/anexos, edição contextual e first paint validados.');
+console.log('OK: multitenancy, portal público schema-compatible por projetos, Reports segregados, PWA, arquivos R2/D1, fases/anexos, edição contextual e first paint validados.');
