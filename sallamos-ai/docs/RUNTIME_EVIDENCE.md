@@ -1,63 +1,42 @@
-# Runtime Evidence — conhecimento sem dependência de POP
+# Sallamos AI — Runtime Evidence
 
 ## Objetivo
-Permitir que a Valkíria aprenda com evidências reais do Sallamos sem depender de POPs em Drive ou de código privado indisponível.
+A Valkíria aprende com comportamento real do Sallamos sem depender de POP em Drive. O fluxo oficial é:
 
-## Fluxo
-`Sallamos/STAGE → POST /api/ai/evidence/runtime → sanitização → rascunho → revisão humana → homologado → reindex → retrieval`.
+`Sallamos/STAGE → ingestão server-to-server → sanitização → rascunho tenant-scoped → revisão humana → homologação → embedding → retrieval`.
 
-Nada recebido por esse endpoint vira conhecimento ativo automaticamente.
+## Regra de isolamento
+Toda evidência recebida pelo endpoint nasce com `scope=tenant`. Ela só pode ser recuperada pelo mesmo tenant que originou a evidência. Conteúdo tenant-scoped não aparece no dashboard nem no retrieval de outros tenants.
 
-## Autenticação
-Usar `Authorization: Bearer <EVIDENCE_INGEST_TOKEN>`.
-O token é exclusivo da integração de evidências e não deve reutilizar `ADMIN_TOKEN`, token de usuário ou token da API Sallamos.
+Para promover conhecimento de `tenant` para `global`, o homologador deve informar `publishScope=global` e `globalizationEvidence` explícita. Uma ocorrência isolada nunca é generalizada automaticamente.
 
-A esteira lê `EVIDENCE_INGEST_TOKEN` do GitHub Environment e o provisionador sincroniza o valor para o Worker via `wrangler secret put`. Se já houver secret no Worker e nenhum valor novo for fornecido no STAGE, ele é preservado; em produção o preflight exige valor explícito no Environment.
+## Idempotência
+Enviar `eventId` no corpo ou `X-Idempotency-Key`. O par `tenantId + eventId` é único. Retries do mesmo evento retornam `status=duplicate` e não criam novo documento.
 
-## Tipos aceitos
-- `api_exchange`
-- `error`
-- `successful_flow`
-- `support_resolution`
-- `telemetry`
-- `integration`
-- `permission_behavior`
+## SDK server-side
+Use `sdk/runtime-evidence-client.mjs` em backend/worker/serviço interno. O SDK sanitiza campos sensíveis antes do envio, aplica timeout, retries exponenciais e idempotency key.
 
-## Payload mínimo
-```json
-{
-  "kind": "error",
-  "module": "financeiro",
-  "version": "2026.08",
-  "owner": "time-sallamos",
-  "title": "Erro validado na importação OFX",
-  "summary": "Descrição objetiva do comportamento observado",
-  "observedAt": "2026-08-22T12:00:00Z",
-  "sourceUri": "runtime:stage",
-  "payload": {
-    "httpStatus": 422,
-    "route": "/exemplo",
-    "errorCode": "EXEMPLO"
-  }
-}
+```js
+import { createRuntimeEvidenceClient } from './runtime-evidence-client.mjs';
+const evidence = createRuntimeEvidenceClient({
+  baseUrl: process.env.SALLAMOS_AI_URL,
+  token: process.env.EVIDENCE_INGEST_TOKEN,
+  tenantId: tenant.id,
+  owner: 'Suporte Sallamos',
+  version: appVersion
+});
+await evidence.emit({
+  module: 'financeiro',
+  kind: 'successful_flow',
+  summary: 'Conciliação OFX concluída após parametrização validada.',
+  payload: { route: '/financeiro/conciliacao', result: 'success' }
+});
 ```
 
-## Privacidade
-O payload passa por sanitização recursiva. Campos como senha, token, authorization, cookie, CPF, CNPJ, e-mail, telefone, conta bancária, cartão e API key são removidos/redigidos antes do armazenamento. Mesmo assim, o produtor deve enviar o mínimo necessário.
+**Nunca coloque `EVIDENCE_INGEST_TOKEN` em JavaScript de navegador, PWA ou aplicativo distribuído.** A chamada deve sair de backend confiável.
 
-## Regra de homologação
-Uma evidência isolada descreve apenas o que foi observado. O homologador deve confirmar se ela representa uma regra geral, um comportamento da versão informada ou apenas uma ocorrência específica. Somente depois deve aprovar o documento.
+## Homologação
+O endpoint de runtime evidence não ativa conhecimento. O documento permanece `rascunho`. Um administrador revisa a evidência e decide rejeitar, homologar apenas para aquele tenant ou, com justificativa adicional, publicar como global.
 
-## Uso recomendado
-1. Capturar erros reais e suas resoluções confirmadas.
-2. Capturar fluxos executados com sucesso no STAGE.
-3. Capturar contratos reais de request/response de APIs.
-4. Capturar permissões observadas por perfil.
-5. Capturar feedback resolvido do suporte.
-6. Rejeitar evidência ambígua, específica de cliente ou sem contexto suficiente.
-
-## Segurança operacional
-- Produção exige `EVIDENCE_INGEST_TOKEN` no preflight e no readiness.
-- Sem token, o endpoint falha fechado.
-- O smoke test verifica que chamadas sem token retornam 401/503.
-- Evidência continua em status `rascunho` até aprovação administrativa explícita.
+## Contrato
+Contrato OpenAPI: `docs/runtime-evidence.openapi.yaml`.

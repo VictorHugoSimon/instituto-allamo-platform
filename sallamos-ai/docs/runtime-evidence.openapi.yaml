@@ -1,0 +1,55 @@
+openapi: 3.1.0
+info:
+  title: Sallamos AI Runtime Evidence API
+  version: 1.0.0
+  description: Ingestão server-to-server de evidência real para a Valkíria. Toda evidência entra como rascunho tenant-scoped e exige homologação humana.
+paths:
+  /api/ai/evidence/runtime:
+    post:
+      summary: Registrar evidência observada no Sallamos
+      security:
+        - bearerEvidenceToken: []
+      parameters:
+        - in: header
+          name: X-Idempotency-Key
+          required: false
+          schema: { type: string, maxLength: 160 }
+          description: Alternativa ao campo eventId. Recomendado para retries seguros.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimeEvidence'
+      responses:
+        '200':
+          description: Rascunho criado ou evento duplicado reconhecido.
+        '400': { description: Payload inválido. }
+        '401': { description: Token de ingestão inválido. }
+        '503': { description: Ingestão não configurada. }
+components:
+  securitySchemes:
+    bearerEvidenceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    RuntimeEvidence:
+      type: object
+      required: [tenantId, owner, version, module, kind]
+      properties:
+        eventId: { type: string, maxLength: 160 }
+        tenantId: { type: string, maxLength: 120 }
+        owner: { type: string, maxLength: 120 }
+        version: { type: string, maxLength: 80 }
+        module: { type: string, maxLength: 60 }
+        kind:
+          type: string
+          enum: [api_exchange, error, successful_flow, support_resolution, telemetry, integration, permission_behavior]
+        observedAt: { type: string, format: date-time }
+        title: { type: string, maxLength: 160 }
+        summary: { type: string, maxLength: 5000 }
+        sourceUri: { type: string, maxLength: 500 }
+        payload:
+          type: object
+          additionalProperties: true
