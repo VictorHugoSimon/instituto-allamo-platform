@@ -31,11 +31,28 @@ if /I not "%LOCAL_SHA%"=="%REMOTE_SHA%" (
   exit /b 1
 )
 
+rem Os arquivos abaixo sao artefatos gerados pelo build. Se ja estiverem alterados,
+rem uma execucao anterior pode ter parado no meio e deixado JSON/Worker parcialmente
+rem transformados. Nunca construir por cima disso: o script para sem apagar nada.
+set "DIRTY_GENERATED="
+for /f "delims=" %%G in ('git status --porcelain -- public/index.html public/_worker.js public/sw.js') do set "DIRTY_GENERATED=1"
+if defined DIRTY_GENERATED (
+  echo.
+  echo [ERRO] Artefatos gerados de public/ ja possuem alteracoes locais:
+  git status --short -- public/index.html public/_worker.js public/sw.js
+  echo.
+  echo Isso pode ser resto de build/deploy anterior interrompido.
+  echo Este script NAO vai restaurar, limpar ou sobrescrever automaticamente.
+  echo Faça o deploy a partir de um checkout/clone limpo de develop.
+  echo Seus backups, .wrangler e demais arquivos locais nao serao tocados.
+  exit /b 1
+)
+
 echo.
 echo Estado atual do repositorio:
 git status --short
 echo.
-echo ATENCAO: alteracoes locais serao consideradas pelo build.
+echo ATENCAO: alteracoes locais fora dos artefatos gerados serao consideradas pelo build.
 echo O script nao apaga, nao restaura e nao limpa nenhum arquivo.
 echo Pressione CTRL+C agora para cancelar ou qualquer tecla para continuar.
 pause >nul
