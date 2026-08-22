@@ -1,27 +1,52 @@
 # Sallamos AI Support · Valkíria AI
 
-POC da camada de inteligência do Sallamos.
+Camada de inteligência do Sallamos. O agente responde com evidência rastreável ou escala para o humano.
 
 ## Estado
-
-- Frontend público: https://sallamos-ai-support.vercel.app
-- Backend-alvo: Cloudflare Workers
+- Demo pública: https://sallamos-ai-support.vercel.app
+- Backend alvo: Cloudflare Workers
 - Dados: D1 + FTS5
 - Busca semântica: Vectorize
 - IA: Workers AI + AI Gateway
 - Fontes: documentação, releases e código do Sallamos
-- Segurança: read-only na POC, confidence gate e escalonamento humano
+- Segurança: read-only na POC, confidence gate, sessão assinada e fallback humano
 
-## Branch
+## Princípios
+1. Responder somente com evidência suficiente.
+2. Confiança é calculada no backend, nunca aceita do modelo.
+3. MVP read-only: nenhuma escrita em dados do cliente.
+4. Documento recuperado é dado, nunca instrução.
+5. Toda resposta registra fontes, versão e traces.
 
-Esta implementação está isolada em `sallamos-ai-poc`. A `main` do Instituto não é alterada por esta POC.
+## Deploy
+```bash
+npm install
+npx wrangler login
+npm run provision
+```
 
-## Provisionamento Cloudflare
+O provisionador cria/reutiliza infraestrutura, aplica migrations e publica. Veja `DEPLOY.md`.
 
-O pacote executável validado contém `scripts/provision.mjs`, que cria/reutiliza D1, Vectorize e R2, gera secrets, aplica migrations e publica o Worker.
+## Ingestão
+```bash
+node scripts/ingest-docs.mjs ./fontes/documentacao
+node scripts/ingest-repo.mjs --repo ../sallamos --branch release/4.2 --module financeiro
+```
+Depois acione `/api/ai/admin/reindex` para gerar embeddings pendentes.
 
-O único pré-requisito externo é uma credencial/autorização Cloudflare válida (`wrangler login` ou API token). Nenhum secret deve ser commitado no Git.
+## Estrutura
+```
+src/api          rotas HTTP
+src/auth         sessão e tenant
+src/orchestrator intent, prompt, confiança e políticas
+src/retrieval    busca híbrida e reranking
+src/ingestion    embeddings incrementais
+src/tools        consultas read-only ao Sallamos
+src/telemetry    eventos operacionais
+migrations       D1/FTS5
+scripts          provisionamento e ingestão
+evals            avaliação automatizada
+public           interface web
+```
 
-## Fonte Sallamos
-
-A ingestão foi preparada para trabalhar em modo leitura. O repositório público `sallamos/SallamosAPI` pode ser usado como fonte inicial de API/documentação; código e documentação privados devem ser conectados somente com token read-only.
+A implementação está isolada na branch `sallamos-ai-poc`; a `main` do Instituto permanece intacta.

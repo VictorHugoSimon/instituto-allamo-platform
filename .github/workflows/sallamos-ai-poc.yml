@@ -8,6 +8,13 @@ on:
       - '.github/workflows/sallamos-ai-poc.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: sallamos-ai-poc
+  cancel-in-progress: false
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -21,12 +28,41 @@ jobs:
           node-version: 22
       - name: Install
         run: npm install
-      - name: Validate Cloudflare config
-        run: npx wrangler --version
+      - name: TypeScript strict
+        run: npm run typecheck
+      - name: JavaScript syntax
+        run: |
+          node --check public/app.js
+          node --check scripts/provision.mjs
+          node --check scripts/ingest-docs.mjs
+          node --check scripts/ingest-repo.mjs
+          node --check evals/runner.mjs
+      - name: Validate D1 migrations locally
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib
+          db=sqlite3.connect(':memory:')
+          for f in sorted(pathlib.Path('migrations').glob('*.sql')):
+              db.executescript(f.read_text())
+          assert db.execute('select count(*) from knowledge_document').fetchone()[0] == 5
+          assert db.execute('select count(*) from knowledge_chunk').fetchone()[0] == 5
+          assert db.execute('select count(*) from chunk_fts').fetchone()[0] == 5
+          print('MIGRATIONS_OK')
+          PY
+      - name: Wrangler dry-run
+        run: |
+          cp wrangler.jsonc wrangler.ci.jsonc
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('wrangler.ci.jsonc')
+          p.write_text(p.read_text().replace('"PREENCHER"','"00000000-0000-0000-0000-000000000000"'))
+          PY
+          npx wrangler deploy --dry-run --config wrangler.ci.jsonc
+          rm wrangler.ci.jsonc
 
   deploy-cloudflare:
     needs: validate
-    if: ${{ github.event_name == 'workflow_dispatch' && secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,11 +70,20 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SALLAMOS_SESSION_SECRET: ${{ secrets.SALLAMOS_SESSION_SECRET }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install
-      - name: Deploy
-        run: npm run deploy
+      - name: Validate required secrets
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || (echo 'CLOUDFLARE_API_TOKEN ausente' && exit 1)
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo 'CLOUDFLARE_ACCOUNT_ID ausente' && exit 1)
+          test -n "$SALLAMOS_SESSION_SECRET" || (echo 'SALLAMOS_SESSION_SECRET ausente' && exit 1)
+          test -n "$ADMIN_TOKEN" || (echo 'ADMIN_TOKEN ausente' && exit 1)
+      - name: Provision and deploy
+        run: npm run provision

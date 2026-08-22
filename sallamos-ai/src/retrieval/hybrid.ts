@@ -9,20 +9,23 @@ export interface RetrievalResult {
 export async function hybridSearch(env: Env, query: string, filters: Filters): Promise<RetrievalResult> {
   const started = Date.now();
   const emb = await env.AI.run(env.EMBEDDING_MODEL, { text: [query] });
-  const [semantic, lexical] = await Promise.all([
-    env.VEC.query(emb.data[0], { topK: 8, returnMetadata: 'all' }),
-    env.META.prepare(
-      `SELECT c.id, c.document_id, c.text, c.symbol, c.path, c.commit_sha,
+  const lexicalQuery = sanitizeMatch(query);
+
+  const semanticPromise = env.VEC.query(emb.data[0], { topK: 8, returnMetadata: 'all' });
+  const lexicalPromise = lexicalQuery
+    ? env.META.prepare(
+        `SELECT c.id, c.document_id, c.text, c.symbol, c.path, c.commit_sha,
                 c.module, c.version, d.source_type, d.status, d.owner,
                 bm25(chunk_fts) AS rank
-         FROM chunk_fts
-         JOIN knowledge_chunk c ON c.id = chunk_fts.chunk_id
-         JOIN knowledge_document d ON d.id = c.document_id
-        WHERE chunk_fts MATCH ?
-        ORDER BY rank LIMIT 8`
-    ).bind(sanitizeMatch(query)).all()
-  ]);
+           FROM chunk_fts
+           JOIN knowledge_chunk c ON c.id = chunk_fts.chunk_id
+           JOIN knowledge_document d ON d.id = c.document_id
+          WHERE chunk_fts MATCH ?
+          ORDER BY rank LIMIT 8`
+      ).bind(lexicalQuery).all()
+    : Promise.resolve({ results: [] });
 
+  const [semantic, lexical] = await Promise.all([semanticPromise, lexicalPromise]);
   const semanticIds = semantic.matches.map((m: any) => m.id);
   const semanticHits = semanticIds.length ? await hydrate(env, semanticIds, semantic.matches) : [];
   const lexicalHits = (lexical.results ?? []).map(toLexicalHit);
@@ -37,7 +40,7 @@ async function hydrate(env: Env, ids: string[], matches: any[]): Promise<Hit[]> 
   const placeholders = ids.map(() => '?').join(',');
   const rows = await env.META.prepare(
     `SELECT c.id, c.document_id, c.text, c.symbol, c.path, c.commit_sha,
-              c.module, c.version, d.source_type, d.status, d.owner
+            c.module, c.version, d.source_type, d.status, d.owner
        FROM knowledge_chunk c
        JOIN knowledge_document d ON d.id = c.document_id
       WHERE c.id IN (${placeholders})`
@@ -63,5 +66,10 @@ function toLexicalHit(r: any): Hit {
 
 function sanitizeMatch(q: string): string {
   return q.replace(/["*():^-]/g, ' ')
-          .split(/\s+/).filter(Boolean).map(t => '"' + t + '"').join(' OR ');
+    .split(/\s+/)
+    .map(t => t.trim())
+    .filter(t => t.length >= 2)
+    .slice(0, 16)
+    .map(t => '"' + t.replace(/"/g, '') + '"')
+    .join(' OR ');
 }
