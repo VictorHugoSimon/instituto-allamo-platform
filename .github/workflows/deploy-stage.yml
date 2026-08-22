@@ -11,6 +11,10 @@ on:
         description: 'Motivo da release / referência da homologação'
         required: false
         type: string
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/deploy-stage.yml'
 
 permissions:
   contents: read
@@ -21,7 +25,7 @@ concurrency:
 
 jobs:
   release-stage:
-    if: ${{ inputs.confirm == 'DEPLOY-STAGE' }}
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'DEPLOY-STAGE' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -67,5 +71,5 @@ jobs:
           echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
           echo "- Motivo: ${{ inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Config Cloudflare: wrangler.stage.toml materializada temporariamente como wrangler.toml" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Deploy automático por push: DESATIVADO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy automático por push: TEMPORÁRIO PARA ESTA RELEASE" >> "$GITHUB_STEP_SUMMARY"
           echo "- D1 reset/migration destrutiva: NÃO EXECUTADO" >> "$GITHUB_STEP_SUMMARY"
