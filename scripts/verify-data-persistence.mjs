@@ -7,9 +7,13 @@ const reportAiMigration = fs.readFileSync('migrations/2026-08-21-report-ai-dynam
 const dynamicTenantMigration = fs.readFileSync('migrations/2026-08-21-dynamic-tenant-storage.sql','utf8');
 const milestoneMigration = fs.readFileSync('migrations/2026-08-21-milestone-evidence.sql','utf8');
 const d1ChunksMigration = fs.readFileSync('migrations/2026-08-21-d1-file-chunks.sql','utf8');
+const legacyStageRestoreSql = fs.readFileSync('ops/stage/restore-baseline-three-companies.sql','utf8');
+const legacyStageRestoreCmd = fs.readFileSync('scripts/restore-stage-baseline-three.cmd','utf8');
 
 // Procura comandos SQL destrutivos em qualquer posição, inclusive dentro de strings JS.
+// No SQL legado neutralizado, comentários são removidos antes da inspeção para evitar falso positivo documental.
 const destructive = /\b(DELETE\s+FROM|DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE(?:\s+TABLE)?)\b/i;
+const stripSqlComments = content => content.replace(/^\s*--.*$/gm,'');
 for (const [name,content] of [
   ['bootstrap de Stage',stage],
   ['bootstrap de Reports',reportSchema],
@@ -17,10 +21,15 @@ for (const [name,content] of [
   ['migration Reports IA',reportAiMigration],
   ['migration campos/arquivos multitenant',dynamicTenantMigration],
   ['migration marcos/evidências',milestoneMigration],
-  ['migration chunks D1',d1ChunksMigration]
+  ['migration chunks D1',d1ChunksMigration],
+  ['SQL legado de restore do Stage',stripSqlComments(legacyStageRestoreSql)]
 ]) {
   if (destructive.test(content)) throw new Error(`Falha de governança: ${name} contém SQL destrutivo. Deploy deve preservar dados.`);
 }
+if (/\bwrangler\s+d1\s+(execute|export)\b/i.test(legacyStageRestoreCmd)) throw new Error('Falha de governança: script legado de restore ainda consegue acessar D1.');
+if (/RESTAURAR-STAGE-3/i.test(legacyStageRestoreCmd)) throw new Error('Falha de governança: confirmação destrutiva antiga ainda está presente no script legado.');
+if (!legacyStageRestoreCmd.includes('RESTORE DE BASELINE DO STAGE - DESATIVADO')) throw new Error('Script legado de restore não está explicitamente neutralizado.');
+if (!legacyStageRestoreSql.includes('RESTORE DESATIVADO')) throw new Error('SQL legado de restore não está explicitamente neutralizado.');
 if (!stage.includes("DATA_PERSISTENCE_MODE = 'persistent'")) throw new Error('Modo persistente não declarado no runtime de Stage.');
 if (!stage.includes('reset_disabled: true')) throw new Error('Health-check não declara reset desativado.');
 if (!resetMigration.includes('RESET DESATIVADO')) throw new Error('Migration legada não está explicitamente neutralizada.');
@@ -30,4 +39,4 @@ if (!dynamicTenantMigration.includes('somente aditiva')) throw new Error('Migrat
 if (!d1ChunksMigration.includes('CREATE-ONLY') || !d1ChunksMigration.includes('tenant_file_chunks')) throw new Error('Migration do fallback D1 deve permanecer create-only e chunked.');
 if (!reportSchema.includes('tenant_field_definitions') || !reportSchema.includes('tenant_files') || !reportSchema.includes('tenant_file_chunks')) throw new Error('Schema persistente não contempla campos dinâmicos/arquivos/chunks multitenant.');
 
-console.log('OK: persistência cobre Stage, Reports, IA, campos dinâmicos, arquivos R2/D1, chunks e marcos; nenhum reset automático ou SQL destrutivo permitido.');
+console.log('OK: persistência cobre Stage, Reports, IA, campos dinâmicos, arquivos R2/D1, chunks e marcos; restore legado neutralizado e nenhum SQL destrutivo permitido.');
