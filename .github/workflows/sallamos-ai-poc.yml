@@ -6,14 +6,19 @@ on:
     paths:
       - 'sallamos-ai/**'
       - '.github/workflows/sallamos-ai-poc.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sallamos-ai/**'
+      - '.github/workflows/sallamos-ai-poc.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: sallamos-ai-poc
-  cancel-in-progress: false
+  group: sallamos-ai-poc-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
