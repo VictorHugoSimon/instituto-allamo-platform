@@ -24,8 +24,6 @@ if(worker.includes(start)){
 fs.writeFileSync(workerFile,worker);
 
 // ---- Portal: edita o template já decodificado e reserializa com JSON.stringify ----
-// A aplicação está armazenada como JSON em <script type="__bundler/template">.
-// Nunca escrever JavaScript diretamente na string JSON bruta.
 let html=fs.readFileSync(indexFile,'utf8');
 const templateOpen='<script type="__bundler/template">';
 const templateClose='</script>';
@@ -45,14 +43,17 @@ const nextMethod='  async onLoginSubmit(e) {';
 const restoreEnd=template.indexOf(nextMethod,restoreStart);
 if(restoreStart<0||restoreEnd<0) throw new Error('Limites de restoreSession não encontrados no template decodificado.');
 
+const clearLive="this.companies=[];this.projects=[];this.issues=[];this.viradas=[];this.docs=[];this.users=[];this.reports={};this.plan=[];this.updates={};";
 const stableRestore=[
   'restoreSession() {',
   '    let sess = null;',
   "    try { sess = JSON.parse(localStorage.getItem('allamo_session') || 'null'); } catch(e){}",
   '    if (!sess || !sess.token) return;',
+  '    // remove fotografia histórica antes de abrir a tela autenticada',
+  '    '+clearLive,
   '    // restaura imediatamente; valida autenticação em endpoint dedicado sem derrubar sessão por falha de rede',
   '    this.setState({',
-  "      token: sess.token, live: true, role: sess.role, screen: 'app',",
+  "      token: sess.token, live: true, role: sess.role, screen: 'app', gmud:[],",
   "      company: this.state.deepClient || sess.company || 'all',",
   "      tab: sess.tab || 'exec', reportProject: sess.company",
   '    }, () => {',
@@ -82,11 +83,12 @@ if(template.includes(logoutNeedle)) template=template.replace(logoutNeedle,logou
 if(!template.includes("this.api('session-status').then")) throw new Error('restoreSession ainda não usa endpoint dedicado.');
 if(!template.includes('validação temporariamente indisponível')) throw new Error('Sessão ainda pode ser apagada por falha temporária.');
 if(!template.includes("this.apiBase()+'/logout'")) throw new Error('Logout servidor não aplicado.');
+if(!template.includes('screen: \'app\', gmud:[]')) throw new Error('Boot autenticado ainda pode renderizar GMUD demo.');
+if(!template.includes(clearLive)) throw new Error('Boot autenticado ainda pode renderizar carteira demo.');
 
-// Segurança para JSON embutido em <script>: evita que conteúdo interno </script> feche a tag hospedeira.
 const serialized=JSON.stringify(template).replace(/<\//g,'<\\u002F');
 JSON.parse(serialized);
 html=html.slice(0,jsonStart)+serialized+html.slice(jsonEnd);
 fs.writeFileSync(indexFile,html);
 
-console.log('OK: sessão de 7 dias aplicada com template JSON/HTML reserializado de forma segura.');
+console.log('OK: sessão de 7 dias estável e boot autenticado sem fotografia demo.');
