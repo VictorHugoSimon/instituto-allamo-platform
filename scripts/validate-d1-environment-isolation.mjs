@@ -29,16 +29,28 @@ must(stage,`database_id = "${STAGE_ID}"`,'UUID oficial do banco Stage');
 forbid(stage,'[env.stage]','ambiente stage inválido no Pages');
 forbid(stage,PROD_ID,'config de Stage contaminada com UUID de Produção');
 
-// Produção: arquivo dedicado; previews não recebem D1 de Produção.
+// Produção: top-level/production usam PROD; preview é explicitamente não produtivo.
 must(prod,'name = "allamo-pmo"','projeto Pages oficial de Produção');
 must(prod,'[env.production]','environment production do projeto de Produção');
 must(prod,'[env.preview]','environment preview explicitamente isolado');
-must(prod,'database_name = "allamo-pmo"','nome oficial do banco Produção');
-must(prod,`database_id = "${PROD_ID}"`,'UUID oficial do banco Produção');
 forbid(prod,'[env.stage]','ambiente stage inválido no Pages');
-forbid(prod,STAGE_ID,'config de Produção contaminada com UUID de Stage');
-const previewBlock=prod.split('[env.preview]')[1]||'';
-if(previewBlock.includes('database_id')||previewBlock.includes('d1_databases'))throw new Error('Preview do projeto de Produção não pode possuir D1 de Produção.');
+
+const prodTop=prod.split('[env.production]')[0]||'';
+const afterProd=prod.split('[env.production]')[1]||'';
+const prodEnv=afterProd.split('[env.preview]')[0]||'';
+const previewEnv=prod.split('[env.preview]')[1]||'';
+
+must(prodTop,'database_name = "allamo-pmo"','D1 top-level oficial de Produção');
+must(prodTop,`database_id = "${PROD_ID}"`,'UUID top-level oficial de Produção');
+forbid(prodTop,STAGE_ID,'top-level de Produção não pode usar Stage');
+
+must(prodEnv,'database_name = "allamo-pmo"','D1 do env.production oficial');
+must(prodEnv,`database_id = "${PROD_ID}"`,'UUID do env.production oficial');
+forbid(prodEnv,STAGE_ID,'env.production não pode usar Stage');
+
+must(previewEnv,'database_name = "allamo-pmo-stage"','preview usa D1 não produtivo');
+must(previewEnv,`database_id = "${STAGE_ID}"`,'preview aponta para D1 não produtivo');
+forbid(previewEnv,PROD_ID,'preview do projeto de Produção nunca pode usar D1 produtivo');
 
 // Release de Stage precisa escolher explicitamente o arquivo de Stage.
 must(deployCmd,'--config wrangler.stage.toml','deploy local de Stage com config explícita');
@@ -46,4 +58,4 @@ must(deployWorkflow,'--config wrangler.stage.toml','workflow de Stage com config
 forbid(deployCmd,'--env stage','deploy local não pode usar env.stage');
 forbid(deployWorkflow,'--env stage','workflow não pode usar env.stage');
 
-console.log('OK: Pages config isolada — Stage e Produção usam arquivos distintos, sem env.stage e sem risco de cruzamento D1.');
+console.log('OK: Pages config isolada — Stage e Produção usam arquivos distintos; preview de Produção não toca D1 produtivo; env.stage proibido.');
