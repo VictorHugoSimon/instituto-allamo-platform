@@ -36,12 +36,16 @@ jobs:
         run: |
           node --check scripts/provision.mjs
           node --check scripts/smoke.mjs
+          node --check scripts/preflight.mjs
           node --check scripts/validate-eval-readiness.mjs
+          node --check scripts/validate-eval-candidates.mjs
           node --check scripts/ingest-docs.mjs
           node --check scripts/ingest-repo.mjs
           node --check scripts/sync-sallamos-api.mjs
           node --check evals/runner.mjs
           node --check public/app.js
+      - name: Validate candidate eval backlog
+        run: npm run evals:candidates
       - name: Validate migrations and stage seed
         run: |
           python - <<'PY'
@@ -97,11 +101,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install --no-audit --no-fund
+      - name: Stage preflight
+        run: node scripts/preflight.mjs stage
       - name: Validate Cloudflare credentials
-        run: |
-          test -n "$CLOUDFLARE_API_TOKEN" || (echo 'CLOUDFLARE_API_TOKEN ausente no environment sallamos-ai-stage' && exit 1)
-          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo 'CLOUDFLARE_ACCOUNT_ID ausente' && exit 1)
-          npx wrangler whoami
+        run: npx wrangler whoami
       - name: Provision and deploy stage
         id: deploy
         run: npm run provision:stage
@@ -118,13 +121,29 @@ jobs:
     defaults: { run: { working-directory: sallamos-ai } }
     env:
       PRODUCTION_GO_LIVE: ${{ vars.PRODUCTION_GO_LIVE || 'false' }}
+      SALLAMOS_AI_STAGE_URL: ${{ vars.SALLAMOS_AI_STAGE_URL }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
       - name: Explicit go-live gate
         run: |
           if [ "$PRODUCTION_GO_LIVE" != "true" ]; then echo 'PRODUCTION BLOCKED: defina PRODUCTION_GO_LIVE=true somente após concluir o Gate de Go-Live (#45).'; exit 1; fi
       - name: Dataset homologation gate
-        run: node scripts/validate-eval-readiness.mjs
+        run: npm run evals:ready
+      - name: STAGE URL gate
+        run: |
+          test -n "$SALLAMOS_AI_STAGE_URL" || (echo 'PRODUCTION BLOCKED: SALLAMOS_AI_STAGE_URL ausente no environment de produção' && exit 1)
+          case "$SALLAMOS_AI_STAGE_URL" in https://*) ;; *) echo 'PRODUCTION BLOCKED: SALLAMOS_AI_STAGE_URL deve ser HTTPS'; exit 1;; esac
+      - name: Runtime quality gate against homologated STAGE
+        run: node evals/runner.mjs --base "$SALLAMOS_AI_STAGE_URL" --auto-token true --dataset eval-data/dataset.jsonl --decision-gate 0.90 --retrieval-gate 0.85 --terms-gate 0.90 --escalation-gate 1.00 --max-p95 12000 --output eval-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sallamos-ai-production-eval
+          path: sallamos-ai/eval-results.json
+          if-no-files-found: ignore
 
   deploy-production:
     needs: [validate, production-gate]
@@ -142,6 +161,7 @@ jobs:
       SALLAMOS_API_TOKEN: ${{ secrets.SALLAMOS_API_TOKEN }}
       REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
       SALLAMOS_AI_BASE_URL: ${{ vars.SALLAMOS_AI_BASE_URL }}
+      SALLAMOS_AI_STAGE_URL: ${{ vars.SALLAMOS_AI_STAGE_URL }}
       PRODUCTION_GO_LIVE: ${{ vars.PRODUCTION_GO_LIVE || 'false' }}
       SYNC_KNOWLEDGE: ${{ vars.SYNC_KNOWLEDGE || 'false' }}
     steps:
@@ -149,15 +169,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install --no-audit --no-fund
+      - name: Production preflight
+        run: node scripts/preflight.mjs production
       - name: Validate Cloudflare credentials
-        run: |
-          test -n "$CLOUDFLARE_API_TOKEN" || (echo 'CLOUDFLARE_API_TOKEN ausente no environment sallamos-ai-production' && exit 1)
-          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo 'CLOUDFLARE_ACCOUNT_ID ausente' && exit 1)
-          npx wrangler whoami
-      - name: Validate production integration secrets
-        run: |
-          test -n "$SALLAMOS_AUTH_VALIDATE_URL" || (echo 'SALLAMOS_AUTH_VALIDATE_URL obrigatório em produção' && exit 1)
-          test -n "$SALLAMOS_API_BASE" || (echo 'SALLAMOS_API_BASE obrigatório em produção' && exit 1)
+        run: npx wrangler whoami
       - name: Provision and deploy production
         id: deploy
         run: npm run provision:production

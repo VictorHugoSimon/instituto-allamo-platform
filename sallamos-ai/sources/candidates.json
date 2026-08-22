@@ -1,0 +1,81 @@
+{
+  "policy": {
+    "releaseStrategy": "document-first",
+    "rule": "Nenhuma fonte candidata entra no retrieval até homologação humana explícita pelo fluxo administrativo.",
+    "publicSafe": true
+  },
+  "candidates": [
+    {
+      "alias": "process-map-functional-2025",
+      "kind": "functional-process-map",
+      "coverage": ["painel-controle","financeiro","dre","fluxo-de-caixa","contas-a-pagar","contas-a-receber","centros-de-custo","plano-de-contas","contas-bancarias","conciliacao","cnab","obz","vendas","clientes","servicos","suprimentos"],
+      "freshness": "material atualizado em 2025",
+      "status": "candidate-review-required",
+      "owner": "A confirmar",
+      "risk": "Pode refletir funcionalidades existentes sem detalhar passo a passo ou mudanças posteriores."
+    },
+    {
+      "alias": "pop-finance-2026",
+      "kind": "operational-pop",
+      "coverage": ["contas-a-pagar","contas-a-receber","pedido-de-compra","pedido-de-venda","permissoes","erros-comuns","checklist"],
+      "freshness": "evidência de elaboração/revisão em agosto de 2026",
+      "status": "candidate-review-required",
+      "owner": "A confirmar",
+      "risk": "Os POPs precisam ser localizados na versão aprovada e não apenas inferidos por registros de atividade."
+    },
+    {
+      "alias": "pop-master-data-2026",
+      "kind": "operational-pop",
+      "coverage": ["clientes","parceiros","produtos"],
+      "freshness": "evidência de elaboração em agosto de 2026",
+      "status": "candidate-review-required",
+      "owner": "A confirmar",
+      "risk": "Alguns POPs estavam pendentes de aprovação no registro de atividade."
+    },
+    {
+      "alias": "open-finance-ofx-2026",
+      "kind": "development-homologation-evidence",
+      "coverage": ["open-finance","ofx","conciliacao","conta-bancaria","pagador","performance"],
+      "freshness": "atividades de desenvolvimento e homologação em agosto de 2026",
+      "status": "candidate-review-required",
+      "owner": "A confirmar",
+      "risk": "Worklog comprova trabalho executado, mas não substitui documentação funcional aprovada."
+    },
+    {
+      "alias": "support-activity-2026",
+      "kind": "support-worklog",
+      "coverage": ["bordero","saldo-bancario","lentidao","treinamentos","chamados"],
+      "freshness": "atividades de suporte/homologação em 2026",
+      "status": "candidate-for-eval-discovery",
+      "owner": "A confirmar",
+      "risk": "Usar somente para descobrir cenários de teste; não como resposta oficial sem evidência operacional."
+    },
+    {
+      "alias": "legacy-beta-manual-2023",
+      "kind": "legacy-manual",
+      "coverage": ["instalacao-legada"],
+      "freshness": "2023",
+      "status": "rejected-for-production",
+      "owner": "Sallamos",
+      "risk": "Material antigo com procedimentos e credenciais/defaults históricos."
+    },
+    {
+      "alias": "public-api-placeholder",
+      "kind": "public-repository",
+      "coverage": ["api"],
+      "freshness": "revisado em 2026",
+      "status": "rejected-for-production",
+      "owner": "Sallamos",
+      "risk": "Conteúdo público encontrado representa template Petstore e não a API real."
+    },
+    {
+      "alias": "current-source-code",
+      "kind": "source-code",
+      "coverage": ["backend","frontend","etl"],
+      "freshness": "A confirmar",
+      "status": "required-missing",
+      "owner": "A confirmar",
+      "risk": "Código atual não foi localizado nas integrações GitHub/Drive acessíveis; primeira release permanece document-first."
+    }
+  ]
+}
