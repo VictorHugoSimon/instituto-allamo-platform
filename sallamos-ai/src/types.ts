@@ -10,8 +10,9 @@ export interface Env {
 }
 export interface SessionContext{tenantId:string;userId:string;profile:string;permissions:string[];productVersion:string;locale:string}
 export type SourceType='doc'|'code'|'release'|'faq'|'history'|'tool';
-export interface Hit{chunkId:string;documentId:string;sourceType:SourceType;text:string;path?:string;symbol?:string;commitSha?:string;module?:string;version?:string;status?:string;owner?:string;score:number;origin:'semantic'|'lexical'}
-export interface Filters{module?:string;version?:string;onlyApproved?:boolean}
+export type KnowledgeScope='global'|'tenant';
+export interface Hit{chunkId:string;documentId:string;sourceType:SourceType;text:string;path?:string;symbol?:string;commitSha?:string;module?:string;version?:string;status?:string;owner?:string;scope?:KnowledgeScope;tenantId?:string;score:number;origin:'semantic'|'lexical'}
+export interface Filters{module?:string;version?:string;onlyApproved?:boolean;tenantId?:string}
 export interface ModelOutput{intent:string;module:string;answer:string;steps:string[];sources:Array<{type:SourceType;id:string;version?:string}>;needs_clarification:boolean;missing_context:string[];risk_level:'low'|'medium'|'high';model_notes?:string}
 export type Decision='answer'|'clarify'|'escalate';
 export interface Signals{retrievalRelevance:number;sourceAuthority:number;recency:number;corroboration:number;minimumContext:number;actionRisk:number}
