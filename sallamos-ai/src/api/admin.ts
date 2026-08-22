@@ -1,0 +1,30 @@
+import type { Env } from '../types';
+import { HttpError } from '../auth/session';
+
+export function requireAdmin(req: Request, env: Env) {
+  const auth = req.headers.get('authorization') ?? '';
+  if (!env.ADMIN_TOKEN || auth !== 'Bearer ' + env.ADMIN_TOKEN) throw new HttpError(403, 'forbidden');
+}
+
+export async function handleAdminStatus(req: Request, env: Env) {
+  requireAdmin(req, env);
+  const [docs, chunks, interactions, escalations, feedback, snapshot, events] = await env.META.batch([
+    env.META.prepare("SELECT COUNT(*) AS total, MAX(updated_at) AS latest FROM knowledge_document WHERE status='homologado'"),
+    env.META.prepare('SELECT COUNT(*) AS total FROM knowledge_chunk WHERE embedded=0'),
+    env.META.prepare("SELECT COUNT(*) AS total FROM message WHERE created_at >= datetime('now','-24 hours')"),
+    env.META.prepare("SELECT COUNT(*) AS total FROM escalation WHERE status NOT IN ('resolved','fechado','closed')"),
+    env.META.prepare("SELECT COUNT(*) AS total FROM feedback WHERE created_at >= datetime('now','-24 hours')"),
+    env.META.prepare('SELECT repository, branch, commit_sha, indexed_at, status FROM repo_snapshot ORDER BY indexed_at DESC LIMIT 1'),
+    env.META.prepare("SELECT event_type, COUNT(*) AS total FROM system_event WHERE created_at >= datetime('now','-24 hours') GROUP BY event_type ORDER BY total DESC")
+  ]);
+
+  const d: any = docs.results?.[0] ?? {};
+  const c: any = chunks.results?.[0] ?? {};
+  return {
+    service: 'sallamos-ai', environment: env.ENVIRONMENT, promptVersion: env.PROMPT_VERSION,
+    knowledge: { homologatedDocuments: Number(d.total ?? 0), latestDocumentAt: d.latest ?? null, pendingEmbeddings: Number(c.total ?? 0), latestSnapshot: snapshot.results?.[0] ?? null },
+    last24h: { interactions: Number((interactions.results?.[0] as any)?.total ?? 0), openEscalations: Number((escalations.results?.[0] as any)?.total ?? 0), feedback: Number((feedback.results?.[0] as any)?.total ?? 0), criticalEvents: events.results ?? [] },
+    integrations: { authMode: env.AUTH_MODE, authConfigured: Boolean(env.SALLAMOS_AUTH_VALIDATE_URL), sallamosApiConfigured: Boolean(env.SALLAMOS_API_BASE), repoCredentialConfigured: Boolean(env.REPO_READ_TOKEN) },
+    retention: { dataDays: Number(env.DATA_RETENTION_DAYS ?? (env.ENVIRONMENT === 'production' ? 90 : 14)), eventDays: Number(env.EVENT_RETENTION_DAYS ?? (env.ENVIRONMENT === 'production' ? 180 : 30)) }
+  };
+}
