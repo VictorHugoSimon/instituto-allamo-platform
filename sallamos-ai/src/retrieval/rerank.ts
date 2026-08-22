@@ -5,8 +5,10 @@ const AUTHORITY: Record<SourceType, number> = {
 };
 
 export function rerank(hits: Hit[], filters: Filters): Hit[] {
+  const approvedInput = filters.onlyApproved ? hits.filter(h => h.status === 'homologado') : hits;
   const byChunk = new Map<string, Hit>();
-  for (const h of hits) {
+
+  for (const h of approvedInput) {
     const existing = byChunk.get(h.chunkId);
     if (existing) {
       existing.score = Math.min(1, Math.max(existing.score, h.score) + 0.15);
@@ -23,7 +25,6 @@ export function rerank(hits: Hit[], filters: Filters): Hit[] {
     if (!h.owner || h.status === 'sem_owner') s *= 0.6;
     if (filters.version && h.version && h.version !== filters.version) s *= 0.65;
     if (filters.module && h.module && h.module !== filters.module) s *= 0.85;
-    if (filters.onlyApproved && h.status !== 'homologado') s *= 0.4;
     return { ...h, score: Math.min(1, s) };
   });
 

@@ -26,6 +26,9 @@ interface VectorizeIndex {
   query(vector: number[], options?: Record<string, unknown>): Promise<VectorizeMatches>;
   upsert(vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>): Promise<unknown>;
 }
+interface RateLimit {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
 interface R2Bucket {}
 interface ScheduledEvent {
   scheduledTime: number;
