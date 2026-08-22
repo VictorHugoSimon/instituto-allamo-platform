@@ -10,6 +10,7 @@ echo ============================================================
 echo Instituto Allamo PMO - Release segura de STAGE
 echo Um build. Um gate consolidado. Um deploy.
 echo Nao executa reset, DELETE, migration ou deploy de producao.
+echo Config Cloudflare: wrangler.stage.toml (isolada de Producao).
 echo ============================================================
 echo.
 
@@ -46,7 +47,7 @@ echo [5/7] Executando gate consolidado...
 call npm run test:release || goto :fail
 
 echo [6/7] Publicando exatamente o artefato validado no STAGE...
-call npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production --commit-dirty=true || goto :fail
+call npx wrangler@4.124.0 pages deploy public --config wrangler.stage.toml --project-name allamo-pmo-stage --branch production --commit-dirty=true || goto :fail
 
 set "RESULT=0"
 goto :cleanup
@@ -67,6 +68,7 @@ if not "%RESULT%"=="0" exit /b %RESULT%
 echo [7/7] STAGE publicado com sucesso.
 echo Commit: %REMOTE_SHA%
 echo URL: https://allamo-pmo-stage.pages.dev
+echo Config: wrangler.stage.toml
 echo Nenhuma migration/reset foi executado.
 echo Producao nao foi alterada.
 exit /b 0
