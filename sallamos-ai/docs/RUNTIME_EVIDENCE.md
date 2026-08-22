@@ -4,13 +4,15 @@
 Permitir que a Valkíria aprenda com evidências reais do Sallamos sem depender de POPs em Drive ou de código privado indisponível.
 
 ## Fluxo
-`Sallamos/STAGE → POST /api/ai/evidence/runtime → sanitização → rascunho → revisão humana → homologação → reindex → retrieval`.
+`Sallamos/STAGE → POST /api/ai/evidence/runtime → sanitização → rascunho → revisão humana → homologado → reindex → retrieval`.
 
 Nada recebido por esse endpoint vira conhecimento ativo automaticamente.
 
 ## Autenticação
 Usar `Authorization: Bearer <EVIDENCE_INGEST_TOKEN>`.
 O token é exclusivo da integração de evidências e não deve reutilizar `ADMIN_TOKEN`, token de usuário ou token da API Sallamos.
+
+A esteira lê `EVIDENCE_INGEST_TOKEN` do GitHub Environment e o provisionador sincroniza o valor para o Worker via `wrangler secret put`. Se já houver secret no Worker e nenhum valor novo for fornecido no STAGE, ele é preservado; em produção o preflight exige valor explícito no Environment.
 
 ## Tipos aceitos
 - `api_exchange`
