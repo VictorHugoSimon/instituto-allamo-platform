@@ -1,0 +1,30 @@
+name = "allamo-pmo"
+pages_build_output_dir = "public"
+compatibility_date = "2026-08-20"
+
+# Configuracao EXCLUSIVA do projeto Cloudflare Pages de PRODUCAO.
+# Nao reutilizar este arquivo no projeto allamo-pmo-stage.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "allamo-pmo"
+database_id = "361c63ba-b9f8-409d-9a46-9609914da8b7"
+
+[ai]
+binding = "AI"
+
+[env.production]
+compatibility_date = "2026-08-20"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "allamo-pmo"
+database_id = "361c63ba-b9f8-409d-9a46-9609914da8b7"
+
+[env.production.ai]
+binding = "AI"
+
+# Preview do projeto de producao fica deliberadamente sem D1.
+# Isso impede que um preview acidental escreva no banco de producao.
+[env.preview]
+compatibility_date = "2026-08-20"
