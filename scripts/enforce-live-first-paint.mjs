@@ -3,13 +3,9 @@ import fs from 'node:fs';
 const file='public/index.html';
 let html=fs.readFileSync(file,'utf8');
 
-// O portal principal fica serializado como uma string JSON dentro de
-// <script type="__bundler/template">. Alterar essa string crua com replace
-// pode produzir escapes JSON inválidos. Toda alteração abaixo acontece no
-// template JÁ decodificado e depois é reserializada com JSON.stringify.
-const open='<script type="__bundler/template">';
-const close='</script>';
-
+// O bundle armazena código em diferentes blocos <script type="__bundler/...">.
+// Nunca fazemos replace diretamente no JSON serializado: parseamos cada bloco,
+// alteramos strings já decodificadas e reserializamos com JSON.stringify.
 const prefix=String.raw`const resourceScript = '<style id="allamo-boot-guard">#allamo-boot-status-box{position:fixed;left:16px;bottom:16px;z-index:2147483000;background:#302f39;color:#fff;border-radius:999px;padding:8px 12px;font:700 12px -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 8px 28px #1018282e;display:flex;gap:8px;align-items:center;max-width:min(460px,calc(100vw - 32px))}#allamo-boot-status-box[data-state="error"]{background:#b42318;border-radius:12px}#allamo-boot-retry{border:1px solid #ffffff55;border-radius:7px;background:#fff;color:#302f39;padding:5px 8px;font-weight:800;cursor:pointer}</style><script>' +
       '(function(){' +
       'window.__allamoLegacyLoadingLabel="Carregando dados do Portal PMO";window.__allamoBootNonBlocking=true;window.__allamoApiPending=0;window.__allamoApiStarted=0;window.__allamoApiCompleted=0;window.__allamoBootSeen={companies:false,projects:false,publicClient:false};window.__allamoBootStarted=Date.now();' +
@@ -20,77 +16,97 @@ const prefix=String.raw`const resourceScript = '<style id="allamo-boot-guard">#a
       '})();' +
       '</' + 'script><script>window.__resources = ' +`;
 
-function mutateTemplate(template){
+function mutateText(text){
   const guardedStart="const resourceScript = '<style id=\"allamo-boot-guard\">";
   const tail="<script>window.__resources = ' +";
   const original="const resourceScript = '<script>window.__resources = ' +";
-  const s=template.indexOf(guardedStart);
+  const s=text.indexOf(guardedStart);
 
   if(s>=0){
-    const e=template.indexOf(tail,s);
+    const e=text.indexOf(tail,s);
     if(e<0)throw new Error('Boot guard existente sem final reconhecível.');
-    template=template.slice(0,s)+prefix+template.slice(e+tail.length);
-  }else if(template.includes(original)){
-    template=template.replace(original,prefix);
-  }else if(!template.includes('window.__allamoBootSeen')){
-    return {template,changed:false};
+    return {value:text.slice(0,s)+prefix+text.slice(e+tail.length),changed:true};
   }
-
-  const blocking='body{visibility:'+'hidden!important}';
-  if(!template.includes('window.__allamoBootNonBlocking=true'))throw new Error('First paint ainda não está em modo não bloqueante.');
-  if(template.includes(blocking))throw new Error('Bloqueio global do body ainda presente.');
-  if(!template.includes('window.__allamoBootSeen={companies:false,projects:false,publicClient:false}'))throw new Error('Sincronização não rastreia APIs críticas.');
-  if(!template.includes('seen.companies&&!!seen.projects'))throw new Error('Sessão autenticada não rastreia companies/projects.');
-  if(!template.includes('return !!seen.publicClient'))throw new Error('Link público não rastreia o contexto da empresa.');
-  if(!template.includes('public-client-projects'))throw new Error('Portal público não participa da sincronização inicial.');
-  if(!template.includes('window.__allamoBootGuardStarted'))throw new Error('Sincronização não possui proteção contra dupla inicialização.');
-  if(!template.includes('setTimeout(function(){window.__allamoRevealWhenReady()},0)'))throw new Error('Sincronização não inicia de forma autônoma.');
-  if(!template.includes('allamo-boot-retry'))throw new Error('Fallback recuperável de conectividade ausente.');
-  if(!template.includes('Sincronizando dados'))throw new Error('Indicador não bloqueante de sincronização ausente.');
-  return {template,changed:true};
+  if(text.includes(original))return {value:text.replace(original,prefix),changed:true};
+  return {value:text,changed:false};
 }
 
-let cursor=0;
-let rebuilt='';
-let changed=0;
-let blocks=0;
+function walk(value){
+  if(typeof value==='string')return mutateText(value);
+  if(Array.isArray(value)){
+    let changed=false;
+    const out=value.map(v=>{const r=walk(v);changed=changed||r.changed;return r.value});
+    return {value:out,changed};
+  }
+  if(value&&typeof value==='object'){
+    let changed=false;const out={};
+    for(const [k,v] of Object.entries(value)){const r=walk(v);changed=changed||r.changed;out[k]=r.value}
+    return {value:out,changed};
+  }
+  return {value,changed:false};
+}
 
-while(true){
-  const tagStart=html.indexOf(open,cursor);
-  if(tagStart<0){rebuilt+=html.slice(cursor);break;}
-  const jsonStart=tagStart+open.length;
-  const jsonEnd=html.indexOf(close,jsonStart);
-  if(jsonEnd<0)throw new Error('Fechamento de __bundler/template não encontrado.');
+const tagRe=/<script type="(__bundler\/[^"]+)">/g;
+let cursor=0,rebuilt='',changedCount=0,blockCount=0,m;
 
-  rebuilt+=html.slice(cursor,jsonStart);
-  const encoded=html.slice(jsonStart,jsonEnd);
-  let template;
-  try{template=JSON.parse(encoded)}
-  catch(err){throw new Error(`__bundler/template #${blocks+1} já chegou inválido antes do first paint: ${String(err&&err.message||err)}`)}
-  if(typeof template!=='string')throw new Error(`__bundler/template #${blocks+1} não é string JSON.`);
+while((m=tagRe.exec(html))){
+  const tagStart=m.index;
+  const jsonStart=tagRe.lastIndex;
+  const jsonEnd=html.indexOf('</script>',jsonStart);
+  if(jsonEnd<0)throw new Error(`Fechamento de ${m[1]} não encontrado.`);
 
-  const result=mutateTemplate(template);
-  if(result.changed)changed++;
-  const serialized=JSON.stringify(result.template).replace(/<\//g,'<\\u002F');
+  // Conteúdo fora de blocos JSON pode conter o runtime como JS normal.
+  const outside=html.slice(cursor,tagStart);
+  const outsideResult=mutateText(outside);
+  if(outsideResult.changed)changedCount++;
+  rebuilt+=outsideResult.value+html.slice(tagStart,jsonStart);
+
+  const raw=html.slice(jsonStart,jsonEnd);
+  let parsed;
+  try{parsed=JSON.parse(raw)}
+  catch(err){throw new Error(`${m[1]} já chegou inválido antes do first paint: ${String(err&&err.message||err)}`)}
+
+  const result=walk(parsed);
+  if(result.changed)changedCount++;
+  const serialized=JSON.stringify(result.value).replace(/<\//g,'<\\u002F');
   JSON.parse(serialized);
   rebuilt+=serialized;
+
   cursor=jsonEnd;
-  blocks++;
+  tagRe.lastIndex=jsonEnd+'</script>'.length;
+  blockCount++;
 }
 
-if(!blocks)throw new Error('Nenhum __bundler/template encontrado.');
-if(!changed)throw new Error('Template principal do first paint não foi localizado.');
+const outsideTail=html.slice(cursor);
+const tailResult=mutateText(outsideTail);
+if(tailResult.changed)changedCount++;
+rebuilt+=tailResult.value;
 html=rebuilt;
 
-// Validação final de todos os templates antes de gravar.
-let checkPos=0,checked=0;
-while(true){
-  const a=html.indexOf(open,checkPos);if(a<0)break;
-  const b=a+open.length,c=html.indexOf(close,b);if(c<0)throw new Error('Template final sem fechamento.');
-  JSON.parse(html.slice(b,c));
-  checked++;checkPos=c+close.length;
+if(!blockCount)throw new Error('Nenhum bloco __bundler/* encontrado.');
+if(!changedCount&&!html.includes('window.__allamoBootNonBlocking=true'))throw new Error('Runtime de first paint não foi localizado.');
+
+const blocking='body{visibility:'+'hidden!important}';
+if(!html.includes('window.__allamoBootNonBlocking=true'))throw new Error('First paint ainda não está em modo não bloqueante.');
+if(html.includes(blocking))throw new Error('Bloqueio global do body ainda presente.');
+if(!html.includes('window.__allamoBootSeen={companies:false,projects:false,publicClient:false}'))throw new Error('Sincronização não rastreia APIs críticas.');
+if(!html.includes('seen.companies&&!!seen.projects'))throw new Error('Sessão autenticada não rastreia companies/projects.');
+if(!html.includes('return !!seen.publicClient'))throw new Error('Link público não rastreia o contexto da empresa.');
+if(!html.includes('public-client-projects'))throw new Error('Portal público não participa da sincronização inicial.');
+if(!html.includes('window.__allamoBootGuardStarted'))throw new Error('Sincronização não possui proteção contra dupla inicialização.');
+if(!html.includes('setTimeout(function(){window.__allamoRevealWhenReady()},0)'))throw new Error('Sincronização não inicia de forma autônoma.');
+if(!html.includes('allamo-boot-retry'))throw new Error('Fallback recuperável de conectividade ausente.');
+if(!html.includes('Sincronizando dados'))throw new Error('Indicador não bloqueante de sincronização ausente.');
+
+// Segunda passagem: todo bloco JSON do bundler precisa continuar parseável.
+tagRe.lastIndex=0;
+while((m=tagRe.exec(html))){
+  const a=tagRe.lastIndex,b=html.indexOf('</script>',a);
+  if(b<0)throw new Error(`Fechamento final de ${m[1]} não encontrado.`);
+  try{JSON.parse(html.slice(a,b))}
+  catch(err){throw new Error(`${m[1]} ficou inválido após first paint: ${String(err&&err.message||err)}`)}
+  tagRe.lastIndex=b+'</script>'.length;
 }
-if(checked!==blocks)throw new Error('Quantidade de templates mudou durante o first paint.');
 
 fs.writeFileSync(file,html);
-console.log('OK: first paint não bloqueante aplicado com integridade JSON preservada.');
+console.log('OK: first paint aplicado sem editar JSON serializado diretamente; integridade do bundle preservada.');
