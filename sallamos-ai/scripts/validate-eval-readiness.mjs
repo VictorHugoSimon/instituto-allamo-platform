@@ -19,7 +19,8 @@ for (const [index, row] of rows.entries()) {
   else if (ids.has(row.id)) errors.push(`linha ${pos}: id duplicado ${row.id}`);
   else ids.add(row.id);
 
-  if (row.dataset_type === 'demo') errors.push(`linha ${pos}/${row.id}: caso demo não pode liberar produção`);
+  if (row.dataset_type === 'demo' || row.dataset_type === 'candidate-derived') errors.push(`linha ${pos}/${row.id}: somente caso real homologado pode liberar produção`);
+  if (row.dataset_type !== 'production-real') errors.push(`linha ${pos}/${row.id}: dataset_type=production-real obrigatório`);
   if (row.approved !== true) errors.push(`linha ${pos}/${row.id}: approved=true obrigatório`);
   if (!row.owner || typeof row.owner !== 'string') errors.push(`linha ${pos}/${row.id}: owner/homologador obrigatório`);
   if (!row.module || typeof row.module !== 'string') errors.push(`linha ${pos}/${row.id}: module obrigatório`);
@@ -27,7 +28,8 @@ for (const [index, row] of rows.entries()) {
   if (!['answer','clarify','escalate'].includes(row.expect_decision)) errors.push(`linha ${pos}/${row.id}: expect_decision inválido`);
   if (row.expect_decision === 'answer' && !row.expected_source) errors.push(`linha ${pos}/${row.id}: expected_source obrigatório para answer`);
   if (row.expect_decision !== 'escalate' && (!row.golden_answer || String(row.golden_answer).trim().length < 10)) errors.push(`linha ${pos}/${row.id}: golden_answer obrigatório para answer/clarify`);
-  if (!row.evidence || typeof row.evidence !== 'string') errors.push(`linha ${pos}/${row.id}: evidence deve registrar a referência usada na homologação`);
+  if (row.expect_decision === 'answer' && (!Array.isArray(row.must_contain) || row.must_contain.length < 1 || row.must_contain.length > 8)) errors.push(`linha ${pos}/${row.id}: must_contain deve ter 1..8 termos obrigatórios para answer`);
+  if (!row.evidence || typeof row.evidence !== 'string' || String(row.evidence).trim().length < 5) errors.push(`linha ${pos}/${row.id}: evidence deve registrar a referência usada na homologação`);
   if (containsLikelyPII(JSON.stringify(row))) errors.push(`linha ${pos}/${row.id}: possível PII detectada; sanitize antes da homologação`);
 }
 
@@ -47,5 +49,6 @@ function containsLikelyPII(value) {
   const email = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
   const cpf = /\b(?:\d{3}[.\s-]?){2}\d{3}[-\s]?\d{2}\b/;
   const cnpj = /\b\d{2}[.\s-]?\d{3}[.\s-]?\d{3}[\/]?\d{4}[-\s]?\d{2}\b/;
-  return email.test(value) || cpf.test(value) || cnpj.test(value);
+  const phone = /(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/;
+  return email.test(value) || cpf.test(value) || cnpj.test(value) || phone.test(value);
 }
