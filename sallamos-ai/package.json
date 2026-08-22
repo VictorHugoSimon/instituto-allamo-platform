@@ -1,21 +1,5 @@
 {
-  "name": "sallamos-ai",
-  "version": "1.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "wrangler dev --env stage",
-    "typecheck": "tsc -p tsconfig.json",
-    "validate": "npm run typecheck && wrangler deploy --dry-run --env stage && wrangler deploy --dry-run --env production",
-    "provision:stage": "node scripts/provision.mjs stage",
-    "provision:production": "node scripts/provision.mjs production",
-    "sync:stage": "node scripts/sync-sallamos-api.mjs --env stage",
-    "sync:production": "node scripts/sync-sallamos-api.mjs --env production",
-    "smoke": "node scripts/smoke.mjs",
-    "evals": "node evals/runner.mjs"
-  },
-  "devDependencies": {
-    "typescript": "^5.6.0",
-    "wrangler": "^4.68.0"
-  }
+  "name":"sallamos-ai","version":"1.1.0","private":true,"type":"module",
+  "scripts":{"dev":"wrangler dev --env stage","typecheck":"tsc -p tsconfig.json","validate":"npm run typecheck && wrangler deploy --dry-run --env stage && wrangler deploy --dry-run --env production","provision:stage":"node scripts/provision.mjs stage","provision:production":"node scripts/provision.mjs production","sync:stage":"node scripts/sync-sallamos-api.mjs --env stage","sync:production":"node scripts/sync-sallamos-api.mjs --env production","smoke":"node scripts/smoke.mjs","evals":"node evals/runner.mjs","evals:ready":"node scripts/validate-eval-readiness.mjs"},
+  "devDependencies":{"typescript":"^5.6.0","wrangler":"^4.68.0"}
 }
