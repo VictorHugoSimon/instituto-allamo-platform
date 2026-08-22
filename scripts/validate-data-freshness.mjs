@@ -32,5 +32,5 @@ must(index,'allamo-boot-retry','Falha de conectividade permite retry');
 must(index,'Sincronizando dados','Status discreto de sincronização existe');
 if(index.includes('body{visibility:hidden!important}'))throw new Error('Artefato final ainda bloqueia o body durante carregamento.');
 const build=String(pkg.scripts['build:work']);
-if(!build.includes('harden-portal-runtime.mjs && node scripts/harden-session-stability.mjs && node scripts/enforce-live-first-paint.mjs && node scripts/harden-data-freshness.mjs'))throw new Error('Ordem do build pode reintroduzir sessão/cache antigos.');
+if(!build.includes('harden-portal-runtime.mjs && node scripts/harden-session-stability.mjs && node scripts/harden-public-client-pwa.mjs && node scripts/enforce-live-first-paint.mjs && node scripts/harden-data-freshness.mjs'))throw new Error('Ordem do build pode reintroduzir sessão/cache/PWA antigos.');
 console.log('OK: cache, sessão estável entre abas, BFCache, Service Worker e contexto multiempresa revalidam sem bloquear a interface.');
