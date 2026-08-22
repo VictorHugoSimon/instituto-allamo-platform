@@ -68,9 +68,11 @@ function base64UrlEncode(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-function base64UrlDecode(value: string): Uint8Array {
+function base64UrlDecode(value: string): ArrayBuffer {
   let normalized = value.replace(/-/g, '+').replace(/_/g, '/');
   while (normalized.length % 4) normalized += '=';
   const binary = atob(normalized);
-  return Uint8Array.from(binary, c => c.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
 }
