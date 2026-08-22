@@ -24,6 +24,7 @@
     "test:report-scope": "node scripts/validate-report-project-scope.mjs && node scripts/validate-bundle-json.mjs",
     "test:bundle": "node scripts/validate-bundle-json.mjs",
     "test:env-isolation": "node scripts/validate-d1-environment-isolation.mjs",
+    "test:release": "npm run test:bundle && npm run test:session && npm run test:freshness && npm run test:tenant && npm run test:public && npm run test:pwa && npm run test:live && npm run test:baseline && npm run test:report-scope && npm run test:platform && npm run test:report-ai && npm run test:series && npm run test:ux && npm run test:env-isolation",
     "lint": "npm run lint --workspace=apps/web",
     "start": "npm run start --workspace=apps/web"
   },
