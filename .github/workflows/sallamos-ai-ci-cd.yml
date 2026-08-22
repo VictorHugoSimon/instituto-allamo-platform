@@ -131,8 +131,24 @@ jobs:
           echo "- Smoke test: OK" >> "$GITHUB_STEP_SUMMARY"
           echo "- URL: ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
 
-  deploy-production:
+  production-gate:
     needs: validate
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
+    runs-on: ubuntu-latest
+    environment: sallamos-ai-production
+    env:
+      PRODUCTION_GO_LIVE: ${{ vars.PRODUCTION_GO_LIVE || 'false' }}
+    steps:
+      - name: Explicit go-live gate
+        run: |
+          if [ "$PRODUCTION_GO_LIVE" != "true" ]; then
+            echo 'PRODUCTION BLOCKED: defina PRODUCTION_GO_LIVE=true somente após concluir o Gate de Go-Live (#45).'
+            exit 1
+          fi
+          echo 'PRODUCTION_GO_LIVE=true: promoção autorizada.'
+
+  deploy-production:
+    needs: [validate, production-gate]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
     runs-on: ubuntu-latest
     environment: sallamos-ai-production
@@ -149,6 +165,7 @@ jobs:
       SALLAMOS_API_TOKEN: ${{ secrets.SALLAMOS_API_TOKEN }}
       REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
       SALLAMOS_AI_BASE_URL: ${{ vars.SALLAMOS_AI_BASE_URL }}
+      PRODUCTION_GO_LIVE: ${{ vars.PRODUCTION_GO_LIVE || 'false' }}
       SYNC_KNOWLEDGE: ${{ vars.SYNC_KNOWLEDGE || 'false' }}
     steps:
       - uses: actions/checkout@v4
