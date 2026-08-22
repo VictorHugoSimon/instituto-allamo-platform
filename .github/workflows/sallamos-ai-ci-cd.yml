@@ -1,0 +1,159 @@
+name: Sallamos AI CI/CD
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'sallamos-ai/**'
+      - '.github/workflows/sallamos-ai-ci-cd.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'sallamos-ai/**'
+      - '.github/workflows/sallamos-ai-ci-cd.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente a publicar
+        required: true
+        type: choice
+        options: [stage, production]
+        default: stage
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sallamos-ai-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sallamos-ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: TypeScript strict
+        run: npm run typecheck
+      - name: JavaScript syntax
+        run: |
+          node --check scripts/provision.mjs
+          node --check scripts/ingest-docs.mjs
+          node --check scripts/ingest-repo.mjs
+          node --check scripts/sync-sallamos-api.mjs
+          node --check evals/runner.mjs
+          node --check public/app.js
+      - name: Validate migrations and stage seed
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib
+          db=sqlite3.connect(':memory:')
+          for f in sorted(pathlib.Path('migrations').glob('*.sql')):
+              db.executescript(f.read_text())
+          required=['knowledge_document','knowledge_chunk','conversation','ai_response','rate_limit_bucket','system_event']
+          tables={r[0] for r in db.execute("select name from sqlite_master where type='table'")}
+          assert all(t in tables for t in required), (required,tables)
+          db.executescript(pathlib.Path('seeds/stage.sql').read_text())
+          assert db.execute('select count(*) from knowledge_document').fetchone()[0] == 5
+          assert db.execute('select count(*) from chunk_fts').fetchone()[0] == 5
+          print('MIGRATIONS_AND_STAGE_SEED_OK')
+          PY
+      - name: Validate source policy
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'); const x=JSON.parse(fs.readFileSync('sources/sources.json','utf8'));
+          const unsafe=(x.sources||[]).filter(s=>s.enabled===true && s.status==='rejected-for-production' && (s.environments||[]).includes('production'));
+          if(unsafe.length) throw new Error('Fonte rejeitada habilitada em produção: '+unsafe.map(x=>x.id).join(','));
+          console.log('SOURCE_POLICY_OK');
+          NODE
+      - name: Wrangler dry-run stage and production
+        run: |
+          cp wrangler.jsonc wrangler.ci.jsonc
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('wrangler.ci.jsonc')
+          s=p.read_text().replace('PREENCHER_STAGE','00000000-0000-0000-0000-000000000001').replace('PREENCHER_PRODUCTION','00000000-0000-0000-0000-000000000002')
+          p.write_text(s)
+          PY
+          npx wrangler deploy --dry-run --env stage --config wrangler.ci.jsonc
+          npx wrangler deploy --dry-run --env production --config wrangler.ci.jsonc
+          rm wrangler.ci.jsonc
+
+  deploy-stage:
+    needs: validate
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'stage')
+    runs-on: ubuntu-latest
+    environment: sallamos-ai-stage
+    defaults:
+      run:
+        working-directory: sallamos-ai
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SALLAMOS_SESSION_SECRET: ${{ secrets.SALLAMOS_SESSION_SECRET }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      SALLAMOS_API_BASE: ${{ secrets.SALLAMOS_API_BASE }}
+      SALLAMOS_AUTH_VALIDATE_URL: ${{ secrets.SALLAMOS_AUTH_VALIDATE_URL }}
+      SALLAMOS_API_TOKEN: ${{ secrets.SALLAMOS_API_TOKEN }}
+      REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
+      SYNC_KNOWLEDGE: ${{ vars.SYNC_KNOWLEDGE || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Validate Cloudflare credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || (echo 'CLOUDFLARE_API_TOKEN ausente no environment sallamos-ai-stage' && exit 1)
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo 'CLOUDFLARE_ACCOUNT_ID ausente' && exit 1)
+          npx wrangler whoami
+      - name: Provision and deploy stage
+        run: npm run provision:stage
+      - name: Deployment summary
+        run: echo "### Sallamos AI STAGE publicado automaticamente" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-production:
+    needs: validate
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
+    runs-on: ubuntu-latest
+    environment: sallamos-ai-production
+    defaults:
+      run:
+        working-directory: sallamos-ai
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SALLAMOS_SESSION_SECRET: ${{ secrets.SALLAMOS_SESSION_SECRET }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      SALLAMOS_API_BASE: ${{ secrets.SALLAMOS_API_BASE }}
+      SALLAMOS_AUTH_VALIDATE_URL: ${{ secrets.SALLAMOS_AUTH_VALIDATE_URL }}
+      SALLAMOS_API_TOKEN: ${{ secrets.SALLAMOS_API_TOKEN }}
+      REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
+      SYNC_KNOWLEDGE: ${{ vars.SYNC_KNOWLEDGE || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Validate Cloudflare credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || (echo 'CLOUDFLARE_API_TOKEN ausente no environment sallamos-ai-production' && exit 1)
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo 'CLOUDFLARE_ACCOUNT_ID ausente' && exit 1)
+          npx wrangler whoami
+      - name: Validate production integration secrets
+        run: |
+          test -n "$SALLAMOS_AUTH_VALIDATE_URL" || (echo 'SALLAMOS_AUTH_VALIDATE_URL obrigatório em produção' && exit 1)
+          test -n "$SALLAMOS_API_BASE" || (echo 'SALLAMOS_API_BASE obrigatório em produção' && exit 1)
+      - name: Provision and deploy production
+        run: npm run provision:production
+      - name: Deployment summary
+        run: echo "### Sallamos AI PRODUCTION publicado automaticamente" >> "$GITHUB_STEP_SUMMARY"
