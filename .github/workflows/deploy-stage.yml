@@ -31,6 +31,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Marcar release em andamento
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=pending -f context=allamo/stage-deploy -f description='Release de Stage em andamento'
+
       - name: Checkout da release candidata
         uses: actions/checkout@v4
 
@@ -49,16 +54,31 @@ jobs:
       - name: Gate consolidado da plataforma
         run: npm run test:release
 
+      - name: Registrar gates aprovados
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-gates -f description='Build e gate consolidado aprovados'
+
       - name: Preflight Cloudflare
         run: npx wrangler@4.124.0 whoami
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Registrar autenticação Cloudflare aprovada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-cloudflare-auth -f description='Wrangler autenticado no Cloudflare'
+
       - name: Materializar configuração exclusiva de Stage
         run: |
           cp wrangler.stage.toml wrangler.toml
           grep -F 'name = "allamo-pmo-stage"' wrangler.toml
+
+      - name: Registrar configuração Stage validada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração exclusiva do Stage validada'
 
       - name: Publicar exatamente o artefato validado no STAGE
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production --commit-dirty=true
@@ -76,7 +96,7 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-deploy -f description='Release de Stage falhou; verificar Actions'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-deploy -f description='Release de Stage falhou; verificar último marco aprovado'
 
       - name: Resumo da release
         if: always()
