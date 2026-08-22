@@ -1,0 +1,28 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(p,'utf8');
+const api=read('src/public-client-manifest-api.js');
+const runtime=read('src/public-client-pwa-runtime.js');
+const portal=read('src/public-client-portal.js');
+const worker=read('public/_worker.js');
+const index=read('public/index.html');
+const pkg=JSON.parse(read('package.json'));
+const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+
+must(api,"id:'/?cliente_app='+encodeURIComponent(canonicalId)",'ID PWA exclusivo por tenant');
+must(api,"start_url:'/?cliente='+encodeURIComponent(canonicalId)+'&source=pwa'",'start_url reabre tenant canônico');
+must(api,"application/manifest+json",'manifesto usa MIME correto');
+must(api,"cache-control':'no-store",'manifesto não fica preso em cache antigo');
+must(runtime,"public-client-manifest?company=",'runtime troca manifesto pelo tenant atual');
+must(runtime,"beforeinstallprompt",'instalação PWA pública é capturada');
+must(runtime,".pc-install",'botão Instalar usa fluxo tenant-safe');
+must(runtime,"sem login",'orientação pública deixa explícito acesso sem login');
+must(portal,"public-client-projects?company=",'portal público resolve empresa sem login');
+must(worker,"path==='public-client-manifest'",'endpoint está no Worker final');
+must(index,'BEGIN ALLAMO PUBLIC CLIENT PWA RUNTIME','runtime está no HTML final');
+const manifestPos=worker.indexOf('BEGIN ALLAMO PUBLIC CLIENT MANIFEST');
+const authPos=worker.indexOf('const user = await currentUser');
+if(manifestPos<0||authPos<0||manifestPos>authPos)throw new Error('Manifesto público ficou atrás da autenticação interna.');
+const build=String(pkg.scripts['build:work']||'');
+if(!build.includes('harden-public-client-pwa.mjs'))throw new Error('Build não aplica hardening PWA público.');
+if(!String(pkg.scripts['test:pwa']||'').includes('validate-public-client-pwa.mjs'))throw new Error('Script test:pwa não configurado.');
+console.log('OK: PWA público é multitenant, reabre empresa canônica e não depende do login interno.');
