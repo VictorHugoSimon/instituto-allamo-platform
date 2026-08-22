@@ -8,6 +8,7 @@
     return item;
   }
   function ensureSidebar(){
+    if(new URLSearchParams(location.search).get('cliente'))return;
     let work=document.querySelector('[data-allamo-work-menu]');
     if(!work){
       const projects=sidebarItemByText('Projetos');
@@ -23,12 +24,13 @@
       reports.style.cursor='pointer';reports.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.AllamoReports&&window.AllamoReports.open()},true);work.insertAdjacentElement('afterend',reports);
     }
   }
+  function ensurePublicClient(){if(new URLSearchParams(location.search).get('cliente')&&window.AllamoPublicClientPortal&&typeof window.AllamoPublicClientPortal.mount==='function')window.AllamoPublicClientPortal.mount()}
   function removeLegacyLaunchers(){document.getElementById('awm-launcher')?.remove();document.getElementById('arm-launcher')?.remove()}
   function executiveVisible(){return Array.from(document.querySelectorAll('h2')).some(e=>e.textContent.trim()==='Distribuição do portfólio')}
   function tick(){
     const root=document.documentElement,changed=root!==lastRoot;if(changed)lastRoot=root;
-    ensureSidebar();removeLegacyLaunchers();
-    const now=Date.now();if(executiveVisible()&&typeof window.AllamoRefreshExecutive==='function'&&(changed||now-lastExecRefresh>10000)){lastExecRefresh=now;window.AllamoRefreshExecutive()}
+    ensurePublicClient();ensureSidebar();removeLegacyLaunchers();
+    const now=Date.now();if(!new URLSearchParams(location.search).get('cliente')&&executiveVisible()&&typeof window.AllamoRefreshExecutive==='function'&&(changed||now-lastExecRefresh>10000)){lastExecRefresh=now;window.AllamoRefreshExecutive()}
   }
   window.AllamoPostUnpackTick=tick;
   setInterval(tick,2000);setTimeout(tick,0);
