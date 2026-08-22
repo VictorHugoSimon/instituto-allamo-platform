@@ -38,7 +38,7 @@ jobs:
           node --check scripts/provision.mjs
           node --check scripts/smoke.mjs
           node --check scripts/preflight.mjs
-          node --check scripts/normalize-cloudflare-token.mjs
+          node --check scripts/prepare-cloudflare-auth.mjs
           node --check scripts/build-production-dataset.mjs
           node --check scripts/validate-eval-readiness.mjs
           node --check scripts/validate-eval-candidates.mjs
@@ -94,6 +94,8 @@ jobs:
     defaults: { run: { working-directory: sallamos-ai } }
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       SALLAMOS_SESSION_SECRET: ${{ secrets.SALLAMOS_SESSION_SECRET }}
       ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
@@ -109,8 +111,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install --no-audit --no-fund
-      - name: Normalize Cloudflare token safely
-        run: node scripts/normalize-cloudflare-token.mjs
+      - name: Prepare Cloudflare authentication
+        run: node scripts/prepare-cloudflare-auth.mjs
       - name: Stage preflight
         run: node scripts/preflight.mjs stage
       - name: Validate Cloudflare credentials
@@ -174,6 +176,8 @@ jobs:
     defaults: { run: { working-directory: sallamos-ai } }
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       SALLAMOS_SESSION_SECRET: ${{ secrets.SALLAMOS_SESSION_SECRET }}
       ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
@@ -191,8 +195,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install --no-audit --no-fund
-      - name: Normalize Cloudflare token safely
-        run: node scripts/normalize-cloudflare-token.mjs
+      - name: Prepare Cloudflare authentication
+        run: node scripts/prepare-cloudflare-auth.mjs
       - name: Production preflight
         run: node scripts/preflight.mjs production
       - name: Validate Cloudflare credentials
