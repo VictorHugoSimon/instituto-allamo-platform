@@ -8,8 +8,10 @@ Sistema de suporte inteligente do Sallamos. O agente responde somente com evidê
 - Busca semântica: Vectorize.
 - IA: Workers AI; AI Gateway opcional.
 - Evidências brutas: R2.
+- Rate limiting: binding nativo Cloudflare por tenant+usuário; D1 apenas como fallback local.
 - Autenticação: HMAC apenas em stage; validação externa Sallamos em produção.
 - Segurança: tenant isolation, permission gate, rate limit, CORS restrito e fallback humano.
+- Indexação incremental: cron a cada 5 minutos para embeddings pendentes.
 
 ## Ambientes
 | Ambiente | Branch | Worker | D1 | Vectorize | R2 |
@@ -32,7 +34,9 @@ O workflow `.github/workflows/sallamos-ai-ci-cd.yml` executa:
 Produção falha fechada se faltar autenticação externa, API Sallamos ou conhecimento homologado.
 
 ## Segurança de conhecimento
-`seeds/stage.sql` existe somente para homologação. Produção não recebe seed fictício. Uma fonte só pode entrar no índice produtivo quando estiver habilitada e homologada em `sources/sources.json`.
+`seeds/stage.sql` existe somente para homologação. Produção não recebe seed fictício. Quando `onlyApproved=true`, fontes fora do status `homologado` são descartadas antes do reranking e nunca entram no prompt do modelo.
+
+Uma fonte só pode entrar no índice produtivo quando estiver habilitada e homologada em `sources/sources.json`.
 
 O repositório público `sallamos/SallamosAPI` foi bloqueado como fonte de produção porque, na validação atual, contém conteúdo/template Petstore e não representa a fonte de verdade do produto.
 

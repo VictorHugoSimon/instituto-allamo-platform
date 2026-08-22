@@ -3,6 +3,7 @@ export interface Env {
   META: D1Database;
   VEC: VectorizeIndex;
   SOURCES: R2Bucket;
+  RATE_LIMITER?: RateLimit;
   ENVIRONMENT: 'stage' | 'production' | string;
   AUTH_MODE: 'hmac' | 'external' | string;
   AI_GATEWAY_ID: string;

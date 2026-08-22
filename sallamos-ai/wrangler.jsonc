@@ -5,7 +5,7 @@
   "compatibility_date": "2026-08-22",
   "workers_dev": true,
   "observability": { "enabled": true },
-  "triggers": { "crons": ["0 3 * * *"] },
+  "triggers": { "crons": ["*/5 * * * *"] },
   "assets": {
     "directory": "./public",
     "run_worker_first": ["/api/*", "/health", "/health/*"]
@@ -22,6 +22,9 @@
       ],
       "r2_buckets": [
         { "binding": "SOURCES", "bucket_name": "sallamos-ai-sources-stage" }
+      ],
+      "ratelimits": [
+        { "name": "RATE_LIMITER", "namespace_id": "2026082201", "simple": { "limit": 60, "period": 60 } }
       ],
       "vars": {
         "ENVIRONMENT": "stage",
@@ -48,6 +51,9 @@
       ],
       "r2_buckets": [
         { "binding": "SOURCES", "bucket_name": "sallamos-ai-sources-production" }
+      ],
+      "ratelimits": [
+        { "name": "RATE_LIMITER", "namespace_id": "2026082202", "simple": { "limit": 45, "period": 60 } }
       ],
       "vars": {
         "ENVIRONMENT": "production",
