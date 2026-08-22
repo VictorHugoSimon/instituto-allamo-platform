@@ -23,6 +23,7 @@
     "test:baseline": "node scripts/validate-portal-baseline.mjs && node scripts/validate-bundle-json.mjs",
     "test:report-scope": "node scripts/validate-report-project-scope.mjs && node scripts/validate-bundle-json.mjs",
     "test:bundle": "node scripts/validate-bundle-json.mjs",
+    "test:env-isolation": "node scripts/validate-d1-environment-isolation.mjs",
     "lint": "npm run lint --workspace=apps/web",
     "start": "npm run start --workspace=apps/web"
   },
