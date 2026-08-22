@@ -21,6 +21,7 @@
     "test:pwa": "node scripts/validate-public-client-pwa.mjs && node scripts/validate-bundle-json.mjs",
     "test:live": "node scripts/validate-live-bootstrap.mjs && node scripts/validate-bundle-json.mjs",
     "test:baseline": "node scripts/validate-portal-baseline.mjs && node scripts/validate-bundle-json.mjs",
+    "test:report-scope": "node scripts/validate-report-project-scope.mjs && node scripts/validate-bundle-json.mjs",
     "test:bundle": "node scripts/validate-bundle-json.mjs",
     "lint": "npm run lint --workspace=apps/web",
     "start": "npm run start --workspace=apps/web"
