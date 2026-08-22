@@ -23,13 +23,28 @@ if(worker.includes(start)){
 }
 fs.writeFileSync(workerFile,worker);
 
-// ---- Portal: substitui o método completo para não depender do escaping do bundle ----
+// ---- Portal: edita o template JÁ DECODIFICADO e reserializa via JSON.stringify ----
+// O public/index.html contém a aplicação dentro de <script type="__bundler/template"> como JSON.
+// Nunca inserir JavaScript diretamente na string JSON bruta: qualquer barra/escape pode invalidar o bundle.
 let html=fs.readFileSync(indexFile,'utf8');
-const restoreStart=html.indexOf('restoreSession() {');
+const templateOpen='<script type="__bundler/template">';
+const templateClose='</script>';
+const tagStart=html.indexOf(templateOpen);
+if(tagStart<0) throw new Error('Template do bundler não encontrado.');
+const jsonStart=tagStart+templateOpen.length;
+const jsonEnd=html.indexOf(templateClose,jsonStart);
+if(jsonEnd<0) throw new Error('Fechamento do template do bundler não encontrado.');
+const encodedTemplate=html.slice(jsonStart,jsonEnd);
+let template;
+try{ template=JSON.parse(encodedTemplate); }
+catch(err){ throw new Error('Bundle-base já chegou com JSON inválido: '+String(err&&err.message||err)); }
+if(typeof template!=='string') throw new Error('Template do bundler não é uma string JSON.');
+
+const restoreStart=template.indexOf('restoreSession() {');
 const nextMethod='  async onLoginSubmit(e) {';
-const restoreEnd=html.indexOf(nextMethod,restoreStart);
-if(restoreStart<0||restoreEnd<0) throw new Error('Limites de restoreSession não encontrados no portal.');
-const slashNL='\\\n';
+const restoreEnd=template.indexOf(nextMethod,restoreStart);
+if(restoreStart<0||restoreEnd<0) throw new Error('Limites de restoreSession não encontrados no template decodificado.');
+
 const stableRestore=[
   'restoreSession() {',
   '    let sess = null;',
@@ -57,16 +72,22 @@ const stableRestore=[
   '  }',
   '',
   '  '
-].join(slashNL);
-html=html.slice(0,restoreStart)+stableRestore+html.slice(restoreEnd);
+].join('\n');
+template=template.slice(0,restoreStart)+stableRestore+template.slice(restoreEnd);
 
 // Logout explícito revoga também o token no servidor.
 const logoutNeedle="logout() { try{ localStorage.removeItem('allamo_session'); }catch(e){}";
 const logoutSafe="logout() { const tok=this.state.token; if(tok){ try{ fetch(this.apiBase()+'/logout',{method:'POST',headers:{authorization:'Bearer '+tok,'content-type':'application/json'},cache:'no-store'}).catch(()=>{}); }catch(e){} } try{ localStorage.removeItem('allamo_session'); }catch(e){}";
-if(html.includes(logoutNeedle)) html=html.replace(logoutNeedle,logoutSafe);
-if(!html.includes("this.api('session-status').then")) throw new Error('restoreSession ainda não usa endpoint dedicado.');
-if(!html.includes('validação temporariamente indisponível')) throw new Error('Sessão ainda pode ser apagada por falha temporária.');
-if(!html.includes("this.apiBase()+'/logout'")) throw new Error('Logout servidor não aplicado.');
+if(template.includes(logoutNeedle)) template=template.replace(logoutNeedle,logoutSafe);
+
+if(!template.includes("this.api('session-status').then")) throw new Error('restoreSession ainda não usa endpoint dedicado.');
+if(!template.includes('validação temporariamente indisponível')) throw new Error('Sessão ainda pode ser apagada por falha temporária.');
+if(!template.includes("this.apiBase()+'/logout'")) throw new Error('Logout servidor não aplicado.');
+
+// JSON.stringify é a única saída autorizada para recolocar o template no bundle.
+const serialized=JSON.stringify(template);
+JSON.parse(serialized); // sanity check local antes de gravar
+html=html.slice(0,jsonStart)+serialized+html.slice(jsonEnd);
 fs.writeFileSync(indexFile,html);
 
-console.log('OK: sessão de 7 dias, renovação, validação dedicada, falha temporária sem logout e revogação explícita aplicadas.');
+console.log('OK: sessão de 7 dias aplicada com template JSON reserializado de forma segura.');
