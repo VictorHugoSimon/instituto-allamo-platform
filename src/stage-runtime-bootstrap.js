@@ -1,7 +1,7 @@
 // STAGE runtime bootstrap — usa exatamente o D1 vinculado ao Pages STAGE.
 // Nunca executa em produção: hostname precisa conter allamo-pmo-stage.pages.dev.
 // MODO PERSISTENTE: deploy nunca apaga dados cadastrados.
-const STAGE_BUILD = 'awm-stage-20260821-1021';
+const STAGE_BUILD = 'awm-stage-20260822-1845';
 const stageHost = (url.hostname || '').toLowerCase();
 const isAllamoStage = stageHost === 'allamo-pmo-stage.pages.dev' || stageHost.endsWith('.allamo-pmo-stage.pages.dev');
 const DATA_PERSISTENCE_MODE = 'persistent';

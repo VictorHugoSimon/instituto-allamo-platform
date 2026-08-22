@@ -1,4 +1,5 @@
 name: Release STAGE - Manual Gate
+# ONE-SHOT RELEASE MARKER: awm-stage-20260822-1845
 
 on:
   workflow_dispatch:
