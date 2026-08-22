@@ -1,4 +1,4 @@
-// Portal público do cliente: empresa da URL é a única fonte de verdade.
+// Portal público do cliente: o parâmetro ?company é a única fonte de verdade.
 // Retorna somente dados necessários para navegação Empresa -> Projetos -> Reports publicados.
 // Compatível com evolução de schema: campos auxiliares nunca podem derrubar o painel público.
 if(path==='public-client-projects'&&request.method==='GET'){
@@ -6,11 +6,27 @@ if(path==='public-client-projects'&&request.method==='GET'){
   const cid=String(requested||'').trim();
   if(!cid)return json({error:'Informe a empresa'},400);
 
-  // Nunca seleciona colunas opcionais nominalmente: SELECT * tolera tenants/bancos em versões diferentes de schema.
-  // Resolve somente pelo ID da empresa (case-insensitive para links antigos). Nunca usa primeira empresa, sessão ou outro tenant.
-  const co=await DB.prepare('SELECT * FROM companies WHERE CAST(id AS TEXT)=? OR lower(CAST(id AS TEXT))=lower(?) LIMIT 1').bind(cid,cid).first();
+  // IDs internos continuam sendo a chave canônica. Links antigos/amigáveis também podem usar um slug
+  // EXATO do nome da empresa. Nunca usa busca parcial, aproximação, primeira empresa ou contexto de sessão.
+  const pcToken=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const pcSlug=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+  let co=await DB.prepare('SELECT * FROM companies WHERE CAST(id AS TEXT)=? OR lower(CAST(id AS TEXT))=lower(?) LIMIT 1').bind(cid,cid).first();
+  let resolvedBy='id';
+  if(!co){
+    const wanted=pcToken(cid);
+    const all=(await DB.prepare('SELECT * FROM companies').all()).results||[];
+    const matches=all.filter(row=>{
+      const aliases=[row.public_slug,row.slug,row.client_slug,row.name,row.company_name,row.nome_fantasia];
+      return aliases.some(v=>v!=null&&pcToken(v)===wanted);
+    });
+    if(matches.length>1)return json({error:'Link público ambíguo. Gere um novo link para esta empresa.'},409);
+    co=matches[0]||null;
+    resolvedBy=co?'slug':'none';
+  }
   if(!co)return json({error:'Empresa não encontrada'},404);
   const canonicalId=String(co.id);
+  const displayName=co.name||co.company_name||co.nome_fantasia||canonicalId;
+  const publicSlug=pcSlug(co.public_slug||co.slug||co.client_slug||displayName);
 
   // Projetos são carregados sem depender de badge/summary/start_date/meta_date existirem fisicamente.
   const projectRows=(await DB.prepare('SELECT * FROM projects p WHERE p.company_id=? ORDER BY p.id DESC').bind(canonicalId).all()).results||[];
@@ -46,7 +62,9 @@ if(path==='public-client-projects'&&request.method==='GET'){
 
   return json({
     requested_company:cid,
-    company:{id:canonicalId,name:co.name||co.company_name||canonicalId,city:co.city||'',status:co.status||'',status_text:co.status_text||''},
+    resolved_by:resolvedBy,
+    public_slug:publicSlug,
+    company:{id:canonicalId,name:displayName,city:co.city||'',status:co.status||'',status_text:co.status_text||''},
     projects,
     context_locked:true,
     schema_compatible:true

@@ -12,7 +12,7 @@ const index=read('public/index.html');
 const worker=read('public/_worker.js');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
 new Function(client);new Function(ui);new Function(viewer);new Function(`return async function(){${guard}}`);new Function(`return async function(){${api}}`);
-for(const [n,l] of [["data.client=co.name",'identidade pública autoritativa'],["data.tap.cliente=co.name",'TAP público autoritativo'],['context_locked:true','sinal de contexto bloqueado']])must(guard,n,l);
+for(const [n,l] of [["data.client=companyName",'identidade pública autoritativa'],["data.tap.cliente=companyName",'TAP público autoritativo'],['context_locked:true','sinal de contexto bloqueado'],['resolved_by:resolvedBy','resolução ID/slug auditável']])must(guard,n,l);
 for(const [n,l] of [["if(publicCompany)return",'precedência da URL'],["publicMode:true",'modo público mesmo com sessão local'],['AllamoRichReport','visualização rica publicada']])must(client,n,l);
 for(const [n,l] of [['report_series','tabela série'],['report_series_cycles','tabela ciclos'],['report_series_meetings','tabela reuniões']]){must(schema,n,l);must(migration,n,l)}
 for(const [n,l] of [['WEEKLY','semanal'],['BIWEEKLY','quinzenal'],['MONTHLY','mensal'],['/snapshot','fechamento de ciclo'],['/context','contexto das reuniões'],['previous_cycle_id','encadeamento'],['used_cycle_id','reuniões consumidas']])must(api,n,l);
@@ -22,4 +22,4 @@ for(const f of ['src/public-report-context-guard.js','src/report-series-api.js',
 for(const marker of ['BEGIN ALLAMO PUBLIC REPORT CONTEXT GUARD','BEGIN ALLAMO REPORT SERIES'])must(worker,marker,'worker final '+marker);
 for(const marker of ['__allamoReportSeriesLoaded','AllamoRichReport','publicCompany)return'])must(index,marker,'index final '+marker);
 if(/\bDELETE\s+FROM\b|\bDROP\s+TABLE\b|\bTRUNCATE\b/i.test(migration))throw new Error('Migration recorrente contém SQL destrutivo.');
-console.log('OK: contexto público isolado, recorrência semanal/quinzenal/mensal, reuniões, IA, ciclos encadeados e visualização rica validados.');
+console.log('OK: contexto público isolado por ID/slug, recorrência semanal/quinzenal/mensal, reuniões, IA, ciclos encadeados e visualização rica validados.');
