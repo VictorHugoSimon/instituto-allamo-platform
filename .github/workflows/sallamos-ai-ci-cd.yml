@@ -17,6 +17,7 @@ on:
         default: stage
 permissions:
   contents: read
+  issues: write
 concurrency:
   group: sallamos-ai-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref_name }}
   cancel-in-progress: true
@@ -43,6 +44,7 @@ jobs:
           node --check scripts/ingest-docs.mjs
           node --check scripts/ingest-repo.mjs
           node --check scripts/sync-sallamos-api.mjs
+          node --check sdk/runtime-evidence-client.mjs
           node --check evals/runner.mjs
           node --check public/app.js
       - name: Validate candidate eval backlog
@@ -53,13 +55,16 @@ jobs:
           import sqlite3, pathlib
           db=sqlite3.connect(':memory:')
           for f in sorted(pathlib.Path('migrations').glob('*.sql')): db.executescript(f.read_text())
-          required=['knowledge_document','knowledge_chunk','conversation','ai_response','rate_limit_bucket','system_event']
+          required=['knowledge_document','knowledge_chunk','conversation','ai_response','rate_limit_bucket','system_event','runtime_evidence_event']
           tables={r[0] for r in db.execute("select name from sqlite_master where type='table'")}
           assert all(t in tables for t in required), (required,tables)
+          cols={r[1] for r in db.execute('pragma table_info(knowledge_document)')}
+          assert {'scope','tenant_id'}.issubset(cols), cols
           db.executescript(pathlib.Path('seeds/stage.sql').read_text())
           assert db.execute('select count(*) from knowledge_document').fetchone()[0] == 5
           assert db.execute('select count(*) from chunk_fts').fetchone()[0] == 5
-          print('MIGRATIONS_AND_STAGE_SEED_OK')
+          assert db.execute("select count(*) from knowledge_document where scope='global'").fetchone()[0] == 5
+          print('MIGRATIONS_STAGE_SEED_AND_SCOPE_OK')
           PY
       - name: Validate source policy
         run: |
@@ -114,6 +119,17 @@ jobs:
         run: |
           BASE="${{ steps.deploy.outputs.url }}"; if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
           node scripts/smoke.mjs --base "$BASE" --env stage
+      - name: Publish STAGE evidence to Go-Live issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          BASE="$DEPLOY_URL"; if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          BODY=$(printf '### Sallamos AI STAGE — deploy automático\n- Status: **%s**\n- Commit: `%s`\n- URL detectada: `%s`\n- Run: %s\n- Evidência gerada automaticamente pelo workflow.\n' "$JOB_STATUS" "$GITHUB_SHA" "${BASE:-não detectada}" "$RUN_URL")
+          gh issue comment 45 --repo "$GITHUB_REPOSITORY" --body "$BODY"
 
   production-gate:
     needs: validate
@@ -183,3 +199,14 @@ jobs:
         run: |
           BASE="${{ steps.deploy.outputs.url }}"; if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
           node scripts/smoke.mjs --base "$BASE" --env production
+      - name: Publish PRODUCTION evidence to Go-Live issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          BASE="$DEPLOY_URL"; if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          BODY=$(printf '### Sallamos AI PRODUCTION — deploy automático\n- Status: **%s**\n- Commit: `%s`\n- URL detectada: `%s`\n- Run: %s\n' "$JOB_STATUS" "$GITHUB_SHA" "${BASE:-não detectada}" "$RUN_URL")
+          gh issue comment 45 --repo "$GITHUB_REPOSITORY" --body "$BODY"
