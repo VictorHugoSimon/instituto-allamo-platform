@@ -32,6 +32,20 @@ if(!template.includes('sc-camel-on-input="{{ onPassword }}"')) throw new Error('
 if(!template.includes('autocomplete="username"')) throw new Error('Autocomplete de usuário não aplicado.');
 if(!template.includes('autocomplete="current-password"')) throw new Error('Autocomplete de senha não aplicado.');
 
-html=html.slice(0,start)+JSON.stringify(template)+html.slice(end);
+// IMPORTANTE: JSON.parse() recupera tags HTML como </script>. Se JSON.stringify()
+// gravar isso literalmente dentro de <script type="__bundler/template">, o parser
+// HTML encerra o bloco antes da hora e o próximo hardening recebe JSON truncado.
+// Escapar a barra como \u002F preserva exatamente o mesmo valor após JSON.parse(),
+// mas impede fechamento prematuro do elemento <script> no artefato.
+const serialized=JSON.stringify(template).replace(/<\//gi,'<\\u002F');
+try{
+  const roundTrip=JSON.parse(serialized);
+  if(roundTrip!==template) throw new Error('round-trip alterou o template');
+}catch(err){
+  throw new Error('Falha ao serializar template do login com segurança: '+String(err&&err.message||err));
+}
+if(serialized.toLowerCase().includes('</script')) throw new Error('Serialização insegura: </script> literal permaneceu no JSON do bundler.');
+
+html=html.slice(0,start)+serialized+html.slice(end);
 fs.writeFileSync(file,html);
-console.log('OK: login sem bindings literais, com autocomplete nativo e handlers preservados.');
+console.log('OK: login sem bindings literais, autocomplete nativo, handlers preservados e JSON do bundler protegido contra fechamento prematuro.');
