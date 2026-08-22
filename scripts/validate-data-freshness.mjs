@@ -15,9 +15,9 @@ must(runtime,'sessionToken(e.newValue)','Mudança entre abas compara token novo'
 must(runtime,'if(oldToken===newToken)return','Mudança apenas de tab/company não recarrega outras abas');
 must(runtime,'location.reload()','Troca real de token/logout invalida contexto de outras abas');
 must(runtime,"e.persisted",'BFCache é revalidado');
-must(runtime,"visibility",'Retorno à aba revalida dados');
-must(runtime,"allamo:context-changed",'Mudança empresa/projeto emite invalidação');
-must(runtime,"getRegistration().then(r=>r?.update())",'Service Worker procura atualização');
+must(runtime,'visibility','Retorno à aba revalida dados');
+must(runtime,'allamo:context-changed','Mudança empresa/projeto emite invalidação');
+must(runtime,'getRegistration().then(r=>r?.update())','Service Worker procura atualização');
 must(worker,"'cache-control':'no-store, no-cache, must-revalidate, max-age=0'",'APIs respondem no-store');
 must(worker,"request.mode === 'navigate'",'HTML recebe política no-store');
 must(worker,"url.pathname === '/sw.js'",'SW recebe revalidação');
@@ -30,8 +30,11 @@ must(index,'__allamoBootNonBlocking=true','First paint não bloqueante está no 
 must(index,'__allamoBootGuardStarted','Sincronização inicial auto-inicia');
 must(index,'allamo-boot-retry','Falha de conectividade permite retry');
 must(index,'Sincronizando dados','Status discreto de sincronização existe');
+must(index,'[allamo-load-initial-reset]','Primeira hidratação zera fotografia histórica uma única vez');
+must(index,'BEGIN ALLAMO PUBLIC CLIENT PWA RUNTIME','PWA público tenant-safe está no artefato');
 if(index.includes('body{visibility:hidden!important}'))throw new Error('Artefato final ainda bloqueia o body durante carregamento.');
+if(index.includes('[allamo-live-reset] nunca renderizar fotografia demo durante fetch'))throw new Error('Refresh recorrente ainda pode zerar a tela inteira.');
 const build=String(pkg.scripts['build:work']);
-const requiredOrder='harden-data-freshness.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs && node scripts/harden-session-stability.mjs && node scripts/validate-bundle-json.mjs';
-if(!build.includes(requiredOrder))throw new Error('Saneamento de sessão/JSON deve ser o último hardening do build.');
-console.log('OK: cache, sessão estável entre abas, BFCache, Service Worker e bundle JSON final revalidam sem bloquear a interface.');
+const requiredOrder='harden-data-freshness.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs && node scripts/harden-session-stability.mjs && node scripts/harden-public-client-pwa.mjs && node scripts/validate-bundle-json.mjs';
+if(!build.includes(requiredOrder))throw new Error('Ordem do build pode reintroduzir sessão/cache/PWA antigos.');
+console.log('OK: cache, sessão, boot live, BFCache, Service Worker e PWA multitenant revalidam sem exibir dados demo.');

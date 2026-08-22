@@ -64,7 +64,8 @@ jobs:
           grep -q "allamo_session_token" public/index.html
           grep -q "+ Demanda" public/index.html
           grep -q "+ Tarefa" public/index.html
-          grep -q "\[allamo-live-reset\]" public/index.html
+          grep -q "\[allamo-login-live-reset\]" public/index.html
+          grep -q "\[allamo-load-initial-reset\]" public/index.html
           grep -q "0 Em andamento — 0,0%" public/index.html
           grep -q "0 Backlog — 0,0%" public/index.html
           grep -q "Date.now()+12000" public/index.html
@@ -79,6 +80,7 @@ jobs:
           grep -q "allamo-boot-retry" public/index.html
           grep -q "__allamoDataFreshnessLoaded" public/index.html
           grep -q "no-store, no-cache, must-revalidate" public/_worker.js
+          if grep -q "\[allamo-live-reset\] nunca renderizar fotografia demo durante fetch" public/index.html; then echo "Reset recorrente antigo ainda presente"; exit 1; fi
           if grep -q "body{visibility:hidden!important}" public/index.html; then echo "First paint ainda bloqueia o body inteiro"; exit 1; fi
           if grep -q "Date.now()+1800" public/index.html; then echo "Guard rápido antigo pode expor fotografia demo"; exit 1; fi
           if grep -q "now-quietSince>=120" public/index.html; then echo "Janela antiga de reveal ainda presente"; exit 1; fi
