@@ -3,16 +3,22 @@ export interface Env {
   META: D1Database;
   VEC: VectorizeIndex;
   SOURCES: R2Bucket;
+  ENVIRONMENT: 'stage' | 'production' | string;
+  AUTH_MODE: 'hmac' | 'external' | string;
   AI_GATEWAY_ID: string;
   EMBEDDING_MODEL: string;
   ANSWER_MODEL: string;
   PROMPT_VERSION: string;
   CONFIDENCE_ANSWER: string;
   CONFIDENCE_CLARIFY: string;
+  RATE_LIMIT_PER_MINUTE?: string;
   DEMO_MODE?: string;
+  ALLOWED_ORIGINS?: string;
   SALLAMOS_API_BASE?: string;
+  SALLAMOS_AUTH_VALIDATE_URL?: string;
   SALLAMOS_SESSION_SECRET: string;
-  REPO_READ_TOKEN: string;
+  SALLAMOS_API_TOKEN?: string;
+  REPO_READ_TOKEN?: string;
   ADMIN_TOKEN: string;
 }
 
