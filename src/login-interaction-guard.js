@@ -1,4 +1,9 @@
 (()=>{
+  const publicCompany=String(new URLSearchParams(location.search).get('cliente')||'').trim();
+  if(publicCompany){
+    window.__allamoPublicNoLogin=true;
+    return;
+  }
   if(window.__allamoLoginInteractionGuard)return;
   window.__allamoLoginInteractionGuard=true;
 
