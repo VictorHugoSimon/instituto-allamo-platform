@@ -19,11 +19,11 @@ Enquanto esta política estiver ativa, mudanças funcionais novas não devem ser
 Cloudflare Pages aceita apenas os environments nomeados `preview` e `production`. Não usar `[env.stage]` em configuração de Pages.
 
 A plataforma usa arquivos separados por projeto:
-- `wrangler.stage.toml`: projeto `allamo-pmo-stage` e D1 exclusivo de Stage;
-- `wrangler.production.toml`: projeto `allamo-pmo` e D1 exclusivo de Produção;
+- `wrangler.stage.toml`: projeto `allamo-pmo-stage`; produção e preview desse projeto usam o D1 não produtivo de Stage;
+- `wrangler.production.toml`: projeto `allamo-pmo`; `env.production` usa exclusivamente o D1 produtivo e `env.preview` aponta para o D1 não produtivo, impedindo escrita acidental no banco oficial;
 - `wrangler.toml`: guard neutro, sem D1, para impedir seleção acidental de banco.
 
-Todo deploy de Stage deve usar `--config wrangler.stage.toml`. Toda futura operação remota de Produção deve usar `--config wrangler.production.toml`. O arquivo de Stage nunca pode conter o UUID do D1 de Produção e vice-versa.
+Todo deploy de Stage deve usar `--config wrangler.stage.toml`. Toda futura operação remota de Produção deve usar `--config wrangler.production.toml`. O UUID produtivo só pode aparecer no top-level/`env.production` do arquivo de Produção e nunca no arquivo de Stage nem em `env.preview`.
 
 ## O que não acontece mais
 - deploy automático a cada push em `develop`;
@@ -32,7 +32,8 @@ Todo deploy de Stage deve usar `--config wrangler.stage.toml`. Toda futura opera
 - rebuild entre validação e publicação;
 - promoção para produção sem homologação do Stage;
 - deploy Pages usando ambiente nomeado `stage`;
-- seleção implícita do D1 por um `wrangler.toml` compartilhado.
+- seleção implícita do D1 por um `wrangler.toml` compartilhado;
+- preview do projeto de Produção escrevendo no D1 produtivo.
 
 ## Gate consolidado
 `npm run test:release` valida bundle, sessão, freshness/cache, isolamento multitenant, portal público, PWA, bootstrap live, baseline funcional, escopo de Reports, plataforma dinâmica, IA, recorrência, responsividade e isolamento de ambientes D1/Pages.
