@@ -1,73 +1,22 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "sallamos-ai",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-08-22",
-  "workers_dev": true,
-  "observability": { "enabled": true },
-  "triggers": { "crons": ["*/5 * * * *"] },
-  "assets": {
-    "directory": "./public",
-    "run_worker_first": ["/api/*", "/health", "/health/*"]
-  },
-  "env": {
-    "stage": {
-      "name": "sallamos-ai-stage",
-      "ai": { "binding": "AI" },
-      "d1_databases": [
-        { "binding": "META", "database_name": "sallamos-ai-meta-stage", "database_id": "PREENCHER_STAGE" }
-      ],
-      "vectorize": [
-        { "binding": "VEC", "index_name": "sallamos-docs-stage" }
-      ],
-      "r2_buckets": [
-        { "binding": "SOURCES", "bucket_name": "sallamos-ai-sources-stage" }
-      ],
-      "ratelimits": [
-        { "name": "RATE_LIMITER", "namespace_id": "2026082201", "simple": { "limit": 60, "period": 60 } }
-      ],
-      "vars": {
-        "ENVIRONMENT": "stage",
-        "AUTH_MODE": "hmac",
-        "AI_GATEWAY_ID": "",
-        "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5",
-        "ANSWER_MODEL": "@cf/meta/llama-3.1-8b-instruct",
-        "PROMPT_VERSION": "v1.2",
-        "CONFIDENCE_ANSWER": "0.75",
-        "CONFIDENCE_CLARIFY": "0.50",
-        "RATE_LIMIT_PER_MINUTE": "60",
-        "DEMO_MODE": "true",
-        "ALLOWED_ORIGINS": ""
-      }
+  "$schema":"./node_modules/wrangler/config-schema.json",
+  "name":"sallamos-ai","main":"src/index.ts","compatibility_date":"2026-08-22","workers_dev":true,
+  "observability":{"enabled":true},"triggers":{"crons":["*/5 * * * *"]},
+  "assets":{"directory":"./public","run_worker_first":["/api/*","/health","/health/*"]},
+  "env":{
+    "stage":{
+      "name":"sallamos-ai-stage","ai":{"binding":"AI"},
+      "d1_databases":[{"binding":"META","database_name":"sallamos-ai-meta-stage","database_id":"PREENCHER_STAGE"}],
+      "vectorize":[{"binding":"VEC","index_name":"sallamos-docs-stage"}],"r2_buckets":[{"binding":"SOURCES","bucket_name":"sallamos-ai-sources-stage"}],
+      "ratelimits":[{"name":"RATE_LIMITER","namespace_id":"2026082201","simple":{"limit":60,"period":60}}],
+      "vars":{"ENVIRONMENT":"stage","AUTH_MODE":"hmac","AI_GATEWAY_ID":"","EMBEDDING_MODEL":"@cf/baai/bge-base-en-v1.5","ANSWER_MODEL":"@cf/meta/llama-3.1-8b-instruct","PROMPT_VERSION":"v1.3","CONFIDENCE_ANSWER":"0.75","CONFIDENCE_CLARIFY":"0.50","RATE_LIMIT_PER_MINUTE":"60","AUTH_TIMEOUT_MS":"1800","CONTEXT_TIMEOUT_MS":"1800","DATA_RETENTION_DAYS":"14","EVENT_RETENTION_DAYS":"30","DEMO_MODE":"true","ALLOWED_ORIGINS":""}
     },
-    "production": {
-      "name": "sallamos-ai-production",
-      "ai": { "binding": "AI" },
-      "d1_databases": [
-        { "binding": "META", "database_name": "sallamos-ai-meta-production", "database_id": "PREENCHER_PRODUCTION" }
-      ],
-      "vectorize": [
-        { "binding": "VEC", "index_name": "sallamos-docs-production" }
-      ],
-      "r2_buckets": [
-        { "binding": "SOURCES", "bucket_name": "sallamos-ai-sources-production" }
-      ],
-      "ratelimits": [
-        { "name": "RATE_LIMITER", "namespace_id": "2026082202", "simple": { "limit": 45, "period": 60 } }
-      ],
-      "vars": {
-        "ENVIRONMENT": "production",
-        "AUTH_MODE": "external",
-        "AI_GATEWAY_ID": "",
-        "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5",
-        "ANSWER_MODEL": "@cf/meta/llama-3.1-8b-instruct",
-        "PROMPT_VERSION": "v1.2",
-        "CONFIDENCE_ANSWER": "0.80",
-        "CONFIDENCE_CLARIFY": "0.58",
-        "RATE_LIMIT_PER_MINUTE": "45",
-        "DEMO_MODE": "false",
-        "ALLOWED_ORIGINS": ""
-      }
+    "production":{
+      "name":"sallamos-ai-production","ai":{"binding":"AI"},
+      "d1_databases":[{"binding":"META","database_name":"sallamos-ai-meta-production","database_id":"PREENCHER_PRODUCTION"}],
+      "vectorize":[{"binding":"VEC","index_name":"sallamos-docs-production"}],"r2_buckets":[{"binding":"SOURCES","bucket_name":"sallamos-ai-sources-production"}],
+      "ratelimits":[{"name":"RATE_LIMITER","namespace_id":"2026082202","simple":{"limit":45,"period":60}}],
+      "vars":{"ENVIRONMENT":"production","AUTH_MODE":"external","AI_GATEWAY_ID":"","EMBEDDING_MODEL":"@cf/baai/bge-base-en-v1.5","ANSWER_MODEL":"@cf/meta/llama-3.1-8b-instruct","PROMPT_VERSION":"v1.3","CONFIDENCE_ANSWER":"0.80","CONFIDENCE_CLARIFY":"0.58","RATE_LIMIT_PER_MINUTE":"45","AUTH_TIMEOUT_MS":"1500","CONTEXT_TIMEOUT_MS":"1800","DATA_RETENTION_DAYS":"90","EVENT_RETENTION_DAYS":"180","DEMO_MODE":"false","ALLOWED_ORIGINS":""}
     }
   }
 }
