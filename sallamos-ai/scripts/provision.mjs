@@ -5,6 +5,9 @@ import { randomBytes } from 'node:crypto';
 
 const environment = String(process.argv[2] ?? '').toLowerCase();
 if (!['stage', 'production'].includes(environment)) throw new Error('Uso: node scripts/provision.mjs <stage|production>');
+if (environment === 'production' && String(process.env.PRODUCTION_GO_LIVE ?? '').toLowerCase() !== 'true') {
+  throw new Error('PRODUCTION BLOCKED: PRODUCTION_GO_LIVE não está habilitado no environment de produção.');
+}
 
 const spec = environment === 'stage'
   ? { db: 'sallamos-ai-meta-stage', vector: 'sallamos-docs-stage', bucket: 'sallamos-ai-sources-stage' }
