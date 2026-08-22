@@ -1,0 +1,21 @@
+{
+  "sources": [
+    {
+      "id": "sallamos-api-public",
+      "kind": "github-public",
+      "repository": "sallamos/SallamosAPI",
+      "branch": "master",
+      "status": "approved-poc",
+      "owner": "Sallamos",
+      "files": [
+        { "path": "README.md", "sourceType": "doc", "module": "api" },
+        { "path": "swagger.yaml", "sourceType": "doc", "module": "api" }
+      ]
+    }
+  ],
+  "privateSources": {
+    "status": "pending-read-only-credential",
+    "policy": "least-privilege-read-only",
+    "notes": "Repositórios privados, documentação interna e releases devem usar token somente leitura. Nunca commitar secrets."
+  }
+}
