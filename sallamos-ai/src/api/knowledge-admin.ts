@@ -3,15 +3,23 @@ import { HttpError } from '../auth/session';
 import { requireAdmin } from './admin';
 import { redactText } from '../privacy/redact';
 
-const ALLOWED_TYPES=new Set<SourceType>(['doc','code','release','faq']);
+const ALLOWED_TYPES=new Set<SourceType>(['doc','code','release','faq','history','tool']);
 const MAX_CONTENT=200_000;
+
+export interface KnowledgeDraftInput{title:string;module:string;version:string;owner:string;sourceType:SourceType;content:string;sourceUri?:string}
 
 export async function handleKnowledgeImport(req:Request,env:Env){
   requireAdmin(req,env);
   const body=(await req.json()) as any;
-  const title=clean(body.title,160),module=clean(body.module,60),version=clean(body.version,80),owner=clean(body.owner,120),sourceUri=clean(body.sourceUri,500);
-  const sourceType=String(body.sourceType??'doc') as SourceType;
-  const raw=String(body.content??'');
+  return importKnowledgeDraft(env,{
+    title:clean(body.title,160),module:clean(body.module,60),version:clean(body.version,80),owner:clean(body.owner,120),
+    sourceType:String(body.sourceType??'doc') as SourceType,content:String(body.content??''),sourceUri:clean(body.sourceUri,500)
+  },clean(body.owner,120)||'admin','knowledge.import');
+}
+
+export async function importKnowledgeDraft(env:Env,input:KnowledgeDraftInput,actor:string,auditAction='knowledge.import'){
+  const title=clean(input.title,160),module=clean(input.module,60),version=clean(input.version,80),owner=clean(input.owner,120),sourceUri=clean(input.sourceUri,500);
+  const sourceType=input.sourceType;const raw=String(input.content??'');
   if(!title||!module||!version||!owner)throw new HttpError(400,'knowledge_metadata_required');
   if(!ALLOWED_TYPES.has(sourceType))throw new HttpError(400,'invalid_source_type');
   if(raw.length<40)throw new HttpError(400,'knowledge_content_too_small');
@@ -23,7 +31,7 @@ export async function handleKnowledgeImport(req:Request,env:Env){
   chunks.forEach((text,i)=>{const chunkId=id+'#'+i;statements.push(env.META.prepare('INSERT INTO knowledge_chunk (id,document_id,chunk_index,text,symbol,path,commit_sha,module,version,hash,embedded) VALUES (?,?,?,?,?,?,?,?,?,?,0)').bind(chunkId,id,i,text,'',sourceUri||'',null,module,version,hashText(text)));statements.push(env.META.prepare('INSERT INTO chunk_fts (text,symbol,path,chunk_id) VALUES (?,?,?,?)').bind(text,'',sourceUri||'',chunkId))});
   for(let i=0;i<statements.length;i+=40)await env.META.batch(statements.slice(i,i+40));
   await env.SOURCES.put(`knowledge/${id}.txt`,sanitized.text,{httpMetadata:{contentType:'text/plain; charset=utf-8'},customMetadata:{documentId:id,status:'rascunho',module,version}});
-  await audit(env,'knowledge.import',id,owner,{title,module,version,sourceType,redacted:sanitized.redacted,chunks:chunks.length,sourceUri:sourceUri||null});
+  await audit(env,auditAction,id,clean(actor,120)||owner,{title,module,version,sourceType,redacted:sanitized.redacted,chunks:chunks.length,sourceUri:sourceUri||null});
   return{status:'draft',documentId:id,chunks:chunks.length,redacted:sanitized.redacted,next:'human_approval_required'};
 }
 

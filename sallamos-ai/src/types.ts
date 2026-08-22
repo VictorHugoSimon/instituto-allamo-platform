@@ -6,6 +6,7 @@ export interface Env {
   AUTH_TIMEOUT_MS?:string; CONTEXT_TIMEOUT_MS?:string; DATA_RETENTION_DAYS?:string; EVENT_RETENTION_DAYS?:string;
   DEMO_MODE?:string; ALLOWED_ORIGINS?:string; SALLAMOS_API_BASE?:string; SALLAMOS_AUTH_VALIDATE_URL?:string;
   SALLAMOS_SESSION_SECRET:string; SALLAMOS_API_TOKEN?:string; REPO_READ_TOKEN?:string; ADMIN_TOKEN:string;
+  EVIDENCE_INGEST_TOKEN?:string;
 }
 export interface SessionContext{tenantId:string;userId:string;profile:string;permissions:string[];productVersion:string;locale:string}
 export type SourceType='doc'|'code'|'release'|'faq'|'history'|'tool';
