@@ -37,9 +37,13 @@ must(pubReports,"filter(a=>Number(a?.client_visible??1)!==0)",'API pública remo
 must(pubReports,"f?.client_visible!==false",'API pública remove campos internos');
 must(pubReports,"data.client=company.name",'API pública força identidade real da empresa');
 must(ctxGuard,"data.client=co.name",'Contexto público força identidade da empresa');
-must(publicClientApi,'WHERE p.company_id=?','Portal público lista apenas projetos da empresa');
+must(publicClientApi,'SELECT * FROM companies','Empresa pública não depende de colunas opcionais');
+must(publicClientApi,'SELECT * FROM projects p WHERE p.company_id=?','Projetos públicos não dependem de colunas opcionais');
+must(publicClientApi,'reportStats','Contagem de Reports é enriquecimento separado da lista de projetos');
+must(publicClientApi,'schema_compatible:true','API declara contrato compatível com schema evolutivo');
 must(publicClientApi,'lower(CAST(id AS TEXT))=lower(?)','Link público resolve o mesmo ID sem diferença de caixa');
 must(publicClientApi,'requested_company:cid','API devolve o token solicitado para trava de contexto');
+forbid(publicClientApi,/SELECT\s+p\.id,p\.name,p\.status,p\.badge,p\.summary,p\.start_date,p\.meta_date/i,'Portal público não pode exigir colunas opcionais de projeto');
 must(publicClientUi,"params.get('cliente')",'Empresa pública vem da URL');
 must(publicClientUi,'canonicalCompanyId','Consultas seguintes usam ID canônico retornado pela API');
 must(publicClientUi,"String(c.requested_company||'')!==requestedCompany",'UI valida que a resposta pertence à URL solicitada');
@@ -66,4 +70,4 @@ must(worker,'BEGIN ALLAMO PUBLIC CLIENT PORTAL','Portal público segregado no wo
 must(index,'Marcos, entregáveis & evidências','UI de evidências no artefato final');
 must(index,'FLUXO DE REPORTS','Fluxo de Reports no artefato final');
 must(index,'allamo-public-client-portal','Portal público por projetos no artefato final');
-console.log('OK: isolamento empresa/projeto, portal público autoritativo pós-unpack, storage R2/D1, sanitização pública, marcos, snapshots, exportação e fluxo de Reports validados.');
+console.log('OK: isolamento empresa/projeto, portal público autoritativo e schema-compatible, storage R2/D1, sanitização pública, marcos, snapshots, exportação e fluxo de Reports validados.');
