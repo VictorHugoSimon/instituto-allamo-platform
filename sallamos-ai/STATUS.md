@@ -1,36 +1,31 @@
-# Sallamos AI Support — status
+# Sallamos AI Support — status production-ready
 
-## CONFIRMADO
-- Código-fonte navegável versionado na branch `sallamos-ai-poc`.
-- PR técnico aberto em draft: `#39`.
-- API Worker com chat, RAG híbrido, confidence gate, feedback, dashboard e escalonamento.
-- Interface web responsiva com fallback demo controlado.
-- D1/FTS5, Vectorize, R2 e Workers AI previstos no mesmo deploy.
-- AI Gateway tornou-se opcional no primeiro go-live.
-- Sessão demo HMAC com expiração.
-- Contexto do tenant read-only e redaction de campos sensíveis.
-- Migrations, seed, ingestion scripts, eval runner e provisionador idempotente.
-- Sincronização automática preparada para `sallamos/SallamosAPI` (`README.md` + `swagger.yaml`).
-- Demo pública em produção: https://sallamos-ai-support.vercel.app.
-- CI real no GitHub Actions aprovado: TypeScript strict, JavaScript syntax, D1 migrations/FTS5 e Wrangler dry-run.
-- Demais workflows do repositório também passaram no commit atual.
+## CONCLUÍDO
+- Arquitetura separada para STAGE e PRODUCTION.
+- `develop` configurado como trilha automática de stage.
+- `main` configurado como trilha automática de produção.
+- Recursos isolados por ambiente: Worker, D1, Vectorize e R2.
+- CI aprovado para TypeScript, JavaScript, migrations, seed, source policy e Wrangler dry-run nos dois ambientes.
+- Tenant isolation aplicado em dashboards, feedback e escalonamentos.
+- Autenticação externa obrigatória em produção.
+- Rate limit persistente.
+- Health/readiness e security headers.
+- UI produtiva sem mock/fallback de resposta.
+- Seed fictício removido do caminho de migrations e restrito a stage.
+- Fontes não homologadas bloqueadas para produção.
+- Production knowledge gate antes do deploy.
+- Rollback versionado por GitHub Actions.
 
-## BLOQUEIO EXTERNO ATUAL
-O secret `CLOUDFLARE_API_TOKEN` existente no GitHub já foi testado anteriormente com `wrangler whoami` e falhou na API Cloudflare com:
-- code `6003`: Invalid request headers;
-- code `6111`: Invalid format for Authorization header.
+## STAGE
+Código já integrado à branch `develop`. O workflow automático está habilitado por push/merge.
 
-Portanto o código e o pipeline estão prontos; o bloqueio restante é a rotação/correção desse token Cloudflare.
+## PRODUÇÃO
+PR production-ready aberto contra `main`. A promoção deve ocorrer somente após stage e credenciais externas estarem válidos.
 
-## APÓS A ROTAÇÃO DO TOKEN
-O workflow `Sallamos AI POC` precisa apenas de:
-- `CLOUDFLARE_API_TOKEN` válido;
-- `CLOUDFLARE_ACCOUNT_ID` válido.
+## BLOQUEIOS EXTERNOS
+1. O `CLOUDFLARE_API_TOKEN` disponível anteriormente falhou com Cloudflare 6003/6111 e precisa ser substituído por token válido.
+2. É necessário informar `SALLAMOS_AUTH_VALIDATE_URL` real para produção.
+3. É necessário informar `SALLAMOS_API_BASE` real para contexto read-only.
+4. É necessário disponibilizar e homologar a fonte real de código/documentação Sallamos. O repositório público encontrado não é fonte de verdade utilizável.
 
-`SALLAMOS_SESSION_SECRET` e `ADMIN_TOKEN` são gerados no próprio job, mascarados e enviados diretamente ao Worker. Não precisam ser cadastrados manualmente no GitHub.
-
-## PRODUÇÃO REAL
-- Trocar `DEMO_MODE` para `false`.
-- Integrar autenticação oficial e API interna read-only do Sallamos.
-- Ingerir documentação/repositórios privados com credencial somente leitura.
-- Executar evals de homologação e rollout por feature flag.
+Sem esses quatro itens, produção permanece fail-closed e não atende usuários com informação simulada.
