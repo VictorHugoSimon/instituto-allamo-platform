@@ -17,6 +17,7 @@
     "test:platform": "node scripts/validate-dynamic-tenant-platform.mjs && node scripts/verify-data-persistence.mjs",
     "test:freshness": "node scripts/validate-boot-guard.mjs && node scripts/validate-data-freshness.mjs",
     "test:session": "node scripts/validate-session-stability.mjs && node scripts/validate-login-interaction.mjs && node scripts/validate-bundle-json.mjs",
+    "test:public": "node scripts/validate-public-no-login.mjs && node scripts/validate-bundle-json.mjs",
     "test:bundle": "node scripts/validate-bundle-json.mjs",
     "lint": "npm run lint --workspace=apps/web",
     "start": "npm run start --workspace=apps/web"
