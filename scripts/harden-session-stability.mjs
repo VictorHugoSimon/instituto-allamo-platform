@@ -23,22 +23,42 @@ if(worker.includes(start)){
 }
 fs.writeFileSync(workerFile,worker);
 
-// ---- Portal: não confundir indisponibilidade temporária com sessão inválida ----
+// ---- Portal: substitui o método completo para não depender do escaping do bundle ----
 let html=fs.readFileSync(indexFile,'utf8');
 const restoreStart=html.indexOf('restoreSession() {');
-if(restoreStart<0) throw new Error('restoreSession não encontrado no portal.');
-const restoreEnd=Math.min(html.length,restoreStart+4200);
-let restore=html.slice(restoreStart,restoreEnd);
-
-restore=restore.replace("this.api('companies').then(() => {","this.api('session-status').then(() => {");
-restore=restore.replace('}).catch(() => {','}).catch((err) => {');
-
-const destructive=/try \{ localStorage\.removeItem\('allamo_session'\); \} catch\(e\)\{\}[\\\s]*this\.setState\(\{ screen:'login', token:null, live:false, role:null \}\);/;
-const stableLogout="const sessionMsg=String((err&&err.message)||err||''); const authInvalid=/Não autenticado|HTTP 401|HTTP 403|Credenciais inválidas/i.test(sessionMsg); if(authInvalid){ try { localStorage.removeItem('allamo_session'); } catch(e){} this.setState({ screen:'login', token:null, live:false, role:null }); } else { console.warn('[session] validação temporariamente indisponível; sessão local preservada',sessionMsg); this.setState({ sessionWarning:'Conexão instável. Mantendo sua sessão e tentando sincronizar os dados.' }); setTimeout(()=>{ try{ this.loadData(); }catch(e){} },1200); }";
-if(destructive.test(restore)) restore=restore.replace(destructive,stableLogout);
-else if(!restore.includes('validação temporariamente indisponível')) throw new Error('Catch destrutivo de restoreSession não encontrado.');
-
-html=html.slice(0,restoreStart)+restore+html.slice(restoreEnd);
+const nextMethod='  async onLoginSubmit(e) {';
+const restoreEnd=html.indexOf(nextMethod,restoreStart);
+if(restoreStart<0||restoreEnd<0) throw new Error('Limites de restoreSession não encontrados no portal.');
+const slashNL='\\\n';
+const stableRestore=[
+  'restoreSession() {',
+  '    let sess = null;',
+  "    try { sess = JSON.parse(localStorage.getItem('allamo_session') || 'null'); } catch(e){}",
+  '    if (!sess || !sess.token) return;',
+  '    // restaura imediatamente; valida autenticação em endpoint dedicado sem derrubar sessão por falha de rede',
+  '    this.setState({',
+  "      token: sess.token, live: true, role: sess.role, screen: 'app',",
+  "      company: this.state.deepClient || sess.company || 'all',",
+  "      tab: sess.tab || 'exec', reportProject: sess.company",
+  '    }, () => {',
+  "      this.api('session-status').then(() => {",
+  "        this.setState({ sessionWarning:'' });",
+  '        this.loadData().then(() => {',
+  "          if (this.state.tab === 'historico') this.loadAudit();",
+  "          if (this.state.tab === 'acompanhamento') this.loadReport();",
+  '        });',
+  '      }).catch((err) => {',
+  "        const sessionMsg=String((err&&err.message)||err||'');",
+  "        const authInvalid=/Não autenticado|HTTP 401|HTTP 403|Credenciais inválidas/i.test(sessionMsg);",
+  "        if(authInvalid){ try { localStorage.removeItem('allamo_session'); } catch(e){} this.setState({ screen:'login', token:null, live:false, role:null }); }",
+  "        else { console.warn('[session] validação temporariamente indisponível; sessão local preservada',sessionMsg); this.setState({ sessionWarning:'Conexão instável. Mantendo sua sessão e tentando sincronizar os dados.' }); setTimeout(()=>{ try{ this.loadData(); }catch(e){} },1200); }",
+  '      });',
+  '    });',
+  '  }',
+  '',
+  '  '
+].join(slashNL);
+html=html.slice(0,restoreStart)+stableRestore+html.slice(restoreEnd);
 
 // Logout explícito revoga também o token no servidor.
 const logoutNeedle="logout() { try{ localStorage.removeItem('allamo_session'); }catch(e){}";
