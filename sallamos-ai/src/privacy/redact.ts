@@ -1,38 +1,4 @@
-const BLOCKED_KEYS = /(password|senha|secret|token|authorization|cookie|cpf|cnpj|email|telefone|phone|celular|conta(_bancaria)?|account(_number)?|agencia|chave|api[_-]?key|card|cartao)/i;
-
-export function redactText(input: unknown): { text: string; redacted: boolean } {
-  let text = String(input ?? '');
-  const original = text;
-
-  const replacements: Array<[RegExp, string]> = [
-    [/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[EMAIL_REDACTED]'],
-    [/\b(?:\d{3}[.\s-]?){2}\d{3}[-\s]?\d{2}\b/g, '[CPF_REDACTED]'],
-    [/\b\d{2}[.\s-]?\d{3}[.\s-]?\d{3}[\/]?\d{4}[-\s]?\d{2}\b/g, '[CNPJ_REDACTED]'],
-    [/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\s*)?\d{4}[-\s]?\d{4}\b/g, '[PHONE_REDACTED]'],
-    [/\b(?:\d[ -]*?){13,19}\b/g, '[CARD_REDACTED]'],
-    [/\b(?:Bearer\s+)?(?:sk|pk|tok|token|secret)[-_][A-Za-z0-9._-]{12,}\b/gi, '[TOKEN_REDACTED]']
-  ];
-
-  for (const [pattern, replacement] of replacements) text = text.replace(pattern, replacement);
-  return { text: text.slice(0, 12000), redacted: text !== original };
-}
-
-export function sanitizeForStorage(value: unknown, depth = 0): unknown {
-  if (depth > 8) return '[TRUNCATED]';
-  if (value == null || typeof value === 'boolean' || typeof value === 'number') return value;
-  if (typeof value === 'string') return redactText(value).text;
-  if (Array.isArray(value)) return value.slice(0, 50).map(v => sanitizeForStorage(v, depth + 1));
-  if (typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-      if (BLOCKED_KEYS.test(key)) { out[key] = '[REDACTED]'; continue; }
-      out[key] = sanitizeForStorage(child, depth + 1);
-    }
-    return out;
-  }
-  return String(value).slice(0, 2000);
-}
-
-export function redactionStatus(input: unknown): 'clean' | 'redacted' {
-  return redactText(input).redacted ? 'redacted' : 'clean';
-}
+const BLOCKED_KEYS=/(password|senha|secret|token|authorization|cookie|cpf|cnpj|email|telefone|phone|celular|conta(_bancaria)?|account(_number)?|agencia|chave|api[_-]?key|card|cartao)/i;
+export function redactText(input:unknown,maxLength=12000):{text:string;redacted:boolean}{let text=String(input??''),original=text;const replacements:Array<[RegExp,string]>=[[/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,'[EMAIL_REDACTED]'],[/\b(?:\d{3}[.\s-]?){2}\d{3}[-\s]?\d{2}\b/g,'[CPF_REDACTED]'],[/\b\d{2}[.\s-]?\d{3}[.\s-]?\d{3}[\/]?\d{4}[-\s]?\d{2}\b/g,'[CNPJ_REDACTED]'],[/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\s*)?\d{4}[-\s]?\d{4}\b/g,'[PHONE_REDACTED]'],[/\b(?:\d[ -]*?){13,19}\b/g,'[CARD_REDACTED]'],[/\b(?:Bearer\s+)?(?:sk|pk|tok|token|secret)[-_][A-Za-z0-9._-]{12,}\b/gi,'[TOKEN_REDACTED]']];for(const[p,r]of replacements)text=text.replace(p,r);return{text:text.slice(0,Math.max(1,maxLength)),redacted:text!==original}}
+export function sanitizeForStorage(value:unknown,depth=0):unknown{if(depth>8)return'[TRUNCATED]';if(value==null||typeof value==='boolean'||typeof value==='number')return value;if(typeof value==='string')return redactText(value).text;if(Array.isArray(value))return value.slice(0,50).map(v=>sanitizeForStorage(v,depth+1));if(typeof value==='object'){const out:Record<string,unknown>={};for(const[key,child]of Object.entries(value as Record<string,unknown>)){if(BLOCKED_KEYS.test(key)){out[key]='[REDACTED]';continue}out[key]=sanitizeForStorage(child,depth+1)}return out}return String(value).slice(0,2000)}
+export function redactionStatus(input:unknown):'clean'|'redacted'{return redactText(input).redacted?'redacted':'clean'}
