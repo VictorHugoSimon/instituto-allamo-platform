@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 
 const environment = String(process.argv[2] ?? '').toLowerCase();
@@ -63,7 +63,15 @@ if (environment === 'production') {
   if (!(total > 0)) throw new Error('PRODUCTION BLOCKED: nenhuma fonte homologada disponível no D1 de produção. Ingerir e homologar conhecimento antes do deploy.');
 }
 
-run(['deploy', '--env', environment]);
+const deployOutput = run(['deploy', '--env', environment], true);
+console.log(deployOutput);
+const deployUrl = resolveDeployUrl(deployOutput) || process.env.SALLAMOS_AI_BASE_URL || '';
+if (deployUrl) {
+  console.log(`DEPLOY_URL=${deployUrl}`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `url=${deployUrl}\n`);
+} else {
+  console.warn('Deploy concluído, mas a URL não pôde ser extraída automaticamente do Wrangler.');
+}
 console.log(`\nSallamos AI ${environment} provisionado e publicado com recursos isolados.`);
 
 function ensureGeneratedSecret(name, supplied, current) {
@@ -83,4 +91,8 @@ function findTotal(value) {
     for (const x of Object.values(value)) { const n = findTotal(x); if (n != null) return n; }
   }
   return null;
+}
+function resolveDeployUrl(output) {
+  const matches = String(output || '').match(/https:\/\/[a-zA-Z0-9.-]+\.workers\.dev\/?/g) || [];
+  return matches.at(-1) || '';
 }

@@ -1,6 +1,6 @@
 {
   "name": "sallamos-ai",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "provision:production": "node scripts/provision.mjs production",
     "sync:stage": "node scripts/sync-sallamos-api.mjs --env stage",
     "sync:production": "node scripts/sync-sallamos-api.mjs --env production",
+    "smoke": "node scripts/smoke.mjs",
     "evals": "node evals/runner.mjs"
   },
   "devDependencies": {

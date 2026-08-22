@@ -10,19 +10,18 @@ export async function hybridSearch(env: Env, query: string, filters: Filters): P
   const started = Date.now();
   const emb = await env.AI.run(env.EMBEDDING_MODEL, { text: [query] });
   const lexicalQuery = sanitizeMatch(query);
+  const semanticFilter: Record<string, string> = {};
+  if (filters.onlyApproved) semanticFilter.status = 'homologado';
+  if (filters.module) semanticFilter.module = filters.module;
 
-  const semanticPromise = env.VEC.query(emb.data[0], { topK: 8, returnMetadata: 'all' });
+  const semanticPromise = env.VEC.query(emb.data[0], {
+    topK: 8,
+    returnMetadata: 'all',
+    ...(Object.keys(semanticFilter).length ? { filter: semanticFilter } : {})
+  });
+
   const lexicalPromise = lexicalQuery
-    ? env.META.prepare(
-        `SELECT c.id, c.document_id, c.text, c.symbol, c.path, c.commit_sha,
-                c.module, c.version, d.source_type, d.status, d.owner,
-                bm25(chunk_fts) AS rank
-           FROM chunk_fts
-           JOIN knowledge_chunk c ON c.id = chunk_fts.chunk_id
-           JOIN knowledge_document d ON d.id = c.document_id
-          WHERE chunk_fts MATCH ?
-          ORDER BY rank LIMIT 8`
-      ).bind(lexicalQuery).all()
+    ? lexicalSearch(env, lexicalQuery, filters)
     : Promise.resolve({ results: [] });
 
   const [semantic, lexical] = await Promise.all([semanticPromise, lexicalPromise]);
@@ -36,6 +35,24 @@ export async function hybridSearch(env: Env, query: string, filters: Filters): P
   };
 }
 
+function lexicalSearch(env: Env, lexicalQuery: string, filters: Filters) {
+  const where = ['chunk_fts MATCH ?'];
+  const bindings: unknown[] = [lexicalQuery];
+  if (filters.onlyApproved) { where.push("d.status = 'homologado'"); }
+  if (filters.module) { where.push('c.module = ?'); bindings.push(filters.module); }
+
+  return env.META.prepare(
+    `SELECT c.id, c.document_id, c.text, c.symbol, c.path, c.commit_sha,
+            c.module, c.version, d.source_type, d.status, d.owner,
+            bm25(chunk_fts) AS rank
+       FROM chunk_fts
+       JOIN knowledge_chunk c ON c.id = chunk_fts.chunk_id
+       JOIN knowledge_document d ON d.id = c.document_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY rank LIMIT 8`
+  ).bind(...bindings).all();
+}
+
 async function hydrate(env: Env, ids: string[], matches: any[]): Promise<Hit[]> {
   const placeholders = ids.map(() => '?').join(',');
   const rows = await env.META.prepare(
@@ -45,7 +62,6 @@ async function hydrate(env: Env, ids: string[], matches: any[]): Promise<Hit[]> 
        JOIN knowledge_document d ON d.id = c.document_id
       WHERE c.id IN (${placeholders})`
   ).bind(...ids).all();
-
   const scoreById = new Map(matches.map((m: any) => [m.id, m.score]));
   return (rows.results ?? []).map((r: any) => ({
     chunkId: r.id, documentId: r.document_id, sourceType: r.source_type, text: r.text,
@@ -63,13 +79,6 @@ function toLexicalHit(r: any): Hit {
     score: Math.min(1, 1 / (1 + Math.abs(r.rank ?? 10))), origin: 'lexical'
   };
 }
-
 function sanitizeMatch(q: string): string {
-  return q.replace(/["*():^-]/g, ' ')
-    .split(/\s+/)
-    .map(t => t.trim())
-    .filter(t => t.length >= 2)
-    .slice(0, 16)
-    .map(t => '"' + t.replace(/"/g, '') + '"')
-    .join(' OR ');
+  return q.replace(/["*():^-]/g, ' ').split(/\s+/).map(t => t.trim()).filter(t => t.length >= 2).slice(0, 16).map(t => '"' + t.replace(/"/g, '') + '"').join(' OR ');
 }
