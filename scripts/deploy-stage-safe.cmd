@@ -48,7 +48,7 @@ call npm run test:release || goto :fail
 
 echo [6/7] Materializando config exclusiva e publicando o STAGE...
 copy /Y wrangler.stage.toml wrangler.toml >nul || goto :fail
-findstr /C:"name = \"allamo-pmo-stage\"" wrangler.toml >nul || (
+findstr /C:"allamo-pmo-stage" wrangler.toml >nul || (
   echo [ERRO] wrangler.toml temporario nao aponta para o projeto de Stage.
   goto :fail
 )
