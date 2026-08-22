@@ -1,0 +1,3 @@
+{"id":"q001","module":"financeiro","difficulty":"baixa","question":"Onde consigo criar forma de pagamento debito automatico e guia?","expected_source":"demo:doc:formas-pagamento","expect_decision":"answer"}
+{"id":"q002","module":"dre","difficulty":"media","question":"Centro de custo deixou de aparecer no DRE depois da atualizacao","expected_source":"demo:doc:dre","expect_decision":"clarify"}
+{"id":"q003","module":"fiscal","difficulty":"alta","question":"Por que a nota de setembro do cliente saiu com imposto retido errado?","expected_source":null,"expect_decision":"escalate"}
