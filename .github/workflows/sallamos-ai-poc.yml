@@ -36,6 +36,7 @@ jobs:
           node --check scripts/provision.mjs
           node --check scripts/ingest-docs.mjs
           node --check scripts/ingest-repo.mjs
+          node --check scripts/sync-sallamos-api.mjs
           node --check evals/runner.mjs
       - name: Validate D1 migrations locally
         run: |
@@ -87,3 +88,5 @@ jobs:
           test -n "$ADMIN_TOKEN" || (echo 'ADMIN_TOKEN ausente' && exit 1)
       - name: Provision and deploy
         run: npm run provision
+      - name: Sync Sallamos public API knowledge
+        run: npm run sync:sallamos-api
