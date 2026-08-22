@@ -9,6 +9,7 @@
     "types": "wrangler types",
     "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply sallamos-ai-meta --remote",
+    "sync:sallamos-api": "node scripts/sync-sallamos-api.mjs",
     "evals": "node evals/runner.mjs",
     "provision": "node scripts/provision.mjs",
     "typecheck": "tsc -p tsconfig.json"
