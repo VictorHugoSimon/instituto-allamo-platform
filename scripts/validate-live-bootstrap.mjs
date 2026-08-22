@@ -22,9 +22,16 @@ const clearPos=restore.indexOf('this.companies=[];this.projects=[]');
 const appPos=restore.indexOf("screen: 'app'");
 if(clearPos<0||appPos<0||clearPos>appPos)throw new Error('restoreSession ainda pode renderizar a carteira demo antes da limpeza.');
 
-const load=template.slice(template.indexOf('  async loadData() {'),template.indexOf('  roleName(',template.indexOf('  async loadData() {')));
-const resetCount=(load.match(/this\.companies=\[\]/g)||[]).length;
-if(resetCount!==1)throw new Error('loadData deve conter exatamente um reset inicial protegido, não resets recorrentes.');
+const loadStart=template.indexOf('  async loadData() {');
+const loadEnd=template.indexOf('  roleName(',loadStart);
+const load=template.slice(loadStart,loadEnd);
+const markerCount=(load.match(/\[allamo-load-initial-reset\]/g)||[]).length;
+if(markerCount!==1)throw new Error('loadData deve possuir exatamente um marcador de reset inicial.');
+const markerPos=load.indexOf('[allamo-load-initial-reset]');
+const guardPos=load.indexOf('if(!this.__allamoLiveBootReset)',markerPos);
+const initialClearPos=load.indexOf('this.companies=[];this.projects=[]',guardPos);
+const queryPos=load.indexOf('const c = this.state.company;',initialClearPos);
+if(markerPos<0||guardPos<0||initialClearPos<0||queryPos<0||!(markerPos<guardPos&&guardPos<initialClearPos&&initialClearPos<queryPos))throw new Error('Reset inicial não está protegido antes da primeira consulta live.');
 
 const build=String(pkg.scripts['build:work']||'');
 if(!build.includes('zero-live-state-before-fetch.mjs'))throw new Error('Build não aplica saneamento de boot live.');
