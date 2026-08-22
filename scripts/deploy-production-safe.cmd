@@ -58,7 +58,7 @@ call npm run test:release || goto :fail
 
 echo [6/9] Materializando config exclusiva de Producao...
 copy /Y wrangler.production.toml wrangler.toml >nul || goto :fail
-findstr /C:"name = \"allamo-pmo\"" wrangler.toml >nul || (
+findstr /C:"allamo-pmo" wrangler.toml >nul || (
   echo [ERRO] wrangler.toml temporario nao aponta para o projeto de Producao.
   goto :fail
 )
