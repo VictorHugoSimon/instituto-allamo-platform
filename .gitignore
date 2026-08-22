@@ -17,3 +17,9 @@ supabase/.temp/
 supabase/.branches/
 
 supabase/snippets/
+
+# Backups operacionais locais — nunca versionar dados de Stage/Produção.
+backups/
+backup-*.sql
+*.sqlite
+*.sqlite3
