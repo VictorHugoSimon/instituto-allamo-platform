@@ -1,7 +1,9 @@
 const base=(process.env.ALLAMO_STAGE_URL||'https://allamo-pmo-stage.pages.dev').replace(/\/$/,'');
 const companies=String(process.env.ALLAMO_SMOKE_COMPANIES||'').split(',').map(x=>x.trim()).filter(Boolean);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const get=async p=>{const r=await fetch(base+p,{headers:{'cache-control':'no-store'}}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(`${p}: HTTP ${r.status} ${d.error||''}`);return d};
-const health=await get('/api/stage-health');if(health.ok!==true||health.environment!=='stage')throw new Error('Stage health inválido.');
+async function waitHealth(){let last;for(let i=1;i<=12;i++){try{const h=await get('/api/stage-health');if(h.ok===true&&h.environment==='stage')return h;last=new Error('Stage health inválido.')}catch(e){last=e}console.log(`Aguardando propagação do Stage (${i}/12)…`);await sleep(10000)}throw last||new Error('Stage indisponível')}
+const health=await waitHealth();
 console.log(`OK health: ${health.build||'stage'}`);
 if(!companies.length){console.log('SKIP tenants: defina ALLAMO_SMOKE_COMPANIES=slug1,slug2,slug3 para smoke multitenant completo.');process.exit(0)}
 for(const token of companies){
