@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+const html=fs.readFileSync('public/index.html','utf8');
+const open='<script type="__bundler/template">',close='</script>';
+const a=html.indexOf(open),s=a+open.length,e=html.indexOf(close,s);
+if(a<0||e<0) throw new Error('Template não encontrado.');
+const template=JSON.parse(html.slice(s,e));
+const must=(n,l)=>{if(!template.includes(n))throw new Error('Ausente: '+l+' ('+n+')')};
+must("form.querySelector('input[name=\\\"email\\\"]",'submit lê e-mail real do DOM');
+must("form.querySelector('input[name=\\\"password\\\"]",'submit lê senha real do DOM');
+must('autocomplete="username"','autocomplete de usuário');
+must('autocomplete="current-password"','autocomplete de senha');
+must('data-allamo-password="1"','seletor estável da senha');
+must('data-allamo-password-toggle','controle mostrar/ocultar senha');
+must("input.type=show?'text':'password'",'toggle alterna visibilidade');
+if(/console\.(?:log|info|warn)\([^\n]*(?:password|senha)/i.test(template))throw new Error('Possível logging indevido de senha no runtime.');
+console.log('OK: autofill sincronizado no submit e senha possui mostrar/ocultar sem exposição em log.');
