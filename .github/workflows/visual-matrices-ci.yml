@@ -1,0 +1,26 @@
+name: Visual RACI + Risk Matrices CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  visual-matrices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate visual matrices
+        run: npm run test:matrices
+      - name: Validate responsive usability
+        run: npm run test:ux
+      - name: Validate tenant isolation
+        run: npm run test:tenant

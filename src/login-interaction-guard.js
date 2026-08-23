@@ -8,6 +8,7 @@
   window.__allamoLoginInteractionGuard=true;
 
   const draft={email:'',password:''};
+  const edited={email:false,password:false};
   let loginBusy=false;
 
   const loginForm=()=>{
@@ -50,6 +51,7 @@
     const company=user.company_id||'all';
     const session={token:res.token,role,company,tab:defaultTab,name:user.name||''};
     localStorage.setItem('allamo_session',JSON.stringify(session));
+    draft.password='';
     location.reload();
   };
 
@@ -72,11 +74,30 @@
       const payload=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(payload.error||('HTTP '+response.status));
       if(!payload.token)throw new Error('Login não retornou uma sessão válida.');
-      draft.password='';
       saveSessionAndReload(payload);
     }catch(err){
       loginBusy=false;setBusy(form,false);
       showError(form,String((err&&err.message)||err||'Não foi possível entrar.'));
+    }
+  };
+
+  const hardenField=(input,kind)=>{
+    const isPassword=kind==='password';
+    input.setAttribute('name',isPassword?'allamo-login-secret':'allamo-login-user');
+    input.setAttribute('autocomplete',isPassword?'new-password':'off');
+    input.setAttribute('data-lpignore','true');
+    input.setAttribute('data-1p-ignore','true');
+    input.setAttribute('autocapitalize','none');
+    input.setAttribute('spellcheck','false');
+
+    // Antes da primeira digitação do usuário, qualquer valor reaparecido é tratado
+    // como autofill do navegador/gerenciador e removido. Depois que o usuário toca
+    // no campo, o rascunho manual vira a única fonte de verdade — inclusive vazio.
+    if(edited[kind]){
+      if(input.value!==draft[kind])input.value=draft[kind];
+    }else if(input.value){
+      input.value='';
+      draft[kind]='';
     }
   };
 
@@ -87,27 +108,23 @@
     const password=form.querySelector('input[type="password"]');
     if(!email||!password)return;
 
-    email.setAttribute('name','email');
-    email.setAttribute('autocomplete','username');
-    password.setAttribute('name','password');
-    password.setAttribute('autocomplete','current-password');
-
-    if(draft.email&&email.value!==draft.email)email.value=draft.email;
-    else if(!draft.email&&email.value)draft.email=email.value;
-    if(draft.password&&password.value!==draft.password)password.value=draft.password;
-    else if(!draft.password&&password.value)draft.password=password.value;
+    form.setAttribute('autocomplete','off');
+    hardenField(email,'email');
+    hardenField(password,'password');
 
     if(!email.dataset.allamoNativeInput){
       email.dataset.allamoNativeInput='1';
-      email.addEventListener('input',()=>{draft.email=email.value;showError(form,'')},true);
-      email.addEventListener('change',()=>{draft.email=email.value},true);
-      email.addEventListener('keydown',()=>{setTimeout(()=>{draft.email=email.value},0)},true);
+      email.addEventListener('input',()=>{edited.email=true;draft.email=email.value;showError(form,'')},true);
+      email.addEventListener('change',()=>{edited.email=true;draft.email=email.value},true);
+      email.addEventListener('keydown',()=>{edited.email=true;setTimeout(()=>{draft.email=email.value},0)},true);
+      email.addEventListener('paste',()=>{edited.email=true;setTimeout(()=>{draft.email=email.value},0)},true);
     }
     if(!password.dataset.allamoNativeInput){
       password.dataset.allamoNativeInput='1';
-      password.addEventListener('input',()=>{draft.password=password.value;showError(form,'')},true);
-      password.addEventListener('change',()=>{draft.password=password.value},true);
-      password.addEventListener('keydown',()=>{setTimeout(()=>{draft.password=password.value},0)},true);
+      password.addEventListener('input',()=>{edited.password=true;draft.password=password.value;showError(form,'')},true);
+      password.addEventListener('change',()=>{edited.password=true;draft.password=password.value},true);
+      password.addEventListener('keydown',()=>{edited.password=true;setTimeout(()=>{draft.password=password.value},0)},true);
+      password.addEventListener('paste',()=>{edited.password=true;setTimeout(()=>{draft.password=password.value},0)},true);
     }
     if(!form.dataset.allamoNativeLogin){
       form.dataset.allamoNativeLogin='1';
