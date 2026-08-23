@@ -8,10 +8,10 @@ const destructive=/\b(DELETE\s+FROM|DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE(?:\s+T
 if(destructive.test(ps)||destructive.test(portable)||destructive.test(smoke))throw new Error('Runner portátil contém padrão SQL destrutivo.');
 
 must(ps,"RECOVER-AND-DEPLOY",'confirmação explícita');
-must(ps,"git','worktree','add','--detach'",'worktree isolado');
+must(ps,"@('worktree','add','--detach'",'worktree isolado');
 must(ps,"origin/main",'fonte remota limpa');
 must(ps,"origin/develop",'comparação main/develop');
-must(ps,"npm','run','test:release'",'gate consolidado');
+must(ps,"@('run','test:release')",'gate consolidado');
 must(ps,"wrangler@4.124.0','whoami",'preflight Wrangler');
 must(ps,"backup-stage-before-core-recovery",'backup Stage');
 must(ps,"backup-production-before-core-recovery",'backup Produção');
