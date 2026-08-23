@@ -62,7 +62,12 @@ if (isAllamoStage) {
         plan_items: await stageCount('plan_items'),
         report_records: await stageCount('report_records'),
         report_versions: await stageCount('report_versions'),
-        report_roadmap_items: await stageCount('report_roadmap_items')
+        report_roadmap_items: await stageCount('report_roadmap_items'),
+        governance_events: await stageCount('governance_events'),
+        governance_agenda_items: await stageCount('governance_event_agenda_items'),
+        governance_stakeholders: await stageCount('governance_event_stakeholders'),
+        governance_work_links: await stageCount('governance_event_work_links'),
+        governance_decisions: await stageCount('governance_event_decisions')
       },
       reset_key: null,
       legacy_reset_key: legacyResetKey
