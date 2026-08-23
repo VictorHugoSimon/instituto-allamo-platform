@@ -34,7 +34,26 @@ must(index,'[allamo-load-initial-reset]','Primeira hidratação zera fotografia 
 must(index,'BEGIN ALLAMO PUBLIC CLIENT PWA RUNTIME','PWA público tenant-safe está no artefato');
 if(index.includes('body{visibility:hidden!important}'))throw new Error('Artefato final ainda bloqueia o body durante carregamento.');
 if(index.includes('[allamo-live-reset] nunca renderizar fotografia demo durante fetch'))throw new Error('Refresh recorrente ainda pode zerar a tela inteira.');
+
 const build=String(pkg.scripts['build:work']);
-const requiredOrder='harden-data-freshness.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs && node scripts/harden-session-stability.mjs && node scripts/harden-public-client-pwa.mjs && node scripts/harden-visual-matrices.mjs && node scripts/validate-portal-baseline.mjs && node scripts/validate-bundle-json.mjs';
-if(!build.includes(requiredOrder))throw new Error('Ordem do build pode reintroduzir sessão/cache/PWA antigos.');
-console.log('OK: cache, sessão, boot live, BFCache, Service Worker, PWA multitenant e matrizes visuais revalidam sem exibir dados demo.');
+const orderedSteps=[
+  'harden-data-freshness.mjs',
+  'zero-static-executive-chart.mjs',
+  'zero-live-state-before-fetch.mjs',
+  'optimize-portal-performance.mjs',
+  'stamp-release.mjs',
+  'harden-session-stability.mjs',
+  'harden-stage-no-login.mjs',
+  'harden-public-client-pwa.mjs',
+  'harden-visual-matrices.mjs',
+  'validate-portal-baseline.mjs',
+  'validate-bundle-json.mjs'
+];
+let previous=-1;
+for(const step of orderedSteps){
+  const pos=build.indexOf(`node scripts/${step}`);
+  if(pos<0)throw new Error(`Etapa obrigatória ausente do build: ${step}`);
+  if(pos<=previous)throw new Error(`Ordem inválida no build próximo de: ${step}`);
+  previous=pos;
+}
+console.log('OK: cache, sessão, Stage sem login isolado, boot live, BFCache, Service Worker, PWA multitenant e matrizes visuais revalidam sem exibir dados demo.');
