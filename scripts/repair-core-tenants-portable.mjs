@@ -12,10 +12,13 @@ if(!fs.existsSync(sourcePath)){
 const normalizeSource=(raw)=>String(raw||'').replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
 const sourceRaw=fs.readFileSync(sourcePath,'utf8');
 const old=`    let parsed;\n    try{ parsed=JSON.parse(out); }\n    catch{ throw new Error('Wrangler retornou saída não-JSON ao consultar D1.'); }`;
-const replacement=`    let parsed;\n    try{ parsed=JSON.parse(out); }\n    catch{\n      const clean=String(out||'').replace(/\\u001b\\[[0-9;?]*[ -\\/]*[@-~]/g,'').trim();\n      let recovered=null;\n      const starts=[];\n      for(let i=0;i<clean.length;i++) if(clean[i]==='['||clean[i]==='{') starts.push(i);\n      const ends=[];\n      for(let i=clean.length-1;i>=0;i--) if(clean[i]===']'||clean[i]==='}') ends.push(i);\n      outer: for(const a of starts){\n        for(const b of ends){\n          if(b<=a) continue;\n          try{ recovered=JSON.parse(clean.slice(a,b+1)); break outer; }catch{}\n        }\n      }\n      if(recovered===null) throw new Error('Wrangler retornou saída sem payload JSON reconhecível ao consultar D1.');\n      parsed=recovered;\n    }`;
+const replacement=`    let parsed;\n    try{ parsed=JSON.parse(out); }\n    catch{\n      const clean=String(out||'').replace(/\\u001b\\[[0-9;?]*[ -\\/]*[@-~]/g,'').trim();\n      let recovered=null;\n      let recoveredSize=-1;\n      const starts=[];\n      for(let i=0;i<clean.length;i++) if(clean[i]==='['||clean[i]==='{') starts.push(i);\n      const ends=[];\n      for(let i=clean.length-1;i>=0;i--) if(clean[i]===']'||clean[i]==='}') ends.push(i);\n      for(const a of starts){\n        for(const b of ends){\n          if(b<=a) continue;\n          const slice=clean.slice(a,b+1);\n          try{\n            const candidate=JSON.parse(slice);\n            const rows=extractResults(candidate);\n            if(rows!==null && slice.length>recoveredSize){ recovered=candidate; recoveredSize=slice.length; }\n          }catch{}\n        }\n      }\n      if(recovered===null) throw new Error('Wrangler retornou saída sem payload JSON D1 reconhecível ao consultar D1.');\n      parsed=recovered;\n    }`;
 
 function patchSource(raw){
   const source=normalizeSource(raw);
+  if(!source.includes('function extractResults(node)')){
+    throw new Error('O reparo não possui extractResults(); não é seguro executar o wrapper portátil.');
+  }
   if(!source.includes(old)){
     throw new Error('O contrato do parser do reparo mudou; wrapper portátil não será executado.');
   }
@@ -29,9 +32,11 @@ if(process.argv.includes('--self-test')){
     const bomCrlf='\uFEFF'+crlf;
     for(const sample of [lf,crlf,bomCrlf]){
       const patched=patchSource(sample);
-      if(!patched.includes('Wrangler retornou saída sem payload JSON reconhecível')) throw new Error('Parser tolerante não foi aplicado no self-test.');
+      if(!patched.includes('Wrangler retornou saída sem payload JSON D1 reconhecível')) throw new Error('Parser tolerante não foi aplicado no self-test.');
+      if(!patched.includes('const rows=extractResults(candidate)')) throw new Error('Parser portátil não exige envelope D1 com results.');
+      if(!patched.includes('slice.length>recoveredSize')) throw new Error('Parser portátil não prioriza o payload D1 estruturalmente mais completo.');
     }
-    console.log('OK: wrapper portátil aceita LF, CRLF e BOM+CRLF sem relaxar o gate do contrato do parser.');
+    console.log('OK: wrapper portátil aceita LF, CRLF e BOM+CRLF e só recupera payload JSON que contém results do D1.');
     process.exit(0);
   }catch(e){
     console.error('[ABORTADO] Self-test do wrapper portátil falhou: '+(e?.message||String(e)));
