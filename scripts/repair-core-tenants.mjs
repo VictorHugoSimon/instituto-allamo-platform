@@ -39,22 +39,31 @@ const sqlIdent=v=>`"${String(v).replace(/"/g,'""')}"`;
 
 function fail(message,code=1){ console.error(`\n[ABORTADO] ${message}`); process.exit(code); }
 
-function cmdQuote(v){
-  const s=String(v);
-  return /[\s&|<>^()]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+function resolveNpxCli(){
+  const candidates=[];
+  if(process.env.npm_execpath){
+    candidates.push(path.join(path.dirname(process.env.npm_execpath),'npx-cli.js'));
+  }
+  candidates.push(path.join(path.dirname(process.execPath),'node_modules','npm','bin','npx-cli.js'));
+  for(const candidate of candidates){
+    if(candidate&&fs.existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 function runWrangler(args,{capture=true}={}){
   let r;
   if(process.platform==='win32'){
-    const comspec=process.env.ComSpec||process.env.COMSPEC||'cmd.exe';
-    const command=['npx','--yes',...args].map(cmdQuote).join(' ');
-    r=spawnSync(comspec,['/d','/s','/c',command],{
+    // Não passa por cmd.exe. O SQL de --command precisa chegar ao Wrangler como
+    // um único argv; cmd /c reinterpreta espaços, aspas e ponto-e-vírgula.
+    const npxCli=resolveNpxCli();
+    if(!npxCli) throw new Error('npx-cli.js não encontrado junto da instalação do Node/npm.');
+    r=spawnSync(process.execPath,[npxCli,'--yes',...args],{
       cwd:ROOT,
       encoding:capture?'utf8':undefined,
       stdio:capture?['ignore','pipe','pipe']:'inherit',
       shell:false,
-      windowsHide:false
+      windowsHide:true
     });
   }else{
     r=spawnSync('npx',['--yes',...args],{
