@@ -81,6 +81,9 @@ const deepParserSource=`function extractResults(node,expectedFields=[]){
 const evidenceNeedle="  const companies=query(config,'SELECT id,name FROM companies ORDER BY name,id;',['id','name']);";
 const evidenceGuard=`${evidenceNeedle}\n  const malformedCompanies=companies.filter(c=>!c||typeof c!=='object'||c.id==null||c.name==null);\n  if(malformedCompanies.length) fail('Consulta de companies retornou envelope inválido sem id/name. Nenhuma alteração será planejada.');`;
 
+const windowsStreamNeedle="  return capture?(r.stdout||''):'';";
+const windowsStreamReplacement="  if(!capture)return '';\n  const stdout=String(r.stdout||'');\n  const stderr=String(r.stderr||'');\n  if(process.platform==='win32' && !stdout.trim() && stderr.trim()) console.warn('[wrangler] stdout vazio; analisando stderr como fallback D1.');\n  return stdout+(stderr?'\\n'+stderr:'');";
+
 function patchSource(raw){
   let source=normalizeSource(raw);
   const parserStart=source.indexOf('function extractResults(node){');
@@ -89,6 +92,11 @@ function patchSource(raw){
     throw new Error('O reparo não possui extractResults() no contrato esperado; não é seguro executar o wrapper portátil.');
   }
   source=source.slice(0,parserStart)+deepParserSource+source.slice(parserEnd+2);
+
+  if(!source.includes(windowsStreamNeedle)){
+    throw new Error('O contrato de captura do Wrangler mudou; wrapper portátil não será executado.');
+  }
+  source=source.replace(windowsStreamNeedle,windowsStreamReplacement);
 
   source=source.replace(
     "function executeSqlFile(config,sql,{json=true,capture=true}={}){",
@@ -127,7 +135,9 @@ function patchSource(raw){
     "['company_id']",
     "['company_id','projects']",
     'extractResults(candidate,expectedFields)',
-    'extractResults(parsed,expectedFields)'
+    'extractResults(parsed,expectedFields)',
+    "const stderr=String(r.stderr||'')",
+    "return stdout+(stderr?'\\n'+stderr:'')"
   ];
   for(const needle of required) if(!source.includes(needle)) throw new Error('Patch incompleto do contrato D1: '+needle);
   return source;
@@ -170,8 +180,10 @@ if(process.argv.includes('--self-test')){
       if(!patched.includes("['id','name']")) throw new Error('Consulta de companies não exige id/name.');
       if(!patched.includes("['company_id']")) throw new Error('Consulta de referências não exige company_id.');
       if(!patched.includes('malformedCompanies=companies.filter')) throw new Error('Fail-safe id/name não foi injetado em collectEvidence().');
+      if(!patched.includes("const stderr=String(r.stderr||'')")) throw new Error('Wrapper portátil não captura stderr do Wrangler.');
+      if(!patched.includes("return stdout+(stderr?'\\n'+stderr:'')")) throw new Error('Wrapper portátil não combina stdout/stderr para o parser D1.');
     }
-    console.log('OK: wrapper portátil aceita LF, CRLF e BOM+CRLF, ignora results de metadados, seleciona linhas pelas colunas esperadas e aborta evidência malformada.');
+    console.log('OK: wrapper portátil aceita LF, CRLF e BOM+CRLF, captura stdout+stderr do Wrangler no Windows, ignora results de metadados, seleciona linhas pelas colunas esperadas e aborta evidência malformada.');
     process.exit(0);
   }catch(e){
     console.error('[ABORTADO] Self-test do wrapper portátil falhou: '+(e?.message||String(e)));
