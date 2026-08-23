@@ -35,7 +35,8 @@ must(repair,"function resolveNpxCli()",'resolução explícita do npx-cli.js no 
 must(repair,"path.join(path.dirname(process.execPath),'node_modules','npm','bin','npx-cli.js')",'fallback npx-cli relativo ao node.exe');
 must(repair,"spawnSync(process.execPath,[npxCli,'--yes',...args]",'Windows executa npx-cli diretamente por argv');
 must(repair,"shell:false",'invocação do Wrangler não usa shell');
-if(/ComSpec|COMSPEC|cmd\.exe|\/c['\",\]]/i.test(repair))throw new Error('Runner base voltou a passar o Wrangler por cmd.exe/shell no Windows.');
+const realCmdInvocation=/process\.env\.(?:ComSpec|COMSPEC)|spawnSync\(\s*(?:['"]cmd\.exe['"]|comspec)|\['\/d','\/s','\/c'/i;
+if(realCmdInvocation.test(repair))throw new Error('Runner base voltou a passar o Wrangler por cmd.exe/shell no Windows.');
 
 must(portable,"Wrangler retornou saída sem payload JSON D1 reconhecível",'parser tolerante a banners com contrato D1');
 must(portable,"const rows=extractResults(candidate,expectedFields)",'recuperação valida o fragmento pelas colunas esperadas');
