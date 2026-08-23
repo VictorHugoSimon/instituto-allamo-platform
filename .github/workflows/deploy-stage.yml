@@ -1,10 +1,12 @@
-name: Release STAGE - Manual Gate
+name: Release STAGE - Auto + Manual Gate
 
 on:
+  push:
+    branches: [develop]
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Digite DEPLOY-STAGE para liberar a publicação após todos os gates'
+        description: 'Digite DEPLOY-STAGE para liberar a publicação manual após todos os gates'
         required: true
         type: string
       reason:
@@ -22,9 +24,9 @@ concurrency:
 
 jobs:
   release-stage:
-    if: ${{ inputs.confirm == 'DEPLOY-STAGE' }}
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'DEPLOY-STAGE' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Marcar release em andamento
         env:
@@ -87,11 +89,17 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Smoke pós-deploy
+        run: npm run smoke:governance
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+          ALLAMO_SMOKE_COMPANIES: ${{ vars.ALLAMO_SMOKE_COMPANIES }}
+
       - name: Registrar sucesso do deploy no commit
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-deploy -f description='Stage publicado com sucesso'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-deploy -f description='Stage publicado e smoke concluído com sucesso'
 
       - name: Registrar falha do deploy no commit
         if: failure()
@@ -104,8 +112,10 @@ jobs:
         run: |
           echo "### Release STAGE" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Motivo: ${{ inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Motivo: ${{ inputs.reason || github.event.head_commit.message }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Config Cloudflare: wrangler.stage.toml materializada temporariamente como wrangler.toml" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Deploy automático por push: DESATIVADO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy automático por merge em develop: ATIVO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Workflow manual: disponível como fallback" >> "$GITHUB_STEP_SUMMARY"
           echo "- Autenticação: API Token ou Global API Key + e-mail" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smoke: stage-health + governança multitenant quando ALLAMO_SMOKE_COMPANIES estiver configurado" >> "$GITHUB_STEP_SUMMARY"
           echo "- D1 reset/migration destrutiva: NÃO EXECUTADO" >> "$GITHUB_STEP_SUMMARY"
