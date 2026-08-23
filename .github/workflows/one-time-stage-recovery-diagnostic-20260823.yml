@@ -1,0 +1,123 @@
+name: ONE TIME - Diagnose Stage Recovery
+
+on:
+  push:
+    branches:
+      - ops/diagnose-stage-core-recovery-20260823
+
+permissions:
+  contents: read
+  statuses: write
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+  CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cloudflare auth diagnostic
+        shell: bash
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set +e
+          node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+          A=$?
+          if [ $A -eq 0 ]; then npx wrangler@4.124.0 whoami; A=$?; fi
+          if [ $A -eq 0 ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-diag-auth -f description='Cloudflare autenticado'
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-diag-auth -f description='Falha de credencial Cloudflare nos Actions'
+            exit $A
+          fi
+
+      - name: Stage D1 read diagnostic
+        shell: bash
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set +e
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command="SELECT id,name FROM companies ORDER BY name,id;"
+          A=$?
+          if [ $A -eq 0 ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-diag-d1-read -f description='D1 Stage acessível e companies legível'
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-diag-d1-read -f description='Falha ao ler D1 Stage'
+            exit $A
+          fi
+
+      - name: Stage backup diagnostic
+        shell: bash
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set +e
+          npx wrangler@4.124.0 d1 export DB --remote --config wrangler.stage.toml --output=stage-diagnostic-backup.sql
+          A=$?
+          if [ $A -eq 0 ] && [ -s stage-diagnostic-backup.sql ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-diag-backup -f description='Backup Stage criado com sucesso'
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-diag-backup -f description='Falha ao exportar backup Stage'
+            exit 1
+          fi
+
+      - name: Patch parser locally and run Stage dry-run only
+        shell: bash
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          node <<'NODE'
+          const fs=require('fs'); const p='scripts/repair-core-tenants.mjs'; let s=fs.readFileSync(p,'utf8');
+          const old=`    let parsed;\n    try{ parsed=JSON.parse(out); }\n    catch{ throw new Error('Wrangler retornou saída não-JSON ao consultar D1.'); }`;
+          const neu=`    let parsed;\n    try{ parsed=JSON.parse(out); }\n    catch{ const clean=String(out||'').replace(/\\u001b\\[[0-9;?]*[ -\\/]*[@-~]/g,'').trim(); let ok=null; const starts=[]; for(let i=0;i<clean.length;i++)if(clean[i]==='['||clean[i]==='{')starts.push(i); const ends=[]; for(let i=clean.length-1;i>=0;i--)if(clean[i]===']'||clean[i]==='}')ends.push(i); outer:for(const a of starts){for(const b of ends){if(b<=a)continue;try{ok=JSON.parse(clean.slice(a,b+1));break outer}catch{}}} if(ok===null)throw new Error('Wrangler retornou saída sem payload JSON reconhecível ao consultar D1.'); parsed=ok; }`;
+          if(!s.includes(old))throw new Error('Parser original não encontrado'); fs.writeFileSync(p,s.replace(old,neu));
+          NODE
+          set +e
+          node scripts/repair-core-tenants.mjs --env=stage
+          A=$?
+          if [ $A -eq 0 ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-diag-repair-dryrun -f description='Dry-run das 3 empresas aprovado'
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-diag-repair-dryrun -f description='Dry-run da recuperação falhou'
+            exit $A
+          fi
+
+      - name: Current Stage public API diagnostic
+        shell: bash
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set +e
+          node <<'NODE'
+          const base='https://allamo-pmo-stage.pages.dev'; const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          async function get(p){let last='';for(let i=0;i<5;i++){try{const r=await fetch(base+p,{cache:'no-store'});const t=await r.text();if(r.ok)return JSON.parse(t);last='HTTP '+r.status+' '+t.slice(0,120)}catch(e){last=String(e)}await sleep(2000)}throw new Error(last)}
+          const companies=await get('/api/companies'); console.log('companies=',companies.map(c=>({id:c.id,name:c.name})));
+          for(const [token,name] of [['dualclima','Dual Clima'],['madrid','Madrid'],['opr','OPR']]){const d=await get('/api/public-client-projects?company='+token); console.log(token,d.company?.name,(d.projects||[]).length); if(d.company?.name!==name)throw new Error(token+' não resolveu para '+name)}
+          NODE
+          A=$?
+          if [ $A -eq 0 ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-diag-public-api -f description='API Stage já resolve Dual Clima, Madrid e OPR'
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-diag-public-api -f description='API Stage ainda não resolve as 3 empresas'
+            exit $A
+          fi
+
+      - name: Upload diagnostic backup
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-diagnostic-backup-20260823
+          path: stage-diagnostic-backup.sql
+          if-no-files-found: warn
+          retention-days: 7
