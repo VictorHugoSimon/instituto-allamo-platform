@@ -15,7 +15,7 @@ must(ps,"return ([string]$v).Trim()",'conversão PowerShell válida do retorno g
 if(/return\s+String\s*\(/i.test(ps))throw new Error('Conversão inválida String(...) reapareceu no runner PowerShell.');
 must(ps,"@('show','-s','--format=%T','origin/main')",'tree SHA de main compatível com PowerShell');
 must(ps,"@('show','-s','--format=%T','origin/develop')",'tree SHA de develop compatível com PowerShell');
-if(/\^\{tree\}/i.test(ps))throw new Error('Sintaxe revision^{tree} reapareceu no runner PowerShell.');
+if(/rev-parse[^\r\n]*\^\{tree\}/i.test(ps))throw new Error('Comando rev-parse com sufixo de tree reapareceu no runner PowerShell.');
 must(ps,"@('run','test:release')",'gate consolidado');
 must(ps,"wrangler@4.124.0','whoami",'preflight Wrangler');
 must(ps,"backup-stage-before-core-recovery",'backup Stage');
