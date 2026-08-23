@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const ps=fs.readFileSync('scripts/recover-release-all.ps1','utf8');
 const portable=fs.readFileSync('scripts/repair-core-tenants-portable.mjs','utf8');
@@ -29,10 +30,20 @@ must(ps,"allamo-pmo','--branch','main",'projeto Produção explícito');
 must(ps,"smoke-core-tenants.mjs",'smoke após deploy');
 must(portable,"Wrangler retornou saída sem payload JSON reconhecível",'parser tolerante a banners');
 must(portable,"repair-core-tenants.mjs",'reuso da lógica governada original');
+must(portable,"replace(/\\r\\n?/g,'\\n')",'normalização CRLF do fonte no Windows');
+must(portable,"--self-test",'self-test portátil sem acesso ao D1');
+
+const selfTest=spawnSync(process.execPath,['scripts/repair-core-tenants-portable.mjs','--self-test'],{
+  cwd:process.cwd(), encoding:'utf8', shell:false
+});
+if(selfTest.error)throw selfTest.error;
+if(selfTest.status!==0)throw new Error(`Self-test do wrapper portátil falhou (${selfTest.status}): ${(selfTest.stderr||selfTest.stdout||'').trim()}`);
+if(!String(selfTest.stdout||'').includes('LF, CRLF e BOM+CRLF'))throw new Error('Self-test do wrapper portátil não comprovou LF/CRLF/BOM.');
+
 must(smoke,"/api/public-client-projects?company=",'validação de contexto público');
 must(smoke,"Cruzamento de tenant",'gate de isolamento');
 must(smoke,"Dual Clima",'Dual Clima obrigatória');
 must(smoke,"Madrid",'Madrid obrigatória');
 must(smoke,"OPR",'OPR obrigatória');
 
-console.log('OK: runner local preserva working tree, usa worktree limpo, gate main/develop via git diff --quiet, backups, gates, reparo aditivo, Stage/Produção e smoke multiempresa.');
+console.log('OK: runner local preserva working tree, usa worktree limpo, gate main/develop via git diff --quiet, backups, gates, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
