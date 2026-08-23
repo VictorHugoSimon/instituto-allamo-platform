@@ -7,6 +7,7 @@ const reportAiMigration = fs.readFileSync('migrations/2026-08-21-report-ai-dynam
 const dynamicTenantMigration = fs.readFileSync('migrations/2026-08-21-dynamic-tenant-storage.sql','utf8');
 const milestoneMigration = fs.readFileSync('migrations/2026-08-21-milestone-evidence.sql','utf8');
 const d1ChunksMigration = fs.readFileSync('migrations/2026-08-21-d1-file-chunks.sql','utf8');
+const gmudProjectMigration = fs.readFileSync('migrations/2026-08-23-gmud-project.sql','utf8');
 
 // Procura comandos SQL destrutivos em qualquer posição, inclusive dentro de strings JS.
 const destructive = /\b(DELETE\s+FROM|DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE(?:\s+TABLE)?)\b/i;
@@ -17,7 +18,8 @@ for (const [name,content] of [
   ['migration Reports IA',reportAiMigration],
   ['migration campos/arquivos multitenant',dynamicTenantMigration],
   ['migration marcos/evidências',milestoneMigration],
-  ['migration chunks D1',d1ChunksMigration]
+  ['migration chunks D1',d1ChunksMigration],
+  ['migration associação GMUD/projeto',gmudProjectMigration]
 ]) {
   if (destructive.test(content)) throw new Error(`Falha de governança: ${name} contém SQL destrutivo. Deploy deve preservar dados.`);
 }
@@ -29,5 +31,7 @@ if (!reportAiMigration.includes('CREATE-ONLY')) throw new Error('Migration de Re
 if (!dynamicTenantMigration.includes('somente aditiva')) throw new Error('Migration multitenant deve permanecer explicitamente aditiva.');
 if (!d1ChunksMigration.includes('CREATE-ONLY') || !d1ChunksMigration.includes('tenant_file_chunks')) throw new Error('Migration do fallback D1 deve permanecer create-only e chunked.');
 if (!reportSchema.includes('tenant_field_definitions') || !reportSchema.includes('tenant_files') || !reportSchema.includes('tenant_file_chunks')) throw new Error('Schema persistente não contempla campos dinâmicos/arquivos/chunks multitenant.');
+if (!stage.includes("stageEnsureColumn('gmud', 'project'")) throw new Error('Stage não corrige de forma idempotente a coluna gmud.project.');
+if (!gmudProjectMigration.includes("ALTER TABLE gmud ADD COLUMN project TEXT NOT NULL DEFAULT ''")) throw new Error('Migration GMUD/projeto não contém a evolução aditiva esperada.');
 
-console.log('OK: persistência cobre Stage, Reports, IA, campos dinâmicos, arquivos R2/D1, chunks e marcos; nenhum reset automático ou SQL destrutivo permitido.');
+console.log('OK: persistência cobre Stage, Reports, IA, campos dinâmicos, arquivos R2/D1, chunks, marcos e evolução GMUD/projeto; nenhum reset automático ou SQL destrutivo permitido.');
