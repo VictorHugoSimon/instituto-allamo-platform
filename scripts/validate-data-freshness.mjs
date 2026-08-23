@@ -35,6 +35,6 @@ must(index,'BEGIN ALLAMO PUBLIC CLIENT PWA RUNTIME','PWA público tenant-safe es
 if(index.includes('body{visibility:hidden!important}'))throw new Error('Artefato final ainda bloqueia o body durante carregamento.');
 if(index.includes('[allamo-live-reset] nunca renderizar fotografia demo durante fetch'))throw new Error('Refresh recorrente ainda pode zerar a tela inteira.');
 const build=String(pkg.scripts['build:work']);
-const requiredOrder='harden-data-freshness.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs && node scripts/harden-session-stability.mjs && node scripts/harden-public-client-pwa.mjs && node scripts/validate-portal-baseline.mjs && node scripts/validate-bundle-json.mjs';
+const requiredOrder='harden-data-freshness.mjs && node scripts/zero-static-executive-chart.mjs && node scripts/zero-live-state-before-fetch.mjs && node scripts/optimize-portal-performance.mjs && node scripts/stamp-release.mjs && node scripts/harden-session-stability.mjs && node scripts/harden-public-client-pwa.mjs && node scripts/harden-visual-matrices.mjs && node scripts/validate-portal-baseline.mjs && node scripts/validate-bundle-json.mjs';
 if(!build.includes(requiredOrder))throw new Error('Ordem do build pode reintroduzir sessão/cache/PWA antigos.');
-console.log('OK: cache, sessão, boot live, BFCache, Service Worker e PWA multitenant revalidam sem exibir dados demo.');
+console.log('OK: cache, sessão, boot live, BFCache, Service Worker, PWA multitenant e matrizes visuais revalidam sem exibir dados demo.');
