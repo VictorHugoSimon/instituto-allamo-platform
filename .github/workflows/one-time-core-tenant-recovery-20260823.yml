@@ -1,0 +1,206 @@
+name: ONE TIME - Recover Core Tenants and Release
+
+on:
+  push:
+    branches:
+      - ops/recover-stage-prod-core-tenants-20260823
+
+permissions:
+  contents: read
+
+concurrency:
+  group: allamo-core-tenant-recovery-20260823
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+  CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  recover-test-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact main source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Guard - main and develop must have identical application tree
+        shell: bash
+        run: |
+          git fetch origin main develop
+          MAIN_TREE="$(git rev-parse origin/main^{tree})"
+          DEVELOP_TREE="$(git rev-parse origin/develop^{tree})"
+          echo "main tree:    $MAIN_TREE"
+          echo "develop tree: $DEVELOP_TREE"
+          test "$MAIN_TREE" = "$DEVELOP_TREE"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build release artifact once
+        run: npm run build:work
+
+      - name: Full architecture/release validation
+        run: npm run test:release
+
+      - name: Prepare Cloudflare authentication
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Cloudflare preflight
+        run: npx wrangler@4.124.0 whoami
+
+      - name: Make Wrangler JSON parsing tolerant to CLI banners for this recovery run
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const p='scripts/repair-core-tenants.mjs';
+          let s=fs.readFileSync(p,'utf8');
+          const old=`    let parsed;\n    try{ parsed=JSON.parse(out); }\n    catch{ throw new Error('Wrangler retornou saída não-JSON ao consultar D1.'); }`;
+          const neu=`    let parsed;\n    try{ parsed=JSON.parse(out); }\n    catch{\n      const clean=String(out||'').replace(/\\u001b\\[[0-9;?]*[ -\\/]*[@-~]/g,'').trim();\n      let ok=null;\n      const starts=[]; for(let i=0;i<clean.length;i++) if(clean[i]==='['||clean[i]==='{') starts.push(i);\n      const ends=[]; for(let i=clean.length-1;i>=0;i--) if(clean[i]===']'||clean[i]==='}') ends.push(i);\n      outer: for(const a of starts){ for(const b of ends){ if(b<=a) continue; try{ ok=JSON.parse(clean.slice(a,b+1)); break outer; }catch{} } }\n      if(ok===null) throw new Error('Wrangler retornou saída sem payload JSON reconhecível ao consultar D1.');\n      parsed=ok;\n    }`;
+          if(!s.includes(old)) throw new Error('Bloco de parser esperado não encontrado');
+          fs.writeFileSync(p,s.replace(old,neu));
+          NODE
+          node scripts/validate-core-tenant-repair.mjs
+
+      - name: Backup Stage D1 before any repair
+        run: npx wrangler@4.124.0 d1 export DB --remote --config wrangler.stage.toml --output=backup-stage-before-core-recovery.sql
+
+      - name: Stage dry-run - inspect Dual Clima, Madrid and OPR
+        run: node scripts/repair-core-tenants.mjs --env=stage
+
+      - name: Stage apply - additive repair only
+        run: node scripts/repair-core-tenants.mjs --env=stage --apply --confirm=REPAIR-STAGE
+
+      - name: Stage post-repair verification
+        run: node scripts/repair-core-tenants.mjs --env=stage
+
+      - name: Deploy validated artifact to Stage
+        shell: bash
+        run: |
+          cp wrangler.stage.toml wrangler.toml
+          grep -F 'name = "allamo-pmo-stage"' wrangler.toml
+          npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production --commit-dirty=true
+
+      - name: Stage smoke test - tenants, projects and public context
+        env:
+          BASE_URL: https://allamo-pmo-stage.pages.dev
+        run: |
+          node <<'NODE'
+          const base=process.env.BASE_URL;
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          async function get(path){
+            let last='';
+            for(let i=0;i<10;i++){
+              try{
+                const r=await fetch(base+path,{headers:{'cache-control':'no-cache'},cache:'no-store'});
+                const text=await r.text();
+                if(r.ok){ try{return JSON.parse(text)}catch{last='JSON inválido: '+text.slice(0,180)} }
+                else last='HTTP '+r.status+': '+text.slice(0,180);
+              }catch(e){last=String(e)}
+              await sleep(3000);
+            }
+            throw new Error(path+' falhou: '+last);
+          }
+          const companies=await get('/api/companies');
+          if(!Array.isArray(companies)) throw new Error('/api/companies não retornou array');
+          const required=['Dual Clima','Madrid','OPR'];
+          for(const n of required) if(!companies.some(c=>String(c.name)===n)) throw new Error('Empresa ausente no Stage: '+n);
+          const projects=await get('/api/projects');
+          if(!Array.isArray(projects)) throw new Error('/api/projects não retornou array');
+          const ids=new Set(companies.map(c=>String(c.id)));
+          const orphan=projects.filter(p=>p.company_id&&!ids.has(String(p.company_id)));
+          if(orphan.length) throw new Error('Projetos órfãos no Stage: '+orphan.slice(0,5).map(p=>p.id+':'+p.company_id).join(','));
+          const checks=[['dualclima','Dual Clima'],['madrid','Madrid'],['opr','OPR']];
+          for(const [token,name] of checks){
+            const d=await get('/api/public-client-projects?company='+encodeURIComponent(token));
+            if(!d.company||String(d.company.name)!==name) throw new Error('Contexto público incorreto para '+token+': '+JSON.stringify(d).slice(0,250));
+            const cid=String(d.company.id);
+            if((d.projects||[]).some(p=>String(p.company_id)!==cid)) throw new Error('Cruzamento de tenant no Stage para '+name);
+          }
+          console.log(JSON.stringify({ok:true,environment:'stage',companies:required,projects:projects.length},null,2));
+          NODE
+
+      - name: Backup Production D1 before any repair
+        run: npx wrangler@4.124.0 d1 export DB --remote --config wrangler.production.toml --output=backup-production-before-core-recovery.sql
+
+      - name: Production dry-run - inspect Dual Clima, Madrid and OPR
+        run: node scripts/repair-core-tenants.mjs --env=production
+
+      - name: Production apply - additive repair only
+        run: node scripts/repair-core-tenants.mjs --env=production --apply --confirm=REPAIR-PRODUCTION
+
+      - name: Production post-repair verification
+        run: node scripts/repair-core-tenants.mjs --env=production
+
+      - name: Re-run full release gate before Production deploy
+        run: npm run test:release
+
+      - name: Deploy exact validated artifact to Production
+        shell: bash
+        run: |
+          cp wrangler.production.toml wrangler.toml
+          grep -F 'name = "allamo-pmo"' wrangler.toml
+          npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo --branch main --commit-dirty=true
+
+      - name: Production smoke test - tenants, projects and public context
+        env:
+          BASE_URL: https://allamo-pmo.pages.dev
+        run: |
+          node <<'NODE'
+          const base=process.env.BASE_URL;
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          async function get(path){
+            let last='';
+            for(let i=0;i<12;i++){
+              try{
+                const r=await fetch(base+path,{headers:{'cache-control':'no-cache'},cache:'no-store'});
+                const text=await r.text();
+                if(r.ok){ try{return JSON.parse(text)}catch{last='JSON inválido: '+text.slice(0,180)} }
+                else last='HTTP '+r.status+': '+text.slice(0,180);
+              }catch(e){last=String(e)}
+              await sleep(3000);
+            }
+            throw new Error(path+' falhou: '+last);
+          }
+          const companies=await get('/api/companies');
+          if(!Array.isArray(companies)) throw new Error('/api/companies não retornou array');
+          const required=['Dual Clima','Madrid','OPR'];
+          for(const n of required) if(!companies.some(c=>String(c.name)===n)) throw new Error('Empresa ausente em Produção: '+n);
+          const projects=await get('/api/projects');
+          if(!Array.isArray(projects)) throw new Error('/api/projects não retornou array');
+          const ids=new Set(companies.map(c=>String(c.id)));
+          const orphan=projects.filter(p=>p.company_id&&!ids.has(String(p.company_id)));
+          if(orphan.length) throw new Error('Projetos órfãos em Produção: '+orphan.slice(0,5).map(p=>p.id+':'+p.company_id).join(','));
+          const checks=[['dualclima','Dual Clima'],['madrid','Madrid'],['opr','OPR']];
+          for(const [token,name] of checks){
+            const d=await get('/api/public-client-projects?company='+encodeURIComponent(token));
+            if(!d.company||String(d.company.name)!==name) throw new Error('Contexto público incorreto para '+token+': '+JSON.stringify(d).slice(0,250));
+            const cid=String(d.company.id);
+            if((d.projects||[]).some(p=>String(p.company_id)!==cid)) throw new Error('Cruzamento de tenant em Produção para '+name);
+          }
+          console.log(JSON.stringify({ok:true,environment:'production',companies:required,projects:projects.length},null,2));
+          NODE
+
+      - name: Preserve D1 backups from this recovery
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-tenant-recovery-backups-20260823
+          path: |
+            backup-stage-before-core-recovery.sql
+            backup-production-before-core-recovery.sql
+            backups/*.sql
+          if-no-files-found: warn
+          retention-days: 30
