@@ -50,8 +50,10 @@ try {
 
   Write-Host '[1/14] Atualizando referências remotas sem tocar nos seus arquivos locais...'
   Invoke-Checked 'git' @('fetch','origin','main','develop','--prune')
-  $mainTree = Get-GitValue @('rev-parse','origin/main^{tree}')
-  $developTree = Get-GitValue @('rev-parse','origin/develop^{tree}')
+  # Evita a sintaxe revision^{tree}, que pode ser interpretada de forma inconsistente pelo PowerShell.
+  # git show --format=%T retorna diretamente o tree SHA do commit/ref e funciona igual em CMD/PowerShell.
+  $mainTree = Get-GitValue @('show','-s','--format=%T','origin/main')
+  $developTree = Get-GitValue @('show','-s','--format=%T','origin/develop')
   if ($mainTree -ne $developTree) { throw "main e develop não estão com a mesma árvore. main=$mainTree develop=$developTree" }
 
   Write-Host '[2/14] Criando worktree limpo a partir de origin/main...'
