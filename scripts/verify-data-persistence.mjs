@@ -2,6 +2,8 @@ import fs from 'node:fs';
 
 const stage = fs.readFileSync('src/stage-runtime-bootstrap.js','utf8');
 const reportSchema = fs.readFileSync('src/report-schema-bootstrap.js','utf8');
+const governanceSchema = fs.readFileSync('src/governance-schema-bootstrap.js','utf8');
+const governanceMigration = fs.readFileSync('migrations/2026-08-23-governance-roadmap.sql','utf8');
 const resetMigration = fs.readFileSync('migrations/2026-08-21-reset-stage.sql','utf8');
 const reportAiMigration = fs.readFileSync('migrations/2026-08-21-report-ai-dynamic.sql','utf8');
 const dynamicTenantMigration = fs.readFileSync('migrations/2026-08-21-dynamic-tenant-storage.sql','utf8');
@@ -17,6 +19,8 @@ const stripSqlComments = content => content.replace(/^\s*--.*$/gm,'');
 for (const [name,content] of [
   ['bootstrap de Stage',stage],
   ['bootstrap de Reports',reportSchema],
+  ['bootstrap de Governança',governanceSchema],
+  ['migration Governança',governanceMigration],
   ['migration legada de reset',resetMigration],
   ['migration Reports IA',reportAiMigration],
   ['migration campos/arquivos multitenant',dynamicTenantMigration],
@@ -32,11 +36,17 @@ if (!legacyStageRestoreCmd.includes('RESTORE DE BASELINE DO STAGE - DESATIVADO')
 if (!legacyStageRestoreSql.includes('RESTORE DESATIVADO')) throw new Error('SQL legado de restore não está explicitamente neutralizado.');
 if (!stage.includes("DATA_PERSISTENCE_MODE = 'persistent'")) throw new Error('Modo persistente não declarado no runtime de Stage.');
 if (!stage.includes('reset_disabled: true')) throw new Error('Health-check não declara reset desativado.');
+if (!stage.includes("governance_events: await stageCount('governance_events')")) throw new Error('Health-check de Stage não valida a camada de governança.');
 if (!resetMigration.includes('RESET DESATIVADO')) throw new Error('Migration legada não está explicitamente neutralizada.');
 if (!reportSchema.includes('MODO PERSISTENTE')) throw new Error('Bootstrap de Reports não declara modo persistente.');
+if (!governanceSchema.includes('criação idempotente e não destrutiva')) throw new Error('Bootstrap de Governança precisa declarar criação não destrutiva.');
+if (!governanceMigration.includes('Migration aditiva e persistente')) throw new Error('Migration de Governança precisa permanecer explicitamente aditiva.');
 if (!reportAiMigration.includes('CREATE-ONLY')) throw new Error('Migration de Reports IA precisa permanecer explicitamente create-only.');
 if (!dynamicTenantMigration.includes('somente aditiva')) throw new Error('Migration multitenant deve permanecer explicitamente aditiva.');
 if (!d1ChunksMigration.includes('CREATE-ONLY') || !d1ChunksMigration.includes('tenant_file_chunks')) throw new Error('Migration do fallback D1 deve permanecer create-only e chunked.');
 if (!reportSchema.includes('tenant_field_definitions') || !reportSchema.includes('tenant_files') || !reportSchema.includes('tenant_file_chunks')) throw new Error('Schema persistente não contempla campos dinâmicos/arquivos/chunks multitenant.');
+for(const table of ['governance_events','governance_event_agenda_items','governance_event_stakeholders','governance_event_work_links','governance_event_decisions']){
+  if(!governanceSchema.includes(`CREATE TABLE IF NOT EXISTS ${table}`)||!governanceMigration.includes(`CREATE TABLE IF NOT EXISTS ${table}`))throw new Error(`Governança persistente incompleta: ${table}`);
+}
 
-console.log('OK: persistência cobre Stage, Reports, IA, campos dinâmicos, arquivos R2/D1, chunks e marcos; restore legado neutralizado e nenhum SQL destrutivo permitido.');
+console.log('OK: persistência cobre Stage, Reports, IA, campos dinâmicos, arquivos R2/D1, marcos e governança; restore legado neutralizado e nenhum SQL destrutivo permitido.');

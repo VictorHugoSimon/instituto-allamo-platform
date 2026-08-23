@@ -6,10 +6,15 @@ on:
     paths:
       - 'src/governance-*'
       - 'src/public-governance-*'
+      - 'src/stage-runtime-bootstrap.js'
       - 'scripts/harden-governance-roadmap.mjs'
       - 'scripts/validate-governance-roadmap.mjs'
+      - 'scripts/validate-governance-release.mjs'
+      - 'scripts/verify-data-persistence.mjs'
       - 'scripts/smoke-governance-stage.mjs'
       - 'migrations/2026-08-23-governance-roadmap.sql'
+      - '.github/workflows/deploy-stage.yml'
+      - '.github/workflows/deploy-production.yml'
       - 'package.json'
       - '.github/workflows/governance-roadmap-ci.yml'
   workflow_dispatch:
