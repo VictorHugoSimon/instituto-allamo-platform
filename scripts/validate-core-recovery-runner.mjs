@@ -30,12 +30,16 @@ must(ps,"allamo-pmo-stage",'projeto Stage explícito');
 must(ps,"allamo-pmo','--branch','main",'projeto Produção explícito');
 must(ps,"smoke-core-tenants.mjs",'smoke após deploy');
 
-must(repair,"function extractResults(node)",'normalização do envelope results do Wrangler D1');
+must(repair,"function extractResults(node)",'normalização base do envelope results do Wrangler D1');
 must(portable,"Wrangler retornou saída sem payload JSON D1 reconhecível",'parser tolerante a banners com contrato D1');
-must(portable,"const rows=extractResults(candidate)",'recuperação só aceita fragmento que contenha results D1');
+must(portable,"const rows=extractResults(candidate,expectedFields)",'recuperação valida o fragmento pelas colunas esperadas');
+must(portable,"extractResults(parsed,expectedFields)",'payload JSON final passa pelo contrato de colunas');
 must(portable,"slice.length>recoveredSize",'recuperação escolhe o payload D1 estruturalmente mais completo');
-must(portable,"function extractResultsDeep(node)",'parser de results D1 aninhado');
-must(portable,"const nested=extractResults(item)",'parser profundo é injetado no reparo temporário');
+must(portable,"function extractResultsDeep(node,expectedFields=[])",'parser D1 orientado por colunas');
+must(portable,"['id','name']",'companies exige id/name');
+must(portable,"['company_id']",'referências exigem company_id');
+must(portable,"['company_id','projects']",'contagem de projetos exige company_id/projects');
+must(portable,"ignora results de metadados",'self-test cobre conflito entre metadata results e linhas SQL');
 must(portable,"malformedCompanies=companies.filter",'fail-safe para evidência sem id/name');
 must(portable,"Nenhuma alteração será planejada",'aborto explícito antes de montar plano com evidência inválida');
 must(portable,"repair-core-tenants.mjs",'reuso da lógica governada original');
@@ -49,8 +53,8 @@ if(selfTest.error)throw selfTest.error;
 if(selfTest.status!==0)throw new Error(`Self-test do wrapper portátil falhou (${selfTest.status}): ${(selfTest.stderr||selfTest.stdout||'').trim()}`);
 const selfOut=String(selfTest.stdout||'');
 if(!selfOut.includes('LF, CRLF e BOM+CRLF'))throw new Error('Self-test do wrapper portátil não comprovou LF/CRLF/BOM.');
-if(!selfOut.includes('results D1 aninhado'))throw new Error('Self-test não comprovou extração do results interno.');
-if(!selfOut.includes('id/name'))throw new Error('Self-test não comprovou contrato de linhas id/name.');
+if(!selfOut.includes('results de metadados'))throw new Error('Self-test não comprovou descarte de results de metadados.');
+if(!selfOut.includes('colunas esperadas'))throw new Error('Self-test não comprovou seleção por schema esperado.');
 if(!selfOut.includes('evidência malformada'))throw new Error('Self-test não comprovou fail-safe de evidência malformada.');
 
 must(smoke,"/api/public-client-projects?company=",'validação de contexto público');
@@ -59,4 +63,4 @@ must(smoke,"Dual Clima",'Dual Clima obrigatória');
 must(smoke,"Madrid",'Madrid obrigatória');
 must(smoke,"OPR",'OPR obrigatória');
 
-console.log('OK: runner local preserva working tree, usa worktree limpo, gate main/develop via git diff --quiet, backups, parser Wrangler D1 profundo, fail-safe id/name, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
+console.log('OK: runner local preserva working tree, usa worktree limpo, backups, parser Wrangler D1 por colunas esperadas, fail-safe id/name, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
