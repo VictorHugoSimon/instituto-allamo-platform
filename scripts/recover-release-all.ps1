@@ -23,7 +23,7 @@ function Get-GitValue {
   param([string[]]$Arguments)
   $v = (& git @Arguments 2>$null | Select-Object -First 1)
   if ($LASTEXITCODE -ne 0 -or -not $v) { throw "Git falhou: git $($Arguments -join ' ')" }
-  return String($v).Trim()
+  return ([string]$v).Trim()
 }
 
 $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
