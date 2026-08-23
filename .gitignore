@@ -13,6 +13,7 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+.wrangler/
 supabase/.temp/
 supabase/.branches/
 
