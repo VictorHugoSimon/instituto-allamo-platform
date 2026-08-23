@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: allamo-core-tenant-recovery-20260823
@@ -23,6 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Mark recovery in progress
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=pending -f context=allamo/core-recovery -f description='Recuperação Stage + Produção em andamento'
+
       - name: Checkout exact main source
         uses: actions/checkout@v4
         with:
@@ -132,6 +138,11 @@ jobs:
           console.log(JSON.stringify({ok:true,environment:'stage',companies:required,projects:projects.length},null,2));
           NODE
 
+      - name: Mark Stage recovered and validated
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/core-recovery-stage -f description='Stage recuperado, publicado e smoke test aprovado'
+
       - name: Backup Production D1 before any repair
         run: npx wrangler@4.124.0 d1 export DB --remote --config wrangler.production.toml --output=backup-production-before-core-recovery.sql
 
@@ -193,11 +204,24 @@ jobs:
           console.log(JSON.stringify({ok:true,environment:'production',companies:required,projects:projects.length},null,2));
           NODE
 
+      - name: Mark Production recovered and validated
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/core-recovery-production -f description='Produção recuperada, publicada e smoke test aprovado'
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/core-recovery -f description='Recuperação Stage + Produção concluída com sucesso'
+
+      - name: Mark recovery failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/core-recovery -f description='Recuperação interrompida com segurança; verificar etapa com falha'
+
       - name: Preserve D1 backups from this recovery
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: core-tenant-recovery-backups-20260823
+          name: core-tenant-recovery-backups-20260823-${{ github.run_attempt }}
           path: |
             backup-stage-before-core-recovery.sql
             backup-production-before-core-recovery.sql
