@@ -11,6 +11,8 @@ must(ps,"RECOVER-AND-DEPLOY",'confirmação explícita');
 must(ps,"@('worktree','add','--detach'",'worktree isolado');
 must(ps,"origin/main",'fonte remota limpa');
 must(ps,"origin/develop",'comparação main/develop');
+must(ps,"return ([string]$v).Trim()",'conversão PowerShell válida do retorno git');
+if(/return\s+String\s*\(/i.test(ps))throw new Error('Conversão inválida String(...) reapareceu no runner PowerShell.');
 must(ps,"@('run','test:release')",'gate consolidado');
 must(ps,"wrangler@4.124.0','whoami",'preflight Wrangler');
 must(ps,"backup-stage-before-core-recovery",'backup Stage');
@@ -28,4 +30,4 @@ must(smoke,"Dual Clima",'Dual Clima obrigatória');
 must(smoke,"Madrid",'Madrid obrigatória');
 must(smoke,"OPR",'OPR obrigatória');
 
-console.log('OK: runner local preserva working tree, usa worktree limpo, backups, gates, reparo aditivo, Stage/Produção e smoke multiempresa.');
+console.log('OK: runner local preserva working tree, usa worktree limpo, PowerShell válido, backups, gates, reparo aditivo, Stage/Produção e smoke multiempresa.');
