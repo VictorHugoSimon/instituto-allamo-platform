@@ -1,0 +1,224 @@
+name: Sallamos AI CI/CD
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths: ['sallamos-ai/**','.github/workflows/sallamos-ai-ci-cd.yml']
+  push:
+    branches: [develop, main]
+    paths: ['sallamos-ai/**','.github/workflows/sallamos-ai-ci-cd.yml']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente a publicar
+        required: true
+        type: choice
+        options: [stage, production]
+        default: stage
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: sallamos-ai-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: sallamos-ai } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: TypeScript strict
+        run: npm run typecheck
+      - name: JavaScript syntax
+        run: |
+          node --check scripts/provision.mjs
+          node --check scripts/smoke.mjs
+          node --check scripts/preflight.mjs
+          node --check scripts/prepare-cloudflare-auth.mjs
+          node --check tests/cloudflare-auth.test.mjs
+          node --check scripts/build-production-dataset.mjs
+          node --check scripts/validate-eval-readiness.mjs
+          node --check scripts/validate-eval-candidates.mjs
+          node --check scripts/ingest-docs.mjs
+          node --check scripts/ingest-repo.mjs
+          node --check scripts/sync-sallamos-api.mjs
+          node --check sdk/runtime-evidence-client.mjs
+          node --check evals/runner.mjs
+          node --check public/app.js
+      - name: Cloudflare auth contract tests
+        run: npm run test:cloudflare-auth
+      - name: Validate candidate eval backlog
+        run: npm run evals:candidates
+      - name: Validate migrations and stage seed
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib
+          db=sqlite3.connect(':memory:')
+          for f in sorted(pathlib.Path('migrations').glob('*.sql')): db.executescript(f.read_text())
+          required=['knowledge_document','knowledge_chunk','conversation','ai_response','rate_limit_bucket','system_event','runtime_evidence_event']
+          tables={r[0] for r in db.execute("select name from sqlite_master where type='table'")}
+          assert all(t in tables for t in required), (required,tables)
+          cols={r[1] for r in db.execute('pragma table_info(knowledge_document)')}
+          assert {'scope','tenant_id'}.issubset(cols), cols
+          db.executescript(pathlib.Path('seeds/stage.sql').read_text())
+          assert db.execute('select count(*) from knowledge_document').fetchone()[0] == 5
+          assert db.execute('select count(*) from chunk_fts').fetchone()[0] == 5
+          assert db.execute("select count(*) from knowledge_document where scope='global'").fetchone()[0] == 5
+          print('MIGRATIONS_STAGE_SEED_AND_SCOPE_OK')
+          PY
+      - name: Validate source policy
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'); const x=JSON.parse(fs.readFileSync('sources/sources.json','utf8'));
+          const unsafe=(x.sources||[]).filter(s=>s.enabled===true && s.status==='rejected-for-production' && (s.environments||[]).includes('production'));
+          if(unsafe.length) throw new Error('Fonte rejeitada habilitada em produção: '+unsafe.map(x=>x.id).join(','));
+          console.log('SOURCE_POLICY_OK');
+          NODE
+      - name: Wrangler dry-run stage and production
+        run: |
+          cp wrangler.jsonc wrangler.ci.jsonc
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('wrangler.ci.jsonc'); s=p.read_text().replace('PREENCHER_STAGE','00000000-0000-0000-0000-000000000001').replace('PREENCHER_PRODUCTION','00000000-0000-0000-0000-000000000002'); p.write_text(s)
+          PY
+          npx wrangler deploy --dry-run --env stage --config wrangler.ci.jsonc
+          npx wrangler deploy --dry-run --env production --config wrangler.ci.jsonc
+          rm wrangler.ci.jsonc
+
+  deploy-stage:
+    needs: validate
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'stage')
+    runs-on: ubuntu-latest
+    environment: sallamos-ai-stage
+    defaults: { run: { working-directory: sallamos-ai } }
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SALLAMOS_SESSION_SECRET: ${{ secrets.SALLAMOS_SESSION_SECRET }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      EVIDENCE_INGEST_TOKEN: ${{ secrets.EVIDENCE_INGEST_TOKEN }}
+      SALLAMOS_API_BASE: ${{ secrets.SALLAMOS_API_BASE }}
+      SALLAMOS_AUTH_VALIDATE_URL: ${{ secrets.SALLAMOS_AUTH_VALIDATE_URL }}
+      SALLAMOS_API_TOKEN: ${{ secrets.SALLAMOS_API_TOKEN }}
+      REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
+      SALLAMOS_AI_BASE_URL: ${{ vars.SALLAMOS_AI_BASE_URL }}
+      SYNC_KNOWLEDGE: ${{ vars.SYNC_KNOWLEDGE || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - name: Prepare Cloudflare authentication
+        run: node scripts/prepare-cloudflare-auth.mjs
+      - name: Stage preflight
+        run: node scripts/preflight.mjs stage
+      - name: Validate Cloudflare credentials
+        run: npx wrangler whoami
+      - name: Provision and deploy stage
+        id: deploy
+        run: npm run provision:stage
+      - name: Smoke test stage
+        run: |
+          BASE="${{ steps.deploy.outputs.url }}"; if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
+          node scripts/smoke.mjs --base "$BASE" --env stage
+      - name: Publish STAGE evidence to Go-Live issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          BASE="$DEPLOY_URL"; if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          BODY=$(printf '### Sallamos AI STAGE — deploy automático\n- Status: **%s**\n- Commit: `%s`\n- URL detectada: `%s`\n- Run: %s\n- Evidência gerada automaticamente pelo workflow.\n' "$JOB_STATUS" "$GITHUB_SHA" "${BASE:-não detectada}" "$RUN_URL")
+          gh issue comment 45 --repo "$GITHUB_REPOSITORY" --body "$BODY"
+
+  production-gate:
+    needs: validate
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
+    runs-on: ubuntu-latest
+    environment: sallamos-ai-production
+    defaults: { run: { working-directory: sallamos-ai } }
+    env:
+      PRODUCTION_GO_LIVE: ${{ vars.PRODUCTION_GO_LIVE || 'false' }}
+      SALLAMOS_AI_STAGE_URL: ${{ vars.SALLAMOS_AI_STAGE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - name: Explicit go-live gate
+        run: |
+          if [ "$PRODUCTION_GO_LIVE" != "true" ]; then echo 'PRODUCTION BLOCKED: defina PRODUCTION_GO_LIVE=true somente após concluir o Gate de Go-Live (#45).'; exit 1; fi
+      - name: Dataset homologation gate
+        run: npm run evals:ready
+      - name: STAGE URL gate
+        run: |
+          test -n "$SALLAMOS_AI_STAGE_URL" || (echo 'PRODUCTION BLOCKED: SALLAMOS_AI_STAGE_URL ausente no environment de produção' && exit 1)
+          case "$SALLAMOS_AI_STAGE_URL" in https://*) ;; *) echo 'PRODUCTION BLOCKED: SALLAMOS_AI_STAGE_URL deve ser HTTPS'; exit 1;; esac
+      - name: Runtime quality gate against homologated STAGE
+        run: node evals/runner.mjs --base "$SALLAMOS_AI_STAGE_URL" --auto-token true --dataset eval-data/dataset.jsonl --decision-gate 0.90 --retrieval-gate 0.85 --terms-gate 0.90 --escalation-gate 1.00 --max-p95 12000 --output eval-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sallamos-ai-production-eval
+          path: sallamos-ai/eval-results.json
+          if-no-files-found: ignore
+
+  deploy-production:
+    needs: [validate, production-gate]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
+    runs-on: ubuntu-latest
+    environment: sallamos-ai-production
+    defaults: { run: { working-directory: sallamos-ai } }
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SALLAMOS_SESSION_SECRET: ${{ secrets.SALLAMOS_SESSION_SECRET }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      EVIDENCE_INGEST_TOKEN: ${{ secrets.EVIDENCE_INGEST_TOKEN }}
+      SALLAMOS_API_BASE: ${{ secrets.SALLAMOS_API_BASE }}
+      SALLAMOS_AUTH_VALIDATE_URL: ${{ secrets.SALLAMOS_AUTH_VALIDATE_URL }}
+      SALLAMOS_API_TOKEN: ${{ secrets.SALLAMOS_API_TOKEN }}
+      REPO_READ_TOKEN: ${{ secrets.REPO_READ_TOKEN }}
+      SALLAMOS_AI_BASE_URL: ${{ vars.SALLAMOS_AI_BASE_URL }}
+      SALLAMOS_AI_STAGE_URL: ${{ vars.SALLAMOS_AI_STAGE_URL }}
+      PRODUCTION_GO_LIVE: ${{ vars.PRODUCTION_GO_LIVE || 'false' }}
+      SYNC_KNOWLEDGE: ${{ vars.SYNC_KNOWLEDGE || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - name: Prepare Cloudflare authentication
+        run: node scripts/prepare-cloudflare-auth.mjs
+      - name: Production preflight
+        run: node scripts/preflight.mjs production
+      - name: Validate Cloudflare credentials
+        run: npx wrangler whoami
+      - name: Provision and deploy production
+        id: deploy
+        run: npm run provision:production
+      - name: Smoke test production
+        run: |
+          BASE="${{ steps.deploy.outputs.url }}"; if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
+          node scripts/smoke.mjs --base "$BASE" --env production
+      - name: Publish PRODUCTION evidence to Go-Live issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          BASE="$DEPLOY_URL"; if [ -z "$BASE" ]; then BASE="$SALLAMOS_AI_BASE_URL"; fi
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          BODY=$(printf '### Sallamos AI PRODUCTION — deploy automático\n- Status: **%s**\n- Commit: `%s`\n- URL detectada: `%s`\n- Run: %s\n' "$JOB_STATUS" "$GITHUB_SHA" "${BASE:-não detectada}" "$RUN_URL")
+          gh issue comment 45 --repo "$GITHUB_REPOSITORY" --body "$BODY"

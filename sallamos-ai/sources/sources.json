@@ -1,0 +1,24 @@
+{
+  "sources": [
+    {
+      "id": "sallamos-api-public",
+      "kind": "github-public",
+      "repository": "sallamos/SallamosAPI",
+      "branch": "master",
+      "enabled": false,
+      "environments": ["stage"],
+      "status": "rejected-for-production",
+      "owner": "Sallamos",
+      "reason": "O repositório público atualmente contém conteúdo/template Petstore e não representa uma fonte de verdade homologada do Sallamos.",
+      "files": [
+        { "path": "README.md", "sourceType": "doc", "module": "api" },
+        { "path": "swagger.yaml", "sourceType": "doc", "module": "api" }
+      ]
+    }
+  ],
+  "privateSources": {
+    "status": "required-for-production",
+    "policy": "least-privilege-read-only",
+    "notes": "Código, documentação interna e releases reais devem ser cadastrados como fontes homologadas com credencial somente leitura. Conteúdo não homologado nunca entra no índice de produção."
+  }
+}

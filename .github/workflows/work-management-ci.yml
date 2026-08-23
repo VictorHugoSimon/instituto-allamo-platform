@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - name: Build portal + módulos nativos
@@ -26,7 +26,10 @@ jobs:
           node --check src/work-management-ui.js
           node --check src/report-management-ui.js
           node --check src/portal-enhancements.js
+          node --check src/data-freshness-runtime.js
           node --check scripts/build-work-management.mjs
+          node --check scripts/enforce-live-first-paint.mjs
+          node --check scripts/harden-data-freshness.mjs
           node --check scripts/harden-portal-runtime.mjs
           node --check scripts/zero-static-executive-chart.mjs
           node --check scripts/zero-live-state-before-fetch.mjs
@@ -44,6 +47,8 @@ jobs:
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT LIST" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT MANAGEMENT" public/_worker.js
+          grep -q "BEGIN ALLAMO DYNAMIC TENANT FIELDS" public/_worker.js
+          grep -q "BEGIN ALLAMO TENANT FILES" public/_worker.js
           grep -q "report_records" public/_worker.js
           grep -q "report_versions" public/_worker.js
           grep -q "report_roadmap_items" public/_worker.js
@@ -59,11 +64,26 @@ jobs:
           grep -q "allamo_session_token" public/index.html
           grep -q "+ Demanda" public/index.html
           grep -q "+ Tarefa" public/index.html
-          grep -q "\[allamo-live-reset\]" public/index.html
+          grep -q "\[allamo-login-live-reset\]" public/index.html
+          grep -q "\[allamo-load-initial-reset\]" public/index.html
           grep -q "0 Em andamento — 0,0%" public/index.html
           grep -q "0 Backlog — 0,0%" public/index.html
-          grep -q "Date.now()+1800" public/index.html
-          grep -q "now-quietSince>=120" public/index.html
+          grep -q "Date.now()+12000" public/index.html
+          grep -q "now-quietSince>=200" public/index.html
+          grep -q "window.__allamoBootSeen" public/index.html
+          grep -q "window.__allamoBootGuardStarted" public/index.html
+          grep -q "window.__allamoBootNonBlocking=true" public/index.html
+          grep -q "seen.companies&&!!seen.projects" public/index.html
+          grep -q "return !!seen.publicClient" public/index.html
+          grep -q "public-client-projects" public/index.html
+          grep -q "Sincronizando dados" public/index.html
+          grep -q "allamo-boot-retry" public/index.html
+          grep -q "__allamoDataFreshnessLoaded" public/index.html
+          grep -q "no-store, no-cache, must-revalidate" public/_worker.js
+          if grep -q "\[allamo-live-reset\] nunca renderizar fotografia demo durante fetch" public/index.html; then echo "Reset recorrente antigo ainda presente"; exit 1; fi
+          if grep -q "body{visibility:hidden!important}" public/index.html; then echo "First paint ainda bloqueia o body inteiro"; exit 1; fi
+          if grep -q "Date.now()+1800" public/index.html; then echo "Guard rápido antigo pode expor fotografia demo"; exit 1; fi
+          if grep -q "now-quietSince>=120" public/index.html; then echo "Janela antiga de reveal ainda presente"; exit 1; fi
           if grep -q "Date.now()+6000" public/index.html; then echo "Boot antigo de 6s ainda presente"; exit 1; fi
           if grep -q "setInterval(tick,1200)" public/index.html; then echo "Polling executivo agressivo ainda presente"; exit 1; fi
           if grep -q "{label:'Projetos', value:'7'" public/index.html; then echo "KPI Projetos ainda hardcoded"; exit 1; fi
@@ -74,4 +94,4 @@ jobs:
           grep -q "CREATE TABLE IF NOT EXISTS report_records" migrations/2026-08-21-report-history-roadmap.sql
           grep -q "CREATE TABLE IF NOT EXISTS report_versions" migrations/2026-08-21-report-history-roadmap.sql
           grep -q "CREATE TABLE IF NOT EXISTS report_roadmap_items" migrations/2026-08-21-report-history-roadmap.sql
-          grep -q "allamo-pmo-v2" public/sw.js
+          grep -q "allamo-pmo-static-v3" public/sw.js

@@ -1,0 +1,1 @@
+(()=>{if(!new URLSearchParams(location.search).get('cliente'))return;const s=document.createElement('style');s.id='allamo-public-client-layer-fix';s.textContent='#allamo-public-client-portal{z-index:2147482000!important}.arrv{z-index:2147483000!important}.pc-modal{z-index:2147483500!important}';(document.head||document.documentElement).appendChild(s)})();

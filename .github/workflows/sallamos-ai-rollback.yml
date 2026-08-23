@@ -1,0 +1,46 @@
+name: Sallamos AI Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente a reverter
+        required: true
+        type: choice
+        options: [stage, production]
+      version_id:
+        description: Version ID Cloudflare; vazio = versão anterior
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: sallamos-ai-${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: sallamos-ai
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Validate credentials
+        run: npx wrangler whoami
+      - name: Roll back Worker version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version_id }}" ]; then
+            npx wrangler rollback "${{ inputs.version_id }}" --env "${{ inputs.environment }}" --message "Rollback via GitHub Actions"
+          else
+            npx wrangler rollback --env "${{ inputs.environment }}" --message "Rollback automático para versão anterior"
+          fi
+      - name: Warning
+        run: echo "Rollback de código concluído. D1/R2/Vectorize não são revertidos por rollback de Worker." >> "$GITHUB_STEP_SUMMARY"

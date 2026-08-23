@@ -1,67 +1,111 @@
-name: Deploy STAGE to Cloudflare Pages
+name: Release STAGE - Manual Gate
 
 on:
-  push:
-    branches: [develop]
-    paths:
-      - 'public/**'
-      - 'src/work-management-*.js'
-      - 'src/report-*.js'
-      - 'src/stage-runtime-bootstrap.js'
-      - 'src/portal-enhancements.js'
-      - 'scripts/build-work-management.mjs'
-      - 'scripts/harden-portal-runtime.mjs'
-      - 'scripts/zero-static-executive-chart.mjs'
-      - 'scripts/optimize-portal-performance.mjs'
-      - 'migrations/2026-08-21-report-history-roadmap.sql'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'wrangler.toml'
-      - '.github/workflows/deploy-stage.yml'
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite DEPLOY-STAGE para liberar a publicação após todos os gates'
+        required: true
+        type: string
+      reason:
+        description: 'Motivo da release / referência da homologação'
+        required: false
+        type: string
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
-  group: allamo-pmo-stage
-  cancel-in-progress: true
+  group: allamo-pmo-stage-release
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  release-stage:
+    if: ${{ inputs.confirm == 'DEPLOY-STAGE' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Marcar release em andamento
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=pending -f context=allamo/stage-deploy -f description='Release de Stage em andamento'
+
+      - name: Checkout da release candidata
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Build portal + módulos nativos
-        run: npm run build:work
-      - name: Validate generated portal
-        run: |
-          node --check public/_worker.js
-          node --check public/sw.js
-          grep -q "BEGIN ALLAMO STAGE RUNTIME" public/_worker.js
-          grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
-          grep -q "BEGIN ALLAMO REPORT MANAGEMENT" public/_worker.js
-          grep -q "report_records" public/_worker.js
-          grep -q "report_roadmap_items" public/_worker.js
-          grep -q "BEGIN ALLAMO WORK MANAGEMENT UI" public/index.html
-          grep -q "data-allamo-work-menu" public/index.html
-          grep -q "data-allamo-reports-menu" public/index.html
-          grep -q "Reports & Roadmap" public/index.html
-          grep -q "Date.now()+1800" public/index.html
-          if grep -q "Date.now()+6000" public/index.html; then exit 1; fi
 
-      # Nunca usar --env production no Stage.
-      # O runtime do Stage cria as tabelas nativas no DB realmente vinculado ao projeto Stage.
-      - name: Deploy to Cloudflare Pages STAGE
-        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production
+      - name: Instalar dependências travadas
+        run: npm ci
+
+      - name: Gerar um único artefato de release
+        run: npm run build:work
+
+      - name: Gate consolidado da plataforma
+        run: npm run test:release
+
+      - name: Registrar gates aprovados
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-gates -f description='Build e gate consolidado aprovados'
+
+      - name: Preparar autenticação Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Preflight Cloudflare
+        run: npx wrangler@4.124.0 whoami
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Registrar autenticação Cloudflare aprovada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-cloudflare-auth -f description='Wrangler autenticado no Cloudflare'
+
+      - name: Materializar configuração exclusiva de Stage
+        run: |
+          cp wrangler.stage.toml wrangler.toml
+          grep -F 'name = "allamo-pmo-stage"' wrangler.toml
+
+      - name: Registrar configuração Stage validada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração exclusiva do Stage validada'
+
+      - name: Publicar exatamente o artefato validado no STAGE
+        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production --commit-dirty=true
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Registrar sucesso do deploy no commit
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-deploy -f description='Stage publicado com sucesso'
+
+      - name: Registrar falha do deploy no commit
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-deploy -f description='Release de Stage falhou; verificar último marco aprovado'
+
+      - name: Resumo da release
+        if: always()
+        run: |
+          echo "### Release STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Motivo: ${{ inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Config Cloudflare: wrangler.stage.toml materializada temporariamente como wrangler.toml" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy automático por push: DESATIVADO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Autenticação: API Token ou Global API Key + e-mail" >> "$GITHUB_STEP_SUMMARY"
+          echo "- D1 reset/migration destrutiva: NÃO EXECUTADO" >> "$GITHUB_STEP_SUMMARY"

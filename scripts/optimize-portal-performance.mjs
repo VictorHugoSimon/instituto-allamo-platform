@@ -1,10 +1,17 @@
 import fs from 'node:fs';
 const file='public/index.html';
 let html=fs.readFileSync(file,'utf8');
-html=html.split('var quietSince=0,max=Date.now()+6000').join('var quietSince=0,max=Date.now()+1800');
-html=html.split('now-quietSince>=700').join('now-quietSince>=120');
-html=html.split('setTimeout(tick,75)').join('setTimeout(tick,30)');
-if(html.includes('Date.now()+6000')||html.includes('now-quietSince>=700')) throw new Error('Boot guard antigo ainda presente.');
-if(!html.includes('Date.now()+1800')||!html.includes('now-quietSince>=120')||!html.includes('setTimeout(tick,30)')) throw new Error('Marcadores de performance otimizados não encontrados.');
-fs.writeFileSync(file,html);
-console.log('OK: boot guard otimizado e idempotente.');
+
+if(html.includes('window.__allamoBootSeen')){
+  if(!html.includes('window.__allamoBootNonBlocking=true')) throw new Error('First paint não bloqueante ausente.');
+  if(html.includes('body{visibility:hidden!important}')) throw new Error('Performance não pode reintroduzir bloqueio global do body.');
+  if(!html.includes('Date.now()+12000')) throw new Error('Timeout seguro da sincronização não encontrado.');
+  if(!html.includes('now-quietSince>=200')) throw new Error('Janela de estabilidade da sincronização não encontrada.');
+  if(!html.includes('seen.companies&&!!seen.projects')) throw new Error('Sincronização não rastreia companies/projects.');
+  if(!html.includes('return !!seen.publicClient')) throw new Error('Sincronização não rastreia public-client-projects.');
+  if(!html.includes('window.__allamoBootGuardStarted')) throw new Error('Sincronização não possui auto-start seguro.');
+  fs.writeFileSync(file,html);
+  console.log('OK: sincronização tenant-safe preservada sem bloquear a interface.');
+}else{
+  throw new Error('Sincronização tenant-safe ausente.');
+}

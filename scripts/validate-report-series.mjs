@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(p,'utf8');
+const guard=read('src/public-report-context-guard.js');
+const client=read('src/client-published-reports.js');
+const api=read('src/report-series-api.js');
+const ui=read('src/report-series-ui.js');
+const viewer=read('src/rich-report-viewer.js');
+const schema=read('src/report-schema-bootstrap.js');
+const migration=read('migrations/2026-08-21-report-series.sql');
+const build=read('scripts/build-work-management.mjs');
+const index=read('public/index.html');
+const worker=read('public/_worker.js');
+const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+new Function(client);new Function(ui);new Function(viewer);new Function(`return async function(){${guard}}`);new Function(`return async function(){${api}}`);
+for(const [n,l] of [["data.client=companyName",'identidade pública autoritativa'],["data.tap.cliente=companyName",'TAP público autoritativo'],['context_locked:true','sinal de contexto bloqueado'],['resolved_by:resolvedBy','resolução ID/slug auditável']])must(guard,n,l);
+for(const [n,l] of [["if(publicCompany)return",'precedência da URL'],["publicMode:true",'modo público mesmo com sessão local'],['AllamoRichReport','visualização rica publicada']])must(client,n,l);
+for(const [n,l] of [['report_series','tabela série'],['report_series_cycles','tabela ciclos'],['report_series_meetings','tabela reuniões']]){must(schema,n,l);must(migration,n,l)}
+for(const [n,l] of [['WEEKLY','semanal'],['BIWEEKLY','quinzenal'],['MONTHLY','mensal'],['/snapshot','fechamento de ciclo'],['/context','contexto das reuniões'],['previous_cycle_id','encadeamento'],['used_cycle_id','reuniões consumidas']])must(api,n,l);
+for(const [n,l] of [['Preparar próximo com IA','jornada IA'],['Fechar ciclo / criar Report','fechamento'],['Adicionar reunião ao próximo Report','entrada de reuniões'],['allamo_series_ai_prefill','prefill da IA'],['AllamoRichReport','abertura rica']])must(ui,n,l);
+for(const [n,l] of [['Visão geral','aba visão'],['Planejamento & Curva S','aba planejamento'],['Riscos & RACI','aba riscos'],['Frentes','aba frentes'],['Documentação','aba documentação'],['Próximos passos','aba próximos passos']])must(viewer,n,l);
+for(const f of ['src/public-report-context-guard.js','src/report-series-api.js','src/report-series-ui.js','src/rich-report-viewer.js'])must(build,f,'injeção no build '+f);
+for(const marker of ['BEGIN ALLAMO PUBLIC REPORT CONTEXT GUARD','BEGIN ALLAMO REPORT SERIES'])must(worker,marker,'worker final '+marker);
+for(const marker of ['__allamoReportSeriesLoaded','AllamoRichReport','publicCompany)return'])must(index,marker,'index final '+marker);
+if(/\bDELETE\s+FROM\b|\bDROP\s+TABLE\b|\bTRUNCATE\b/i.test(migration))throw new Error('Migration recorrente contém SQL destrutivo.');
+console.log('OK: contexto público isolado por ID/slug, recorrência semanal/quinzenal/mensal, reuniões, IA, ciclos encadeados e visualização rica validados.');

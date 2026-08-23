@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#133335" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Sallamos AI Support · Valkíria AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app" class="shell">
+    <header class="topbar">
+      <div class="brand"><img src="https://institutoallamo.com.br/wp-content/uploads/2025/02/logo-principal-sallamos.png" alt="Sallamos" class="logo" /><span class="sep"></span><div><strong>AI Support</strong><span class="mono muted small">Valkíria AI</span></div></div>
+      <div class="topbar-right"><span id="runtimeBadge" class="badge"><i></i><span>iniciando</span></span><span id="tenantBadge" class="badge mono">tenant: — · v—</span><span class="user"><b>AI</b><span><strong>Sallamos</strong><small>sessão segura</small></span></span></div>
+    </header>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="side-label mono">Camada de IA</div>
+        <button class="nav active" data-screen="overview"><span></span>Visão geral</button>
+        <button class="nav" data-screen="assistant"><span></span>Assistente</button>
+        <button class="nav" data-screen="escalations"><span></span>Escalonamentos <em id="escCount">0</em></button>
+        <button class="nav" data-screen="knowledge"><span></span>Conhecimento</button>
+        <button class="nav" data-screen="insights"><span></span>Insights</button>
+        <div class="side-spacer"></div><div class="poc-note"><strong class="mono">READ-ONLY</strong>Produção inicia sem escrita em dados do cliente. AI Operator será liberado somente com autorização, auditoria e confirmação explícita.</div>
+      </aside>
+      <main class="content">
+        <section id="screen-overview" class="screen active"><div class="hero"><div class="eyebrow mono">Sallamos AI · Plataforma de suporte</div><h1>Um especialista no Sallamos que responde com evidência ou passa para o humano.</h1><p>O núcleo consulta fontes homologadas, aplica contexto do tenant, calcula confiança fora do modelo e mantém rastreabilidade. Se a evidência não sustenta a resposta, o caso é escalado.</p><div class="hero-actions"><button class="btn primary" data-go="assistant">Abrir assistente</button><button class="btn ghost" data-go="insights">Ver governança</button></div></div><div class="page"><div class="principles"><article><small class="mono">arquitetura</small><p>Stage e produção usam recursos isolados e o mesmo código versionado.</p></article><article><small class="mono">segurança</small><p>Autenticação, tenant isolation, rate limit e fallback humano.</p></article><article><small class="mono">governança</small><p>Fontes precisam de owner, versão, status e evidência rastreável.</p></article></div><div class="section-head"><div><h2>Como uma pergunta vira resposta</h2><p>Cada etapa deixa rastro para suporte, produto, engenharia e PMO.</p></div></div><div class="flow-grid"><article><b class="mono">01</b><strong>Sessão autenticada</strong><p>Tenant, perfil e versão são validados.</p></article><article><b class="mono">02</b><strong>Classificação</strong><p>Intenção, módulo e risco.</p></article><article><b class="mono">03</b><strong>Busca híbrida</strong><p>Semântica + lexical.</p></article><article><b class="mono">04</b><strong>Contexto</strong><p>Tools read-only do tenant.</p></article><article><b class="mono">05</b><strong>Resposta</strong><p>Passos e evidências.</p></article><article><b class="mono">06</b><strong>Guardrails</strong><p>Responder, clarificar ou escalar.</p></article></div><div id="overviewKpis" class="kpi-grid"></div><div class="two-col"><article class="panel"><div class="panel-title"><div><h3>Hierarquia de fontes</h3><p>Apenas fontes homologadas entram em produção.</p></div></div><div class="rank-list" id="sourceHierarchy"></div></article><article class="panel"><div class="panel-title"><div><h3>Modelo de confiança</h3><p>A decisão é calculada no backend.</p></div></div><div class="confidence-bands"><div class="band high"><b>Alta</b><span>Responde com fontes.</span></div><div class="band medium"><b>Média</b><span>Pede contexto.</span></div><div class="band low"><b>Baixa</b><span>Escala.</span></div></div></article></div></div></section>
+        <section id="screen-assistant" class="screen assistant-screen"><div class="assistant-main"><div class="assistant-head"><div><div class="eyebrow mono dark">Assistente de suporte</div><h2>Como posso ajudar no Sallamos?</h2><p>A resposta só é liberada quando há evidência suficiente.</p></div><button id="resetChat" class="btn mini">Limpar</button></div><div id="suggestions" class="suggestions"></div><div id="messages" class="messages"><div class="empty-chat"><strong>Inicializando</strong><span>Validando ambiente e sessão.</span></div></div><div class="composer"><textarea id="question" rows="2" placeholder="Digite uma dúvida sobre o Sallamos..."></textarea><button id="send" class="btn primary">Enviar</button></div></div><aside class="evidence-pane"><div class="panel-title"><div><h3>Trace e evidências</h3><p>O que sustentou a última decisão.</p></div></div><div id="tracePanel" class="trace-empty">Nenhuma consulta executada.</div></aside></section>
+        <section id="screen-escalations" class="screen"><div class="page"><div class="section-head"><div><div class="eyebrow mono dark">Fallback humano</div><h2>Escalonamentos</h2><p>Casos que exigem revisão humana.</p></div><button id="refreshEsc" class="btn mini">Atualizar</button></div><div id="escalationList" class="cards-list"></div></div></section>
+        <section id="screen-knowledge" class="screen"><div class="page"><div class="section-head"><div><div class="eyebrow mono dark">RAG</div><h2>Base de conhecimento</h2><p>Fontes homologadas com owner, versão e status.</p></div><button id="refreshKnowledge" class="btn mini">Atualizar</button></div><div class="panel table-wrap"><table><thead><tr><th>Tipo</th><th>Fonte</th><th>Módulo</th><th>Versão</th><th>Status</th><th>Owner</th></tr></thead><tbody id="knowledgeRows"></tbody></table></div></div></section>
+        <section id="screen-insights" class="screen"><div class="page"><div class="section-head"><div><div class="eyebrow mono dark">PMO · Produto · Suporte</div><h2>Insights operacionais</h2><p>Decisões, risco e qualidade das interações por tenant.</p></div><button id="refreshInsights" class="btn mini">Atualizar</button></div><div id="insightKpis" class="kpi-grid"></div><div class="two-col"><article class="panel"><h3>Decisões</h3><div id="decisionBars" class="bars"></div></article><article class="panel"><h3>Risco</h3><div id="riskBars" class="bars"></div></article></div></div></section>
+      </main>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div><script src="/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+name: Windows Build Compatibility CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+
+jobs:
+  crlf-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Simulate Windows CRLF checkout on generated portal inputs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ['public/_worker.js','public/index.html']:
+              p=Path(name)
+              text=p.read_text(encoding='utf-8').replace('\r\n','\n').replace('\r','\n')
+              p.write_bytes(text.replace('\n','\r\n').encode('utf-8'))
+          PY
+      - name: Build portal from CRLF inputs
+        run: npm run build:work
+      - name: Validate critical portal gates
+        run: |
+          npm run test:session
+          npm run test:freshness
+          npm run test:tenant
+          npm run test:platform
+          npm run test:public
+          npm run test:pwa
+          npm run test:bundle
