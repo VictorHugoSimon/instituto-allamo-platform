@@ -39,6 +39,10 @@ must(portable,"function extractResultsDeep(node,expectedFields=[])",'parser D1 o
 must(portable,"['id','name']",'companies exige id/name');
 must(portable,"['company_id']",'referências exigem company_id');
 must(portable,"['company_id','projects']",'contagem de projetos exige company_id/projects');
+must(portable,"const stderr=String(r.stderr||'')",'captura stderr do Wrangler no Windows');
+must(portable,"const windowsStreamReplacement=",'patch explícito de captura combinada dos streams');
+must(portable,"return stdout+(stderr?",'retorno combina stdout e stderr para o parser D1');
+must(portable,"stdout vazio; analisando stderr como fallback D1",'diagnóstico não destrutivo quando stdout vier vazio');
 must(portable,"ignora results de metadados",'self-test cobre conflito entre metadata results e linhas SQL');
 must(portable,"malformedCompanies=companies.filter",'fail-safe para evidência sem id/name');
 must(portable,"Nenhuma alteração será planejada",'aborto explícito antes de montar plano com evidência inválida');
@@ -53,6 +57,7 @@ if(selfTest.error)throw selfTest.error;
 if(selfTest.status!==0)throw new Error(`Self-test do wrapper portátil falhou (${selfTest.status}): ${(selfTest.stderr||selfTest.stdout||'').trim()}`);
 const selfOut=String(selfTest.stdout||'');
 if(!selfOut.includes('LF, CRLF e BOM+CRLF'))throw new Error('Self-test do wrapper portátil não comprovou LF/CRLF/BOM.');
+if(!selfOut.includes('stdout+stderr'))throw new Error('Self-test não comprovou captura combinada dos streams do Wrangler.');
 if(!selfOut.includes('results de metadados'))throw new Error('Self-test não comprovou descarte de results de metadados.');
 if(!selfOut.includes('colunas esperadas'))throw new Error('Self-test não comprovou seleção por schema esperado.');
 if(!selfOut.includes('evidência malformada'))throw new Error('Self-test não comprovou fail-safe de evidência malformada.');
@@ -63,4 +68,4 @@ must(smoke,"Dual Clima",'Dual Clima obrigatória');
 must(smoke,"Madrid",'Madrid obrigatória');
 must(smoke,"OPR",'OPR obrigatória');
 
-console.log('OK: runner local preserva working tree, usa worktree limpo, backups, parser Wrangler D1 por colunas esperadas, fail-safe id/name, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
+console.log('OK: runner local preserva working tree, usa worktree limpo, backups, parser Wrangler D1 por colunas esperadas, captura stdout/stderr no Windows, fail-safe id/name, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
