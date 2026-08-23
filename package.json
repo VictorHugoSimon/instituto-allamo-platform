@@ -15,7 +15,7 @@
     "test:series": "node scripts/validate-report-series.mjs",
     "test:tenant": "node scripts/validate-tenant-milestones.mjs",
     "test:platform": "node scripts/validate-dynamic-tenant-platform.mjs && node scripts/verify-data-persistence.mjs",
-    "test:governance": "node scripts/validate-governance-roadmap.mjs && node scripts/verify-data-persistence.mjs",
+    "test:governance": "node scripts/validate-governance-roadmap.mjs && node scripts/validate-governance-release.mjs && node scripts/verify-data-persistence.mjs",
     "smoke:governance": "node scripts/smoke-governance-stage.mjs",
     "test:freshness": "node scripts/validate-boot-guard.mjs && node scripts/validate-data-freshness.mjs && node scripts/validate-portfolio-resilience.mjs",
     "test:session": "node scripts/validate-session-stability.mjs && node scripts/validate-login-interaction.mjs && node scripts/validate-bundle-json.mjs",
