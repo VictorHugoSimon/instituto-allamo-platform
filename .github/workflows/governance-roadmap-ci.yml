@@ -1,0 +1,36 @@
+name: Governance Roadmap CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'src/governance-*'
+      - 'src/public-governance-*'
+      - 'scripts/harden-governance-roadmap.mjs'
+      - 'scripts/validate-governance-roadmap.mjs'
+      - 'scripts/smoke-governance-stage.mjs'
+      - 'migrations/2026-08-23-governance-roadmap.sql'
+      - 'package.json'
+      - '.github/workflows/governance-roadmap-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  governance-roadmap:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Governance contracts
+        run: npm run test:governance
+      - name: Tenant isolation
+        run: npm run test:tenant
+      - name: Public client safety
+        run: npm run test:public
+      - name: Bundle validity
+        run: npm run test:bundle
