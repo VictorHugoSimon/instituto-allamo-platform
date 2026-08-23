@@ -4,18 +4,10 @@ const file='public/index.html';
 let html=fs.readFileSync(file,'utf8');
 
 if(!html.includes('const keepOnError=(name,e)=>')){
-  const needles=['  async loadData() {\\\n','  async loadData() {\n'];
-  let applied=false;
-  for(const needle of needles){
-    if(html.includes(needle)){
-      const nl=needle.endsWith('\\\n')?'\\\n':'\n';
-      const injected=`  async loadData() {${nl}    const keepOnError=(name,e)=>{ console.error('[loadData] '+name,e); if(!this.__dataRetryScheduled){ this.__dataRetryScheduled=true; setTimeout(()=>{ this.__dataRetryScheduled=false; try{ this.loadData(); }catch(_){} },1500); } return null; };${nl}`;
-      html=html.split(needle).join(injected);
-      applied=true;
-      break;
-    }
-  }
-  if(!applied) throw new Error('Método loadData não encontrado para proteção da carteira.');
+  const needle='  async loadData() {';
+  const injected="  async loadData() { const keepOnError=(name,e)=>{ console.error('[loadData] '+name,e); if(!this.__dataRetryScheduled){ this.__dataRetryScheduled=true; setTimeout(()=>{ this.__dataRetryScheduled=false; try{ this.loadData(); }catch(_){} },1500); } return null; };";
+  if(!html.includes(needle)) throw new Error('Método loadData não encontrado para proteção da carteira.');
+  html=html.split(needle).join(injected);
 }
 
 const catches=[
