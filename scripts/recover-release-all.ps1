@@ -19,13 +19,6 @@ function Invoke-Checked {
   if ($LASTEXITCODE -ne 0) { throw "Falha ($LASTEXITCODE): $File $($Arguments -join ' ')" }
 }
 
-function Get-GitValue {
-  param([string[]]$Arguments)
-  $v = (& git @Arguments 2>$null | Select-Object -First 1)
-  if ($LASTEXITCODE -ne 0 -or -not $v) { throw "Git falhou: git $($Arguments -join ' ')" }
-  return ([string]$v).Trim()
-}
-
 $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
 if (-not (Test-Path (Join-Path $RepoRoot '.git'))) { throw "Repo Git não encontrado em $RepoRoot" }
 
@@ -50,11 +43,20 @@ try {
 
   Write-Host '[1/14] Atualizando referências remotas sem tocar nos seus arquivos locais...'
   Invoke-Checked 'git' @('fetch','origin','main','develop','--prune')
-  # Evita a sintaxe revision^{tree}, que pode ser interpretada de forma inconsistente pelo PowerShell.
-  # git show --format=%T retorna diretamente o tree SHA do commit/ref e funciona igual em CMD/PowerShell.
-  $mainTree = Get-GitValue @('show','-s','--format=%T','origin/main')
-  $developTree = Get-GitValue @('show','-s','--format=%T','origin/develop')
-  if ($mainTree -ne $developTree) { throw "main e develop não estão com a mesma árvore. main=$mainTree develop=$developTree" }
+
+  # Gate de igualdade de árvore sem capturar SHA em pipeline PowerShell.
+  # git diff --quiet retorna 0 quando as árvores são equivalentes,
+  # 1 quando há diferença e >1 em erro real de Git.
+  Write-Host '> git diff --quiet origin/main origin/develop --' -ForegroundColor DarkGray
+  & git diff --quiet origin/main origin/develop --
+  $treeDiffExit = $LASTEXITCODE
+  if ($treeDiffExit -eq 1) {
+    throw 'main e develop não estão com a mesma árvore. Sincronize os branches antes da recuperação.'
+  }
+  if ($treeDiffExit -ne 0) {
+    throw "Git falhou ao comparar main/develop (exit $treeDiffExit)."
+  }
+  Write-Host 'Gate OK: main e develop possuem a mesma árvore.' -ForegroundColor Green
 
   Write-Host '[2/14] Criando worktree limpo a partir de origin/main...'
   Invoke-Checked 'git' @('worktree','add','--detach',$buildDir,'origin/main')
