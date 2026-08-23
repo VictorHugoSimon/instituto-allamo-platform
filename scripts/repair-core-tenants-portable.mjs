@@ -84,6 +84,45 @@ const evidenceGuard=`${evidenceNeedle}\n  const malformedCompanies=companies.fil
 const windowsStreamNeedle="  return capture?(r.stdout||''):'';";
 const windowsStreamReplacement="  if(!capture)return '';\n  const stdout=String(r.stdout||'');\n  const stderr=String(r.stderr||'');\n  if(process.platform==='win32' && !stdout.trim() && stderr.trim()) console.warn('[wrangler] stdout vazio; analisando stderr como fallback D1.');\n  return stdout+(stderr?'\\n'+stderr:'');";
 
+// Consultas de evidência devem usar --command. No D1 remoto, --file segue o fluxo
+// de import/ingestão e pode devolver somente métricas (rows read/written), sem as
+// linhas do SELECT. --command usa o endpoint de query e preserva `results`.
+const commandQuerySource=`function executeSqlCommand(config,sql,{json=true,capture=true,expectedFields=[]}={}){
+  const args=[WRANGLER,'d1','execute',DB,'--remote','--config',config,'--command',sql];
+  if(json)args.push('--json');
+  const out=runWrangler(args,{capture});
+  if(!json)return [];
+  let parsed;
+  try{ parsed=JSON.parse(out); }
+  catch{
+    const clean=String(out||'').replace(/\\u001b\\[[0-9;?]*[ -\\/]*[@-~]/g,'').trim();
+    let recovered=null;
+    let recoveredSize=-1;
+    const starts=[];
+    for(let i=0;i<clean.length;i++) if(clean[i]==='['||clean[i]==='{') starts.push(i);
+    const ends=[];
+    for(let i=clean.length-1;i>=0;i--) if(clean[i]===']'||clean[i]==='}') ends.push(i);
+    for(const a of starts){
+      for(const b of ends){
+        if(b<=a) continue;
+        const slice=clean.slice(a,b+1);
+        try{
+          const candidate=JSON.parse(slice);
+          const rows=extractResults(candidate,expectedFields);
+          if(rows!==null && slice.length>recoveredSize){ recovered=candidate; recoveredSize=slice.length; }
+        }catch{}
+      }
+    }
+    if(recovered===null) throw new Error('Wrangler retornou saída sem payload JSON D1 reconhecível ao consultar D1 via --command.');
+    parsed=recovered;
+  }
+  const rows=extractResults(parsed,expectedFields);
+  if(rows===null) throw new Error('Wrangler retornou JSON D1 sem results compatível com as colunas esperadas: '+expectedFields.join(','));
+  return rows;
+}
+
+const query=(config,sql,expectedFields=[])=>executeSqlCommand(config,sql,{json:true,capture:true,expectedFields});`;
+
 function patchSource(raw){
   let source=normalizeSource(raw);
   const parserStart=source.indexOf('function extractResults(node){');
@@ -109,11 +148,11 @@ function patchSource(raw){
   }
   source=source.replace(oldParse,tolerantParse);
 
-  source=source.replace(
-    "const query=(config,sql)=>executeSqlFile(config,sql,{json:true,capture:true});",
-    "const query=(config,sql,expectedFields=[])=>executeSqlFile(config,sql,{json:true,capture:true,expectedFields});"
-  );
-  if(!source.includes('const query=(config,sql,expectedFields=[])')) throw new Error('Não foi possível adicionar contrato de colunas ao query().');
+  const baseQuery="const query=(config,sql)=>executeSqlFile(config,sql,{json:true,capture:true});";
+  if(!source.includes(baseQuery)) throw new Error('O contrato do query() mudou; wrapper portátil não será executado.');
+  source=source.replace(baseQuery,commandQuerySource);
+  if(!source.includes("'--command',sql")) throw new Error('Consultas D1 não foram migradas para --command.');
+  if(source.includes("const query=(config,sql,expectedFields=[])=>executeSqlFile")) throw new Error('Query ainda está usando --file; execução bloqueada.');
 
   const replacements=[
     ["query(config,'SELECT id,name FROM companies ORDER BY name,id;')","query(config,'SELECT id,name FROM companies ORDER BY name,id;',['id','name'])"],
@@ -137,7 +176,10 @@ function patchSource(raw){
     'extractResults(candidate,expectedFields)',
     'extractResults(parsed,expectedFields)',
     "const stderr=String(r.stderr||'')",
-    "return stdout+(stderr?'\\n'+stderr:'')"
+    "return stdout+(stderr?'\\n'+stderr:'')",
+    'function executeSqlCommand(config,sql',
+    "'--command',sql",
+    'executeSqlCommand(config,sql,{json:true,capture:true,expectedFields})'
   ];
   for(const needle of required) if(!source.includes(needle)) throw new Error('Patch incompleto do contrato D1: '+needle);
   return source;
@@ -182,8 +224,11 @@ if(process.argv.includes('--self-test')){
       if(!patched.includes('malformedCompanies=companies.filter')) throw new Error('Fail-safe id/name não foi injetado em collectEvidence().');
       if(!patched.includes("const stderr=String(r.stderr||'')")) throw new Error('Wrapper portátil não captura stderr do Wrangler.');
       if(!patched.includes("return stdout+(stderr?'\\n'+stderr:'')")) throw new Error('Wrapper portátil não combina stdout/stderr para o parser D1.');
+      if(!patched.includes("'--command',sql")) throw new Error('Consultas de evidência ainda não usam --command.');
+      if(!patched.includes('executeSqlCommand(config,sql,{json:true,capture:true,expectedFields})')) throw new Error('query() não está roteando para executeSqlCommand.');
+      if(patched.includes('const query=(config,sql,expectedFields=[])=>executeSqlFile')) throw new Error('query() voltou a usar --file para SELECT.');
     }
-    console.log('OK: wrapper portátil aceita LF, CRLF e BOM+CRLF, captura stdout+stderr do Wrangler no Windows, ignora results de metadados, seleciona linhas pelas colunas esperadas e aborta evidência malformada.');
+    console.log('OK: wrapper portátil aceita LF, CRLF e BOM+CRLF, captura stdout+stderr do Wrangler no Windows, usa --command para SELECT remoto, ignora results de metadados, seleciona linhas pelas colunas esperadas e aborta evidência malformada.');
     process.exit(0);
   }catch(e){
     console.error('[ABORTADO] Self-test do wrapper portátil falhou: '+(e?.message||String(e)));

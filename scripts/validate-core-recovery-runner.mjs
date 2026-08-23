@@ -43,6 +43,11 @@ must(portable,"const stderr=String(r.stderr||'')",'captura stderr do Wrangler no
 must(portable,"const windowsStreamReplacement=",'patch explícito de captura combinada dos streams');
 must(portable,"return stdout+(stderr?",'retorno combina stdout e stderr para o parser D1');
 must(portable,"stdout vazio; analisando stderr como fallback D1",'diagnóstico não destrutivo quando stdout vier vazio');
+must(portable,"function executeSqlCommand(config,sql",'executor dedicado de query remota');
+must(portable,"'--command',sql",'SELECT remoto usa --command, não --file/import');
+must(portable,"executeSqlCommand(config,sql,{json:true,capture:true,expectedFields})",'query roteia para endpoint D1 de query');
+must(portable,"query() voltou a usar --file para SELECT",'fail-safe impede regressão para --file nas leituras');
+must(portable,"usa --command para SELECT remoto",'self-test cobre semântica query vs import');
 must(portable,"ignora results de metadados",'self-test cobre conflito entre metadata results e linhas SQL');
 must(portable,"malformedCompanies=companies.filter",'fail-safe para evidência sem id/name');
 must(portable,"Nenhuma alteração será planejada",'aborto explícito antes de montar plano com evidência inválida');
@@ -58,6 +63,7 @@ if(selfTest.status!==0)throw new Error(`Self-test do wrapper portátil falhou ($
 const selfOut=String(selfTest.stdout||'');
 if(!selfOut.includes('LF, CRLF e BOM+CRLF'))throw new Error('Self-test do wrapper portátil não comprovou LF/CRLF/BOM.');
 if(!selfOut.includes('stdout+stderr'))throw new Error('Self-test não comprovou captura combinada dos streams do Wrangler.');
+if(!selfOut.includes('--command para SELECT remoto'))throw new Error('Self-test não comprovou uso de --command nas consultas remotas.');
 if(!selfOut.includes('results de metadados'))throw new Error('Self-test não comprovou descarte de results de metadados.');
 if(!selfOut.includes('colunas esperadas'))throw new Error('Self-test não comprovou seleção por schema esperado.');
 if(!selfOut.includes('evidência malformada'))throw new Error('Self-test não comprovou fail-safe de evidência malformada.');
@@ -68,4 +74,4 @@ must(smoke,"Dual Clima",'Dual Clima obrigatória');
 must(smoke,"Madrid",'Madrid obrigatória');
 must(smoke,"OPR",'OPR obrigatória');
 
-console.log('OK: runner local preserva working tree, usa worktree limpo, backups, parser Wrangler D1 por colunas esperadas, captura stdout/stderr no Windows, fail-safe id/name, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
+console.log('OK: runner local preserva working tree, usa worktree limpo, backups, consultas D1 remotas via --command, parser por colunas esperadas, captura stdout/stderr no Windows, fail-safe id/name, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
