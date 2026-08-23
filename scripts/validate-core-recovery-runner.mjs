@@ -31,6 +31,13 @@ must(ps,"allamo-pmo','--branch','main",'projeto Produção explícito');
 must(ps,"smoke-core-tenants.mjs",'smoke após deploy');
 
 must(repair,"function extractResults(node)",'normalização base do envelope results do Wrangler D1');
+must(repair,"function resolveNpxCli()",'resolução explícita do npx-cli.js no Windows');
+must(repair,"path.join(path.dirname(process.execPath),'node_modules','npm','bin','npx-cli.js')",'fallback npx-cli relativo ao node.exe');
+must(repair,"spawnSync(process.execPath,[npxCli,'--yes',...args]",'Windows executa npx-cli diretamente por argv');
+must(repair,"shell:false",'invocação do Wrangler não usa shell');
+const realCmdInvocation=/process\.env\.(?:ComSpec|COMSPEC)|spawnSync\(\s*(?:['"]cmd\.exe['"]|comspec)|\['\/d','\/s','\/c'/i;
+if(realCmdInvocation.test(repair))throw new Error('Runner base voltou a passar o Wrangler por cmd.exe/shell no Windows.');
+
 must(portable,"Wrangler retornou saída sem payload JSON D1 reconhecível",'parser tolerante a banners com contrato D1');
 must(portable,"const rows=extractResults(candidate,expectedFields)",'recuperação valida o fragmento pelas colunas esperadas');
 must(portable,"extractResults(parsed,expectedFields)",'payload JSON final passa pelo contrato de colunas');
@@ -74,4 +81,4 @@ must(smoke,"Dual Clima",'Dual Clima obrigatória');
 must(smoke,"Madrid",'Madrid obrigatória');
 must(smoke,"OPR",'OPR obrigatória');
 
-console.log('OK: runner local preserva working tree, usa worktree limpo, backups, consultas D1 remotas via --command, parser por colunas esperadas, captura stdout/stderr no Windows, fail-safe id/name, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
+console.log('OK: runner local preserva working tree, usa worktree limpo, backups, consultas D1 remotas via --command, argv shell-free no Windows, parser por colunas esperadas, captura stdout/stderr, fail-safe id/name, reparo aditivo, wrapper LF/CRLF/BOM, Stage/Produção e smoke multiempresa.');
