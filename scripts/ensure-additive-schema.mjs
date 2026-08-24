@@ -162,4 +162,4 @@ const missingAfter=governanceTables.filter(t=>!tableExists(t));
 if(!gmudProjectAfter) throw new Error('gmud.project continua ausente após aplicação.');
 if(missingAfter.length) throw new Error('Tabelas de Governança continuam ausentes: '+missingAfter.join(', '));
 
-console.log('[OK] Schema aditivo validado. Nenhum reset, DELETE, DROP ou TRUNCATE executado.');
+console.log('[OK] Schema aditivo validado sem operações destrutivas.');
