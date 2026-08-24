@@ -1,0 +1,39 @@
+name: Stage Live Diagnostic
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - '.github/workflows/stage-live-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-stage-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Diagnosticar URL canônica do Stage
+        shell: bash
+        run: |
+          set +e
+          BASE='https://allamo-pmo-stage.pages.dev'
+          TARGET='08de5db7aaf4a461230e4103a2578fa44bdc914c'
+          echo '=== release.json ==='
+          curl -sS -L --max-time 20 -D /tmp/release.headers "$BASE/release.json?_diag=$(date +%s)" -o /tmp/release.body
+          cat /tmp/release.headers
+          cat /tmp/release.body
+          echo
+          echo "=== release-$TARGET.json ==="
+          curl -sS -L --max-time 20 -w '\nHTTP %{http_code}\n' "$BASE/release-$TARGET.json?_diag=$(date +%s)"
+          echo
+          echo '=== stage-health ==='
+          curl -sS -L --max-time 20 -w '\nHTTP %{http_code}\n' "$BASE/api/stage-health?_diag=$(date +%s)"
+          echo
+          echo '=== companies (no auth) ==='
+          curl -sS -L --max-time 20 -w '\nHTTP %{http_code}\n' "$BASE/api/companies?_diag=$(date +%s)"
+          echo
+          echo '=== root headers ==='
+          curl -sS -L --max-time 20 -I "$BASE/?_diag=$(date +%s)"
+          exit 0
