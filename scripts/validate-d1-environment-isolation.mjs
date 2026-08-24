@@ -49,8 +49,12 @@ forbid(previewEnv,PROD_ID,'preview do projeto de Produção nunca pode usar D1 p
 
 must(stageCmd,'copy /Y wrangler.stage.toml wrangler.toml','Stage local materializa config no worktree');
 must(stageWorkflow,'cp wrangler.stage.toml wrangler.toml','Stage Actions materializa config no runner');
-must(stageCmd,'--project-name allamo-pmo-stage --branch production','Stage publica no projeto/branch corretos');
-must(stageWorkflow,'--project-name allamo-pmo-stage --branch production','workflow Stage publica no projeto/branch corretos');
+must(stageCmd,'pages deploy public --project-name allamo-pmo-stage --commit-hash','Stage local publica no destino canônico e carimba commit');
+must(stageWorkflow,'pages deploy public --project-name allamo-pmo-stage --commit-hash','workflow Stage publica no destino canônico e carimba commit');
+forbid(stageCmd,'--branch production','Stage local não pode transformar a release canônica em preview de branch');
+forbid(stageWorkflow,'--branch production','workflow Stage não pode transformar a release canônica em preview de branch');
+must(stageCmd,'verify-stage-canonical-release.mjs','Stage local comprova que a URL canônica recebeu o commit');
+must(stageWorkflow,'verify-stage-canonical-release.mjs','workflow Stage comprova que a URL canônica recebeu o commit');
 forbid(stageCmd,'pages deploy public --config','Pages Stage não usa --config customizado');
 forbid(stageWorkflow,'pages deploy public --config','workflow Pages Stage não usa --config customizado');
 forbid(stageCmd,'--env stage','deploy local não pode usar env.stage');
@@ -81,4 +85,4 @@ must(prodWorkflow,'--project-name allamo-pmo --branch main','workflow produção
 forbid(prodWorkflow,'pages deploy public --config','workflow Pages Produção não usa --config customizado');
 forbid(prodWorkflow,'cp wrangler.stage.toml wrangler.toml','workflow produção nunca materializa config Stage');
 
-console.log('OK: Pages/D1 isolados — Stage automatizado em develop e Produção automatizada somente em main, com configs dedicadas, backup, schema aditivo e fallback manual.');
+console.log('OK: Pages/D1 isolados — Stage usa deploy canônico Direct Upload com fingerprint, Produção permanece governada em main, com configs dedicadas, backup, schema aditivo e fallback manual.');

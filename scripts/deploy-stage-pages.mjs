@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -10,11 +10,15 @@ const redirectFile=path.join(deployDir,'config.json');
 const configFile=path.join(root,'wrangler.stage.toml');
 
 const STAGE_PROJECT='allamo-pmo-stage';
-const STAGE_BRANCH='production';
 const WRANGLER_VERSION='4.124.0';
+const commitSha=String(process.env.GITHUB_SHA||execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'})).trim();
 
 if(!fs.existsSync(configFile)){
   console.error('ERRO: wrangler.stage.toml não encontrado.');
+  process.exit(1);
+}
+if(!/^[0-9a-f]{40}$/i.test(commitSha)){
+  console.error('ERRO: SHA Git inválido para o deploy.');
   process.exit(1);
 }
 
@@ -23,19 +27,18 @@ fs.writeFileSync(redirectFile,JSON.stringify({configPath:'../../wrangler.stage.t
 
 console.log('Configuração de deploy: STAGE -> wrangler.stage.toml');
 console.log('Projeto Cloudflare Pages: '+STAGE_PROJECT);
-console.log('Branch Pages: '+STAGE_BRANCH+' (produção do projeto de STAGE)');
+console.log('Destino: produção canônica do projeto de STAGE (sem --branch de preview)');
+console.log('Commit: '+commitSha);
 
 const wranglerArgs=[
   `wrangler@${WRANGLER_VERSION}`,
   'pages','deploy','public',
   '--project-name',STAGE_PROJECT,
-  '--branch',STAGE_BRANCH,
+  '--commit-hash',commitSha,
   '--commit-dirty=true'
 ];
 
 function runWrangler(){
-  // No Windows/Node 24, spawnSync('npx.cmd', ..., {shell:false}) pode retornar EINVAL.
-  // Executamos o .cmd por meio do próprio cmd.exe, que é a forma suportada pelo Windows.
   if(process.platform==='win32'){
     const comspec=process.env.ComSpec||process.env.COMSPEC||'cmd.exe';
     const command=['npx','--yes',...wranglerArgs].join(' ');
@@ -75,4 +78,4 @@ if(exitCode!==0){
   process.exit(exitCode);
 }
 
-console.log('OK: deploy de STAGE concluído. O redirecionador local do Wrangler foi removido.');
+console.log('OK: deploy canônico de STAGE concluído. O redirecionador local do Wrangler foi removido.');
