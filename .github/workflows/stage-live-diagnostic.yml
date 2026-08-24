@@ -10,6 +10,7 @@ permissions:
   contents: read
   actions: read
 
+# Revalidação final após conclusão da release bd2ebba.
 jobs:
   diagnose-stage-live:
     runs-on: ubuntu-latest
