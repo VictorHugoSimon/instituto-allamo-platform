@@ -99,6 +99,15 @@ jobs:
           node scripts/repair-core-tenants-portable.mjs --env=production --apply --confirm=REPAIR-PRODUCTION
           node scripts/repair-core-tenants-portable.mjs --env=production
 
+      - name: Dry-run da sincronização de empresas e projetos Stage → Produção
+        run: node scripts/sync-stage-catalog-to-production.mjs
+
+      - name: Sincronizar empresas e projetos Stage → Produção sem exclusões
+        run: node scripts/sync-stage-catalog-to-production.mjs --apply --confirm=SYNC-STAGE-CATALOG-PRODUCTION --backup="backup-production-${GITHUB_SHA}.sql"
+
+      - name: Validar catálogo produtivo após sincronização
+        run: node scripts/sync-stage-catalog-to-production.mjs --verify
+
       - name: Gate final antes do deploy produtivo
         run: npm run test:release
 
@@ -123,7 +132,7 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-deploy -f description='Produção publicada, paridade visual e smokes concluídos com sucesso'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-deploy -f description='Produção publicada, catálogo sincronizado, paridade visual e smokes concluídos com sucesso'
 
       - name: Registrar falha do deploy produtivo
         if: failure()
@@ -142,6 +151,7 @@ jobs:
           echo "- Backup D1: obrigatório e retido por 30 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Catálogo Stage → Produção: empresas/projetos sincronizados uma única vez, sem exclusão de dados produtivos" >> "$GITHUB_STEP_SUMMARY"
           echo "- Paridade visual: validada no artefato e na URL pública" >> "$GITHUB_STEP_SUMMARY"
           echo "- Autenticação: API Token com fallback para Global API Key + e-mail quando disponível" >> "$GITHUB_STEP_SUMMARY"
           echo "- Smokes: Dual Clima/Madrid/OPR + governança multitenant + interface homologada" >> "$GITHUB_STEP_SUMMARY"
