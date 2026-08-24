@@ -80,22 +80,31 @@ if(!template.includes('const noLoginLogout=')){
   template=template.replace(logoutNeedle,logoutGuard);
 }
 
-// Remove visualmente o botão Sair nos hosts sem login, inclusive após re-render do componente.
-if(!template.includes('allamo-no-login-ui')){
-  const uiGuard=`<script id="allamo-no-login-ui">(function(){if(!/(^|\\.)(?:allamo-pmo-stage|allamo-pmo)\\.pages\\.dev$/i.test(location.hostname||''))return;function hide(){document.querySelectorAll('button,a').forEach(function(el){if((el.textContent||'').trim()==='Sair')el.style.display='none';});}hide();new MutationObserver(hide).observe(document.documentElement,{subtree:true,childList:true});})();<\\/script>`;
-  if(template.includes('</body>')) template=template.replace('</body>',uiGuard+'</body>');
-  else template+=uiGuard;
+// Remove visualmente o conjunto de autenticação nos hosts sem login:
+// botão Sair + bloco imediatamente anterior de nome/função/avatar. Mantém sino,
+// seletor de empresa e botão de instalação. A heurística atua somente ao redor
+// do botão Sair e evita esconder controles interativos vizinhos.
+const oldUiMarker='allamo-no-login-ui';
+if(!template.includes('allamo-no-login-identity-ui')){
+  const identityGuard=`<script id="allamo-no-login-identity-ui">(function(){if(!/(^|\\.)(?:allamo-pmo-stage|allamo-pmo)\\.pages\\.dev$/i.test(location.hostname||''))return;function interactive(el){if(!el)return true;var t=(el.tagName||'').toUpperCase();return /^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/.test(t)||!!el.querySelector('button,a,input,select,textarea');}function hide(){document.querySelectorAll('button,a').forEach(function(el){if((el.textContent||'').trim()!=='Sair')return;var prev=el.previousElementSibling;el.style.display='none';var hidden=0;while(prev&&hidden<2){var candidate=prev;prev=prev.previousElementSibling;if(interactive(candidate))continue;var txt=(candidate.textContent||'').trim();var hasText=txt.length>0;var rect=candidate.getBoundingClientRect?candidate.getBoundingClientRect():{width:0,height:0};var avatarLike=!hasText&&rect.width>0&&rect.width<=64&&rect.height>0&&rect.height<=64;if(hasText||avatarLike){candidate.style.display='none';candidate.setAttribute('data-allamo-hidden-identity','1');hidden++;}}});}hide();new MutationObserver(hide).observe(document.documentElement,{subtree:true,childList:true});})();<\\/script>`;
+  if(template.includes('</body>')) template=template.replace('</body>',identityGuard+'</body>');
+  else template+=identityGuard;
+}
+// Remove o guard antigo, se ainda estiver embutido, para evitar observers duplicados.
+if(template.includes(`<script id="${oldUiMarker}">`)){
+  template=template.replace(new RegExp(`<script id="${oldUiMarker}">[\\s\\S]*?<\\\\/script>`,'g'),'');
 }
 
 if(!template.includes("role:'pmo', screen:'app'")) throw new Error('Frontend ainda não abre direto como PMO.');
 if(!template.includes("? 'app' : 'login'")) throw new Error('Estado inicial ainda pode apontar para login nos hosts oficiais.');
 if(!template.includes("? true : false")) throw new Error('Modo live sem login não foi ativado.');
 if(!template.includes('const noLoginLogout=')) throw new Error('Logout ainda pode levar para autenticação.');
-if(!template.includes('allamo-no-login-ui')) throw new Error('Botão Sair não foi neutralizado visualmente.');
+if(!template.includes('allamo-no-login-identity-ui')) throw new Error('Identidade visual do usuário ainda não foi neutralizada.');
+if(!template.includes('data-allamo-hidden-identity')) throw new Error('Guard de nome/avatar não foi aplicado.');
 
 const serialized=JSON.stringify(template).replace(/<\//g,'<\\u002F');
 JSON.parse(serialized);
 html=html.slice(0,jsonStart)+serialized+html.slice(jsonEnd);
 fs.writeFileSync(indexFile,html);
 
-console.log('OK: login desativado nos hosts oficiais do Portal PMO; abertura direta como PMO e logout neutralizado.');
+console.log('OK: login desativado nos hosts oficiais; abertura direta como PMO e cabeçalho sem Sair/nome/avatar.');
