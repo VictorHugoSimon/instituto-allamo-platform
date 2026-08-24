@@ -10,6 +10,7 @@ const redirectFile=path.join(deployDir,'config.json');
 const configFile=path.join(root,'wrangler.stage.toml');
 
 const STAGE_PROJECT='allamo-pmo-stage';
+const STAGE_PRODUCTION_BRANCH='develop';
 const WRANGLER_VERSION='4.124.0';
 const commitSha=String(process.env.GITHUB_SHA||execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'})).trim();
 
@@ -27,13 +28,15 @@ fs.writeFileSync(redirectFile,JSON.stringify({configPath:'../../wrangler.stage.t
 
 console.log('Configuração de deploy: STAGE -> wrangler.stage.toml');
 console.log('Projeto Cloudflare Pages: '+STAGE_PROJECT);
-console.log('Destino: produção canônica do projeto de STAGE (sem --branch de preview)');
+console.log('Production branch do projeto Stage: '+STAGE_PRODUCTION_BRANCH);
+console.log('Destino: produção canônica do projeto de STAGE');
 console.log('Commit: '+commitSha);
 
 const wranglerArgs=[
   `wrangler@${WRANGLER_VERSION}`,
   'pages','deploy','public',
   '--project-name',STAGE_PROJECT,
+  '--branch',STAGE_PRODUCTION_BRANCH,
   '--commit-hash',commitSha,
   '--commit-dirty=true'
 ];
@@ -78,4 +81,4 @@ if(exitCode!==0){
   process.exit(exitCode);
 }
 
-console.log('OK: deploy canônico de STAGE concluído. O redirecionador local do Wrangler foi removido.');
+console.log('OK: deploy de STAGE enviado para a production branch develop. O fingerprint canônico deve ser validado em seguida.');
