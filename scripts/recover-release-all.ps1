@@ -38,82 +38,84 @@ try {
   Write-Host '============================================================' -ForegroundColor Cyan
   Write-Host 'INSTITUTO ÁLLAMO PMO - RECUPERAÇÃO + RELEASE COMPLETA' -ForegroundColor Cyan
   Write-Host 'Preserva a pasta local atual; opera em worktree limpo.' -ForegroundColor Cyan
-  Write-Host 'Fluxo: gates -> backup/reparo Stage -> deploy/smoke -> backup/reparo Prod -> deploy/smoke.' -ForegroundColor Cyan
+  Write-Host 'Fluxo: gates -> backup/schema/reparo Stage -> deploy/smoke -> backup/schema/reparo Prod -> deploy/smoke.' -ForegroundColor Cyan
   Write-Host '============================================================' -ForegroundColor Cyan
 
-  Write-Host '[1/14] Atualizando referências remotas sem tocar nos seus arquivos locais...'
+  Write-Host '[1/16] Atualizando referências remotas sem tocar nos seus arquivos locais...'
   Invoke-Checked 'git' @('fetch','origin','main','develop','--prune')
 
-  # Gate de igualdade de árvore sem capturar SHA em pipeline PowerShell.
-  # git diff --quiet retorna 0 quando as árvores são equivalentes,
-  # 1 quando há diferença e >1 em erro real de Git.
   Write-Host '> git diff --quiet origin/main origin/develop --' -ForegroundColor DarkGray
   & git diff --quiet origin/main origin/develop --
   $treeDiffExit = $LASTEXITCODE
-  if ($treeDiffExit -eq 1) {
-    throw 'main e develop não estão com a mesma árvore. Sincronize os branches antes da recuperação.'
-  }
-  if ($treeDiffExit -ne 0) {
-    throw "Git falhou ao comparar main/develop (exit $treeDiffExit)."
-  }
+  if ($treeDiffExit -eq 1) { throw 'main e develop não estão com a mesma árvore. Sincronize os branches antes da recuperação.' }
+  if ($treeDiffExit -ne 0) { throw "Git falhou ao comparar main/develop (exit $treeDiffExit)." }
   Write-Host 'Gate OK: main e develop possuem a mesma árvore.' -ForegroundColor Green
 
-  Write-Host '[2/14] Criando worktree limpo a partir de origin/main...'
+  Write-Host '[2/16] Criando worktree limpo a partir de origin/main...'
   Invoke-Checked 'git' @('worktree','add','--detach',$buildDir,'origin/main')
   $worktreeCreated = $true
   Push-Location $buildDir
   $insideWorktree = $true
 
-  Write-Host '[3/14] Instalando dependências travadas...'
+  Write-Host '[3/16] Instalando dependências travadas...'
   Invoke-Checked 'npm' @('ci')
 
-  Write-Host '[4/14] Gerando artefato e executando todos os gates...'
+  Write-Host '[4/16] Gerando artefato e executando todos os gates...'
   Invoke-Checked 'npm' @('run','build:work')
   Invoke-Checked 'npm' @('run','test:release')
 
-  Write-Host '[5/14] Validando autenticação Wrangler local...'
+  Write-Host '[5/16] Validando autenticação Wrangler local...'
   Invoke-Checked 'npx' @('wrangler@4.124.0','whoami')
 
   $stageBackup = Join-Path $backupDir ("backup-stage-before-core-recovery-" + $stamp + '.sql')
-  Write-Host '[6/14] Backup + dry-run do D1 Stage...'
+  Write-Host '[6/16] Backup + dry-run do D1 Stage...'
   Invoke-Checked 'npx' @('wrangler@4.124.0','d1','export','DB','--remote','--config','wrangler.stage.toml','--output',$stageBackup)
   if (-not (Test-Path $stageBackup) -or (Get-Item $stageBackup).Length -eq 0) { throw 'Backup do Stage não foi criado.' }
+  Invoke-Checked 'node' @('scripts/ensure-additive-schema.mjs','--env=stage')
   Invoke-Checked 'node' @('scripts/repair-core-tenants-portable.mjs','--env=stage')
 
-  Write-Host '[7/14] Aplicando reparo aditivo de Dual Clima, Madrid e OPR no Stage...'
+  Write-Host '[7/16] Aplicando schema aditivo no Stage...'
+  Invoke-Checked 'node' @('scripts/ensure-additive-schema.mjs','--env=stage','--apply','--confirm=APPLY-ADDITIVE-STAGE')
+
+  Write-Host '[8/16] Aplicando reparo aditivo de Dual Clima, Madrid e OPR no Stage...'
   Invoke-Checked 'node' @('scripts/repair-core-tenants-portable.mjs','--env=stage','--apply','--confirm=REPAIR-STAGE')
   Invoke-Checked 'node' @('scripts/repair-core-tenants-portable.mjs','--env=stage')
 
-  Write-Host '[8/14] Publicando exatamente o artefato validado no Stage...'
+  Write-Host '[9/16] Publicando exatamente o artefato validado no Stage...'
   Copy-Item -Force 'wrangler.stage.toml' 'wrangler.toml'
   Invoke-Checked 'npx' @('wrangler@4.124.0','pages','deploy','public','--project-name','allamo-pmo-stage','--branch','production','--commit-dirty=true')
 
-  Write-Host '[9/14] Smoke test Stage: empresas, projetos e isolamento público...'
+  Write-Host '[10/16] Smoke test Stage: empresas, projetos e isolamento público...'
   Invoke-Checked 'node' @('scripts/smoke-core-tenants.mjs','--base=https://allamo-pmo-stage.pages.dev','--env=stage')
 
   $prodBackup = Join-Path $backupDir ("backup-production-before-core-recovery-" + $stamp + '.sql')
-  Write-Host '[10/14] Backup + dry-run do D1 Produção...'
+  Write-Host '[11/16] Backup + dry-run do D1 Produção...'
   Invoke-Checked 'npx' @('wrangler@4.124.0','d1','export','DB','--remote','--config','wrangler.production.toml','--output',$prodBackup)
   if (-not (Test-Path $prodBackup) -or (Get-Item $prodBackup).Length -eq 0) { throw 'Backup de Produção não foi criado.' }
+  Invoke-Checked 'node' @('scripts/ensure-additive-schema.mjs','--env=production')
   Invoke-Checked 'node' @('scripts/repair-core-tenants-portable.mjs','--env=production')
 
-  Write-Host '[11/14] Aplicando reparo aditivo em Produção...'
+  Write-Host '[12/16] Aplicando schema aditivo em Produção...'
+  Invoke-Checked 'node' @('scripts/ensure-additive-schema.mjs','--env=production','--apply','--confirm=APPLY-ADDITIVE-PRODUCTION')
+
+  Write-Host '[13/16] Aplicando reparo aditivo em Produção...'
   Invoke-Checked 'node' @('scripts/repair-core-tenants-portable.mjs','--env=production','--apply','--confirm=REPAIR-PRODUCTION')
   Invoke-Checked 'node' @('scripts/repair-core-tenants-portable.mjs','--env=production')
 
-  Write-Host '[12/14] Gate final antes do deploy produtivo...'
+  Write-Host '[14/16] Gate final antes do deploy produtivo...'
   Invoke-Checked 'npm' @('run','test:release')
 
-  Write-Host '[13/14] Publicando o mesmo artefato em Produção...'
+  Write-Host '[15/16] Publicando o mesmo artefato em Produção...'
   Copy-Item -Force 'wrangler.production.toml' 'wrangler.toml'
   Invoke-Checked 'npx' @('wrangler@4.124.0','pages','deploy','public','--project-name','allamo-pmo','--branch','main','--commit-dirty=true')
 
-  Write-Host '[14/14] Smoke test Produção...'
+  Write-Host '[16/16] Smoke test Produção...'
   Invoke-Checked 'node' @('scripts/smoke-core-tenants.mjs','--base=https://allamo-pmo.pages.dev','--env=production')
 
   Write-Host ''
-  Write-Host 'SUCESSO: Stage e Produção recuperados e validados.' -ForegroundColor Green
+  Write-Host 'SUCESSO: Stage e Produção atualizados, recuperados e validados.' -ForegroundColor Green
   Write-Host 'Empresas obrigatórias: Dual Clima, Madrid e OPR.' -ForegroundColor Green
+  Write-Host 'Schema: GMUD + Governança validados de forma aditiva.' -ForegroundColor Green
   Write-Host "Backup Stage: $stageBackup"
   Write-Host "Backup Produção: $prodBackup"
   Write-Host "Log: $logFile"
