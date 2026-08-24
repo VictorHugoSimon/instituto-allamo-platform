@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
 const sync=fs.readFileSync('scripts/sync-stage-catalog-to-production.mjs','utf8');
+const portable=fs.readFileSync('scripts/sync-stage-catalog-to-production-portable.mjs','utf8');
 const workflow=fs.readFileSync('.github/workflows/deploy-production.yml','utf8');
 const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
 const must=(text,needle,label)=>{if(!text.includes(needle))throw new Error(`Ausente: ${label} (${needle})`)};
@@ -19,12 +20,23 @@ must(sync,"companyMap.set",'mapeamento Stage company_id para ID canônico produt
 must(sync,'validateParity(plan)','pós-validação de empresas e projetos');
 must(sync,'Produção-only é preservado','preservação de registros exclusivos de Produção');
 
-if(/\bDELETE\s+FROM\b/i.test(sync))throw new Error('Sincronizador contém DELETE FROM.');
-if(/\bDROP\s+TABLE\b/i.test(sync))throw new Error('Sincronizador contém DROP TABLE.');
-if(/\bTRUNCATE\s+TABLE\b/i.test(sync))throw new Error('Sincronizador contém TRUNCATE TABLE.');
+must(portable,"'--command',sql",'SELECT remoto usa endpoint de query do D1');
+must(portable,"const query=(config,sql)=>executeSqlCommand",'query corrigido é gerado pelo executor portátil');
+must(portable,"if(source.includes(\"const query=(config,sql)=>executeSqlFile\"))throw new Error('query() ainda aponta para --file.')",'self-test bloqueia regressão para --file');
+must(portable,"'--file',temp",'canal de escrita controlada do sincronizador original é preservado');
+must(portable,"--self-test",'executor possui self-test estático');
+must(portable,'stdout+(stderr?','parser tolera saída Wrangler em stdout/stderr');
+must(portable,'extractD1Json','parser tolerante de envelope JSON D1');
 
+for(const [label,text] of [['sincronizador',sync],['executor portátil',portable]]){
+  if(/\bDELETE\s+FROM\b/i.test(text))throw new Error(`${label} contém DELETE FROM.`);
+  if(/\bDROP\s+TABLE\b/i.test(text))throw new Error(`${label} contém DROP TABLE.`);
+  if(/\bTRUNCATE\s+TABLE\b/i.test(text))throw new Error(`${label} contém TRUNCATE TABLE.`);
+}
+
+must(workflow,'Validar executor portátil da sincronização de catálogo','self-test está na esteira produtiva');
 must(workflow,'Dry-run da sincronização de empresas e projetos Stage → Produção','dry-run está na esteira produtiva');
-must(workflow,'node scripts/sync-stage-catalog-to-production.mjs','sincronizador é executado pela esteira');
+must(workflow,'node scripts/sync-stage-catalog-to-production-portable.mjs','executor corrigido é executado pela esteira');
 must(workflow,'--apply --confirm=SYNC-STAGE-CATALOG-PRODUCTION','aplicação exige confirmação explícita');
 must(workflow,'--backup="backup-production-${GITHUB_SHA}.sql"','sincronização reutiliza backup obrigatório da release');
 must(workflow,'--verify','pós-validação roda antes do deploy');
@@ -32,4 +44,4 @@ must(workflow,'--verify','pós-validação roda antes do deploy');
 if(pkg.scripts['test:catalog-sync']!=='node scripts/validate-stage-production-catalog-sync.mjs')throw new Error('Script test:catalog-sync ausente ou incorreto.');
 if(!String(pkg.scripts['test:release']||'').includes('test:catalog-sync'))throw new Error('Gate de catálogo não faz parte de test:release.');
 
-console.log('OK: sincronização Stage → Produção é aditiva, idempotente, multitenant, com backup, conflitos bloqueados e sem exclusões.');
+console.log('OK: sincronização Stage → Produção usa --command nas leituras D1, permanece aditiva/idempotente, exige backup e confirmação e não possui exclusões.');
