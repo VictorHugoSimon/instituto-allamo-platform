@@ -54,8 +54,6 @@ function resolveNpxCli(){
 function runWrangler(args,{capture=true}={}){
   let r;
   if(process.platform==='win32'){
-    // Não passa por cmd.exe. O SQL de --command precisa chegar ao Wrangler como
-    // um único argv; cmd /c reinterpreta espaços, aspas e ponto-e-vírgula.
     const npxCli=resolveNpxCli();
     if(!npxCli) throw new Error('npx-cli.js não encontrado junto da instalação do Node/npm.');
     r=spawnSync(process.execPath,[npxCli,'--yes',...args],{
@@ -123,7 +121,7 @@ function verifyConfig(target){
 
 function collectEvidence(config){
   const companies=query(config,'SELECT id,name FROM companies ORDER BY name,id;');
-  const tables=query(config,"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;").map(r=>String(r.name||'')).filter(Boolean);
+  const tables=query(config,"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;").map(r=>String(r.name||'')).filter(Boolean).filter(name=>!name.startsWith('d1_')&&!name.startsWith('_cf_'));
   const refs=new Map();
   const add=(id,source)=>{
     const raw=String(id||'').trim(); if(!raw)return;
