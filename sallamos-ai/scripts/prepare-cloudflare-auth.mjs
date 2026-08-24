@@ -6,7 +6,8 @@ const rawToken = String(process.env.CLOUDFLARE_API_TOKEN ?? '');
 const rawKey = String(process.env.CLOUDFLARE_API_KEY ?? '');
 const rawEmail = String(process.env.CLOUDFLARE_EMAIL ?? '');
 const accountId = normalizeSimple(process.env.CLOUDFLARE_ACCOUNT_ID ?? '');
-const verifyOnline = String(process.env.CLOUDFLARE_AUTH_VERIFY ?? '') === '1';
+const workflowName = String(process.env.GITHUB_WORKFLOW ?? '');
+const verifyOnline = String(process.env.CLOUDFLARE_AUTH_VERIFY ?? '') === '1' || /^Release (?:STAGE|PRODUCTION)\b/i.test(workflowName);
 
 let token = normalizeToken(rawToken);
 let apiKey = normalizeSimple(rawKey).replace(/\s+/g, '');
