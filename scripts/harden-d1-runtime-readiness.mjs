@@ -8,18 +8,14 @@ if(text.includes(marker)){
   process.exit(0);
 }
 
-const needle=`async function handleApi(request, env, url) {
-  const path = url.pathname.replace(/^\\/api\\/?/, '');
-  const DB = env.DB;
-  try {`;
-
-if(!text.includes(needle)){
-  throw new Error('Ponto de injeção do handleApi/DB não encontrado; build interrompido para evitar patch inseguro.');
+const handleMarker='async function handleApi(request, env, url) {';
+const dbNeedle='  const DB = env.DB;';
+const occurrences=text.split(dbNeedle).length-1;
+if(!text.includes(handleMarker) || occurrences!==1){
+  throw new Error(`Contrato handleApi/DB inesperado (handle=${text.includes(handleMarker)}, ocorrencias_DB=${occurrences}); build interrompido para evitar patch inseguro.`);
 }
 
-const replacement=`async function handleApi(request, env, url) {
-  const path = url.pathname.replace(/^\\/api\\/?/, '');
-  const DB = env?.DB;
+const replacement=`  const DB = env?.DB;
   if (!DB || typeof DB.prepare !== 'function') {
     return new Response(JSON.stringify({
       error:'Banco temporariamente indisponível',
@@ -33,8 +29,7 @@ const replacement=`async function handleApi(request, env, url) {
         'retry-after':'1'
       }
     });
-  }
-  try {`;
+  }`;
 
-fs.writeFileSync(file,text.replace(needle,replacement));
+fs.writeFileSync(file,text.replace(dbNeedle,replacement));
 console.log('OK: API agora responde 503 retryable quando o binding D1 ainda não propagou, em vez de lançar TypeError/500.');
