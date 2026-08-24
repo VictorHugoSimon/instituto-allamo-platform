@@ -1,0 +1,24 @@
+name: Production UI Parity CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  production-ui-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Gerar artefato final
+        run: npm run build:work
+      - name: Validar paridade Stage -> Produção
+        run: node scripts/validate-production-ui-parity.mjs
+      - name: Validar bundle final
+        run: npm run test:bundle
