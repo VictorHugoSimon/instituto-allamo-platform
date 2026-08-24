@@ -16,9 +16,27 @@ const stageCount = async (table) => {
   try { const r = await DB.prepare('SELECT COUNT(*) AS n FROM ' + table).first(); return Number(r?.n || 0); }
   catch (e) { return null; }
 };
+const stageEnsureColumn = async (table, column, definition) => {
+  try {
+    const info = (await DB.prepare('PRAGMA table_info(' + table + ')').all()).results || [];
+    if (info.some(c => String(c.name || '') === column)) return true;
+    return await stageSafe('ALTER TABLE ' + table + ' ADD COLUMN ' + column + ' ' + definition);
+  } catch (e) {
+    console.warn('[stage-bootstrap] schema', table + '.' + column, String(e));
+    return false;
+  }
+};
 
 if (isAllamoStage) {
   await stageSafe("CREATE TABLE IF NOT EXISTS stage_runtime_flags (key TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')), detail TEXT)");
+
+  // Compatibilidade de schema legado. /api/releases e o cadastro de GMUD usam
+  // gmud.project; bases antigas podem não possuir a coluna. A evolução é aditiva,
+  // idempotente e preserva todas as linhas existentes.
+  const gmudProjectReady = await stageEnsureColumn('gmud', 'project', "TEXT NOT NULL DEFAULT ''");
+  if (gmudProjectReady) {
+    await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES (?,datetime('now'),?)", 'schema-gmud-project', 'Coluna gmud.project disponível para associação de GMUD a projeto');
+  }
 
   // Work Management nativo — apenas criação idempotente de estrutura, sem limpeza de dados.
   await stageSafe("CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, project TEXT, parent_id TEXT, sprint_id TEXT, item_type TEXT NOT NULL DEFAULT 'TASK', title TEXT NOT NULL, description TEXT DEFAULT '', acceptance_criteria TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'BACKLOG', priority TEXT NOT NULL DEFAULT 'Média', owner TEXT DEFAULT '', reporter TEXT DEFAULT '', start_date TEXT, due_date TEXT, story_points REAL, estimate_hours REAL, rank REAL NOT NULL DEFAULT 0, labels TEXT DEFAULT '[]', blocked INTEGER NOT NULL DEFAULT 0, blocked_reason TEXT DEFAULT '', created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), archived_at TEXT)");
@@ -53,6 +71,7 @@ if (isAllamoStage) {
       host: stageHost,
       data_persistence: DATA_PERSISTENCE_MODE,
       reset_disabled: true,
+      schema: { gmud_project: gmudProjectReady },
       counts: {
         companies: await stageCount('companies'),
         projects: await stageCount('projects'),
@@ -62,7 +81,12 @@ if (isAllamoStage) {
         plan_items: await stageCount('plan_items'),
         report_records: await stageCount('report_records'),
         report_versions: await stageCount('report_versions'),
-        report_roadmap_items: await stageCount('report_roadmap_items')
+        report_roadmap_items: await stageCount('report_roadmap_items'),
+        governance_events: await stageCount('governance_events'),
+        governance_agenda_items: await stageCount('governance_event_agenda_items'),
+        governance_stakeholders: await stageCount('governance_event_stakeholders'),
+        governance_work_links: await stageCount('governance_event_work_links'),
+        governance_decisions: await stageCount('governance_event_decisions')
       },
       reset_key: null,
       legacy_reset_key: legacyResetKey
