@@ -49,6 +49,7 @@ if(path==='public-client-projects'&&request.method==='GET'){
     const stats=statsByProject.get(String(p.id))||{};
     return {
       id:String(p.id),
+      company_id:String(p.company_id??canonicalId),
       name:p.name||p.title||'Projeto',
       status:p.status||'',
       badge:p.badge||'',
