@@ -13,10 +13,25 @@ if(!html.includes(newCur)) throw new Error('openReportEditor não está usando r
 // Garante que o editor continue salvando exatamente no mesmo escopo selecionado.
 if(!html.includes("await this.api('report?'+this.repQuery(), { method:'POST'")) throw new Error('submitReport não usa repQuery().');
 
-// Os handlers nativos são a fonte de verdade: botão principal e lápis por seção.
+// O bundle troca o DOM inteiro no unpack. O sc-camel-on-click pode existir no markup
+// e ainda assim perder a ligação com a instância. Publicamos uma ponte a partir do
+// próprio Component sempre que renderVals() roda; o fallback pós-unpack chama essa ponte.
+const bridgeMarker='window.__allamoOpenLegacyReportEditor';
+if(!html.includes(bridgeMarker)){
+  const renderStart=html.indexOf('renderVals() {');
+  if(renderStart<0) throw new Error('renderVals não encontrado para instalar ponte do editor.');
+  const stateNeedle='const st = this.state, role = st.role, accent = this.ACCENT();';
+  const stateAt=html.indexOf(stateNeedle,renderStart);
+  if(stateAt<0||stateAt-renderStart>1000) throw new Error('Ponto interno de renderVals não encontrado.');
+  const bridge="try { window.__allamoLegacyReportInstance=this; window.__allamoOpenLegacyReportEditor=(anchor='')=>this.openReportEditor(anchor); } catch(e){}\\\n    ";
+  html=html.slice(0,stateAt)+bridge+html.slice(stateAt);
+}
+
+// Os handlers nativos continuam presentes como primeira linha de defesa.
 for(const marker of ['openReportEditor:()=>this.openReportEditor()','edPillars:()=>this.openReportEditor(\'sec-tap\')','edSemaf:()=>this.openReportEditor(\'sec-kpis\')','edRiscos:()=>this.openReportEditor(\'sec-riscos\')','edProx:()=>this.openReportEditor(\'sec-prox\')']){
   if(!html.includes(marker)) throw new Error('Handler nativo de edição ausente: '+marker);
 }
+if(!html.includes(bridgeMarker)) throw new Error('Ponte pós-unpack do editor não instalada.');
 
 fs.writeFileSync(file,html);
-console.log('OK: edição do Status Report usa handlers nativos e carrega o rascunho pelo escopo empresa/projeto correto.');
+console.log('OK: edição do Status Report usa repKey, handlers nativos e ponte pós-unpack para botão/lápis.');
