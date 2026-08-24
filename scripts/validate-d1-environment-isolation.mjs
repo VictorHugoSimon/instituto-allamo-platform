@@ -14,17 +14,13 @@ const forbidEnvStage=(text,label)=>{if(/^\s*\[env\.stage\]\s*$/m.test(text))thro
 
 const STAGE_ID='72e2f6a0-3d22-4d65-a820-4a9b9ea88321';
 const PROD_ID='361c63ba-b9f8-409d-9a46-9609914da8b7';
-
 if(STAGE_ID===PROD_ID) throw new Error('Stage e Produção não podem usar o mesmo D1.');
 
-// O arquivo padrão no repositório é um guard. Ele só é sobrescrito dentro do worktree/runner
-// depois dos testes, imediatamente antes de uma operação remota.
 must(root,'name = "allamo-pmo-config-guard"','wrangler raiz em modo guard');
 forbid(root,'database_id','wrangler raiz não pode possuir UUID D1');
 forbid(root,'d1_databases','wrangler raiz não pode possuir binding D1');
 forbidEnvStage(root,'Cloudflare Pages não suporta ambiente nomeado stage');
 
-// Stage: arquivo dedicado e compatível com os únicos environments aceitos pelo Pages.
 must(stage,'name = "allamo-pmo-stage"','projeto Pages oficial de Stage');
 must(stage,'[env.production]','environment production do projeto Stage');
 must(stage,'[env.preview]','environment preview do projeto Stage');
@@ -33,12 +29,10 @@ must(stage,`database_id = "${STAGE_ID}"`,'UUID oficial do banco Stage');
 forbidEnvStage(stage,'ambiente stage inválido no Pages');
 forbid(stage,PROD_ID,'config de Stage contaminada com UUID de Produção');
 
-// Produção: top-level/production usam PROD; preview é explicitamente não produtivo.
 must(prod,'name = "allamo-pmo"','projeto Pages oficial de Produção');
 must(prod,'[env.production]','environment production do projeto de Produção');
 must(prod,'[env.preview]','environment preview explicitamente isolado');
 forbidEnvStage(prod,'ambiente stage inválido no Pages');
-
 const prodTop=prod.split('[env.production]')[0]||'';
 const afterProd=prod.split('[env.production]')[1]||'';
 const prodEnv=afterProd.split('[env.preview]')[0]||'';
@@ -53,8 +47,6 @@ must(previewEnv,'database_name = "allamo-pmo-stage"','preview usa D1 não produt
 must(previewEnv,`database_id = "${STAGE_ID}"`,'preview aponta para D1 não produtivo');
 forbid(previewEnv,PROD_ID,'preview do projeto de Produção nunca pode usar D1 produtivo');
 
-// Pages não aceita caminho customizado de config em pages deploy. A config dedicada é
-// materializada como wrangler.toml somente no worktree/runner efêmero, depois dos gates.
 must(stageCmd,'copy /Y wrangler.stage.toml wrangler.toml','Stage local materializa config no worktree');
 must(stageWorkflow,'cp wrangler.stage.toml wrangler.toml','Stage Actions materializa config no runner');
 must(stageCmd,'--project-name allamo-pmo-stage --branch production','Stage publica no projeto/branch corretos');
@@ -65,8 +57,9 @@ forbid(stageCmd,'--env stage','deploy local não pode usar env.stage');
 forbid(stageWorkflow,'--env stage','workflow não pode usar env.stage');
 forbid(stageCmd,'wrangler.production.toml','Stage local nunca materializa config de Produção');
 forbid(stageWorkflow,'wrangler.production.toml','Stage Actions nunca materializa config de Produção');
+must(stageWorkflow,'Backup obrigatório do D1 Stage','workflow Stage faz backup antes de evolução remota');
+must(stageWorkflow,'ensure-additive-schema.mjs --env=stage','workflow Stage usa schema com config D1 dedicada');
 
-// Produção exige main, confirmação explícita, backup antes do deploy e config exclusiva.
 must(prodCmd,'DEPLOY-PRODUCTION','produção local exige confirmação explícita');
 must(prodCmd,'if /I not "%BRANCH%"=="main"','produção local exige branch main');
 must(prodCmd,'copy /Y wrangler.production.toml wrangler.toml','produção local materializa config produtiva');
@@ -75,13 +68,17 @@ must(prodCmd,'--project-name allamo-pmo --branch main','produção local publica
 forbid(prodCmd,'pages deploy public --config','Pages Produção não usa --config customizado');
 forbid(prodCmd,'wrangler.stage.toml','produção local nunca materializa Stage');
 
-must(prodWorkflow,"inputs.confirm == 'DEPLOY-PRODUCTION'",'workflow produção exige confirmação');
+must(prodWorkflow,'push:','workflow produção possui gatilho automático');
+must(prodWorkflow,'branches: [main]','workflow produção automático somente em main');
+must(prodWorkflow,'workflow_dispatch:','workflow produção mantém fallback manual');
 must(prodWorkflow,"github.ref == 'refs/heads/main'",'workflow produção exige main');
+must(prodWorkflow,"inputs.confirm == 'DEPLOY-PRODUCTION'",'fallback manual exige confirmação');
 must(prodWorkflow,'cp wrangler.production.toml wrangler.toml','workflow produção materializa config produtiva');
-must(prodWorkflow,'d1 export DB --remote','workflow produção faz backup D1');
+must(prodWorkflow,'d1 export DB --remote --config wrangler.production.toml','workflow produção faz backup no D1 produtivo explícito');
 must(prodWorkflow,'actions/upload-artifact@v4','workflow preserva backup como artifact');
+must(prodWorkflow,'ensure-additive-schema.mjs --env=production','workflow produção usa schema com config D1 dedicada');
 must(prodWorkflow,'--project-name allamo-pmo --branch main','workflow produção publica projeto/branch corretos');
 forbid(prodWorkflow,'pages deploy public --config','workflow Pages Produção não usa --config customizado');
 forbid(prodWorkflow,'cp wrangler.stage.toml wrangler.toml','workflow produção nunca materializa config Stage');
 
-console.log('OK: Pages/D1 isolados — configs dedicadas são materializadas apenas em runners temporários; Stage e Produção têm gates, projetos e D1 distintos; Produção exige backup e main.');
+console.log('OK: Pages/D1 isolados — Stage automatizado em develop e Produção automatizada somente em main, com configs dedicadas, backup, schema aditivo e fallback manual.');

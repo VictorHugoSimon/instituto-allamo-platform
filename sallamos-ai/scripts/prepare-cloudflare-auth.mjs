@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import { appendFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const rawToken = String(process.env.CLOUDFLARE_API_TOKEN ?? '');
 const rawKey = String(process.env.CLOUDFLARE_API_KEY ?? '');
 const rawEmail = String(process.env.CLOUDFLARE_EMAIL ?? '');
 const accountId = normalizeSimple(process.env.CLOUDFLARE_ACCOUNT_ID ?? '');
+const workflowName = String(process.env.GITHUB_WORKFLOW ?? '');
+const verifyOnline = String(process.env.CLOUDFLARE_AUTH_VERIFY ?? '') === '1' || /^Release (?:STAGE|PRODUCTION)\b/i.test(workflowName);
 
 let token = normalizeToken(rawToken);
 let apiKey = normalizeSimple(rawKey).replace(/\s+/g, '');
@@ -22,51 +25,71 @@ if (tokenEqualsAccountId) {
   }
   token = '';
 }
-
-let authMode = '';
-if (token && tokenLooksLegacyKey) {
-  // Um Global API Key legado é hex/32 e não funciona no header Bearer esperado por CLOUDFLARE_API_TOKEN.
+if (tokenLooksLegacyKey) {
   if (email) {
     apiKey = apiKey || token;
     token = '';
-    authMode = 'api_key_email';
   } else {
     throw new Error('CLOUDFLARE_API_TOKEN tem formato hex de 32 caracteres e foi rejeitado como Bearer. Provável Global API Key: mova-o para CLOUDFLARE_API_KEY e configure CLOUDFLARE_EMAIL, ou substitua por um API Token moderno.');
   }
-} else if (token) {
-  authMode = 'api_token';
-} else if (explicitLegacyReady) {
-  authMode = 'api_key_email';
-} else {
+}
+
+mask(token);
+mask(apiKey);
+mask(email);
+
+const candidates = [];
+if (token) {
+  if (token.length < 20) throw new Error('CLOUDFLARE_API_TOKEN parece inválido: comprimento insuficiente');
+  candidates.push({ mode: 'api_token', env: { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_API_KEY: '', CLOUDFLARE_EMAIL: '' } });
+}
+if (apiKey && email) {
+  candidates.push({ mode: 'api_key_email', env: { CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_API_KEY: apiKey, CLOUDFLARE_EMAIL: email } });
+}
+if (!candidates.length) {
   throw new Error('Credencial Cloudflare incompleta: configure CLOUDFLARE_API_TOKEN ou o par CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL.');
 }
 
-if (authMode === 'api_token') {
-  if (token.length < 20) throw new Error('CLOUDFLARE_API_TOKEN parece inválido: comprimento insuficiente');
-  mask(token);
-  writeEnv('CLOUDFLARE_API_TOKEN', token);
-  writeEnv('CLOUDFLARE_API_KEY', '');
-  writeEnv('CLOUDFLARE_EMAIL', '');
-} else {
-  if (!apiKey || !email) throw new Error('Global API Key requer CLOUDFLARE_API_KEY e CLOUDFLARE_EMAIL');
-  mask(apiKey); mask(email);
-  writeEnv('CLOUDFLARE_API_TOKEN', '');
-  writeEnv('CLOUDFLARE_API_KEY', apiKey);
-  writeEnv('CLOUDFLARE_EMAIL', email);
+let selected = candidates[0];
+if (verifyOnline) {
+  selected = null;
+  for (const candidate of candidates) {
+    const check = verifyWrangler(candidate.env);
+    if (check.ok) { selected = candidate; break; }
+    console.warn(`[cloudflare-auth] ${candidate.mode} não autenticou; tentando próximo modo disponível.`);
+  }
+  if (!selected) {
+    throw new Error('Nenhuma credencial Cloudflare configurada autenticou no Wrangler. Atualize os GitHub Secrets antes do deploy.');
+  }
 }
+
+writeEnv('CLOUDFLARE_API_TOKEN', selected.env.CLOUDFLARE_API_TOKEN);
+writeEnv('CLOUDFLARE_API_KEY', selected.env.CLOUDFLARE_API_KEY);
+writeEnv('CLOUDFLARE_EMAIL', selected.env.CLOUDFLARE_EMAIL);
+writeEnv('CLOUDFLARE_ACCOUNT_ID', accountId);
 
 console.log(JSON.stringify({
   cloudflareAuthPreparation: 'ok',
-  authMode,
+  authMode: selected.mode,
+  verifiedWithWrangler: verifyOnline,
   accountIdLength: accountId.length,
   tokenProvided: Boolean(rawToken.trim()),
-  tokenLength: token ? token.length : null,
+  tokenLength: selected.mode === 'api_token' ? token.length : null,
   tokenLooksLegacyKey,
   tokenEqualsAccountId,
   apiKeyProvided: Boolean(rawKey.trim()),
-  emailProvided: Boolean(rawEmail.trim())
+  emailProvided: Boolean(rawEmail.trim()),
+  fallbackSupported: true
 }, null, 2));
 
+function verifyWrangler(authEnv) {
+  const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  const result = spawnSync(cmd, ['--yes', 'wrangler@4.124.0', 'whoami'], {
+    cwd: process.cwd(), encoding: 'utf8', shell: false, windowsHide: true,
+    env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: accountId, ...authEnv }
+  });
+  return { ok: !result.error && result.status === 0 };
+}
 function normalizeToken(value) {
   let v = stripQuotes(String(value).trim());
   v = v.replace(/^Bearer\s+/i, '').trim();
