@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   diagnose-stage-live:
@@ -17,12 +18,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Inspecionar execução da release atual
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: bd2ebbaee5c0cc8efa4eb04bb5deada044db0d30
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_ID=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${TARGET_SHA}&event=push&per_page=30" --jq '.workflow_runs[] | select(.name=="Release STAGE - Auto + Manual Gate") | .id' | head -n1)
+          echo "RUN_ID=${RUN_ID:-nao-encontrado}"
+          if [ -z "${RUN_ID:-}" ]; then exit 0; fi
+          echo '=== RUN ==='
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq '{id,name,event,status,conclusion,created_at,updated_at,run_attempt,html_url}'
+          echo '=== JOBS / STEPS ==='
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?per_page=100" --jq '.jobs[] | {id,name,status,conclusion,started_at,completed_at,steps:[.steps[]|{number,name,status,conclusion}]}'
+
       - name: Diagnosticar URL canônica do Stage
         shell: bash
         run: |
           set +e
           BASE='https://allamo-pmo-stage.pages.dev'
-          TARGET='08de5db7aaf4a461230e4103a2578fa44bdc914c'
+          TARGET='bd2ebbaee5c0cc8efa4eb04bb5deada044db0d30'
           echo '=== release.json ==='
           curl -sS -L --max-time 20 -D /tmp/release.headers "$BASE/release.json?_diag=$(date +%s)" -o /tmp/release.body
           cat /tmp/release.headers
