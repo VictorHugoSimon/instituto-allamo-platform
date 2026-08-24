@@ -30,10 +30,13 @@ must(index,'__allamoBootNonBlocking=true','First paint não bloqueante está no 
 must(index,'__allamoBootGuardStarted','Sincronização inicial auto-inicia');
 must(index,'allamo-boot-retry','Falha de conectividade permite retry');
 must(index,'Sincronizando dados','Status discreto de sincronização existe');
-must(index,'[allamo-load-initial-reset]','Primeira hidratação zera fotografia histórica uma única vez');
+must(index,'[allamo-load-initial-continuity]','Primeira hidratação preserva continuidade visual sem zerar a carteira');
+must(index,"sessionStorage.getItem('allamo_portfolio_snapshot_v2')",'Continuidade usa snapshot efêmero da aba');
+must(index,"sessionStorage.setItem('allamo_portfolio_snapshot_v2'",'Snapshot é renovado após dados live válidos');
 must(index,'BEGIN ALLAMO PUBLIC CLIENT PWA RUNTIME','PWA público tenant-safe está no artefato');
 if(index.includes('body{visibility:hidden!important}'))throw new Error('Artefato final ainda bloqueia o body durante carregamento.');
 if(index.includes('[allamo-live-reset] nunca renderizar fotografia demo durante fetch'))throw new Error('Refresh recorrente ainda pode zerar a tela inteira.');
+if(index.includes('[allamo-load-initial-reset]'))throw new Error('Primeira hidratação ainda zera a carteira e pode causar flicker vazio/cheio.');
 
 const build=String(pkg.scripts['build:work']);
 const orderedSteps=[
@@ -56,4 +59,4 @@ for(const step of orderedSteps){
   if(pos<=previous)throw new Error(`Ordem inválida no build próximo de: ${step}`);
   previous=pos;
 }
-console.log('OK: cache, sessão, Stage sem login isolado, boot live, BFCache, Service Worker, PWA multitenant e matrizes visuais revalidam sem exibir dados demo.');
+console.log('OK: cache, sessão, continuidade visual da carteira, Stage sem login, boot live, BFCache, Service Worker, PWA multitenant e matrizes visuais revalidam sem exibir dados demo.');
