@@ -44,6 +44,50 @@ function sanitizeArrayField(text,name){
   return {text:text.slice(0,arrStart)+'[]'+text.slice(arrEnd+1),changed:true};
 }
 
+// Builds antigos podiam deixar este marcador no public/index.html local. Como os
+// artefatos public/* são gerados e podem permanecer modificados entre pulls no
+// Windows, o build precisa migrar o bloco legado em vez de simplesmente falhar.
+function removeLegacyInitialReset(text){
+  const marker='[allamo-load-initial-reset]';
+  let out=text,changed=false,guard=0;
+  while(out.includes(marker)){
+    if(++guard>8)throw new Error('Múltiplos resets legados inesperados no loadData.');
+    const markerPos=out.indexOf(marker);
+    let blockStart=out.lastIndexOf('/*',markerPos);
+    if(blockStart<0)blockStart=out.lastIndexOf('\n',markerPos)+1;
+    const ifPos=out.indexOf('if',markerPos);
+    const braceStart=ifPos>=0?out.indexOf('{',ifPos):-1;
+    if(ifPos<0||braceStart<0||ifPos-markerPos>320){
+      const lineEnd=out.indexOf('\n',markerPos);
+      out=out.slice(0,blockStart)+out.slice(lineEnd<0?out.length:lineEnd+1);
+      changed=true;
+      continue;
+    }
+    let depth=0,quote='',escape=false,braceEnd=-1;
+    for(let i=braceStart;i<out.length;i++){
+      const ch=out[i];
+      if(quote){
+        if(escape){escape=false;continue;}
+        if(ch==='\\'){escape=true;continue;}
+        if(ch===quote)quote='';
+        continue;
+      }
+      if(ch==='\''||ch==='"'||ch==='`'){quote=ch;continue;}
+      if(ch==='{')depth++;
+      else if(ch==='}'){
+        depth--;
+        if(depth===0){braceEnd=i;break;}
+      }
+    }
+    if(braceEnd<0)throw new Error('Reset inicial legado sem fechamento.');
+    let after=braceEnd+1;
+    while(after<out.length&&/[; \t]/.test(out[after]))after++;
+    out=out.slice(0,blockStart)+out.slice(after);
+    changed=true;
+  }
+  return {text:out,changed};
+}
+
 for(const field of ['companies','projects','issues','viradas','docs','users']){
   const r=sanitizeArrayField(template,field);
   template=r.text;
@@ -70,6 +114,8 @@ const newLoadStart=template.indexOf('  async loadData() {');
 const roleStart=template.indexOf('  roleName(',newLoadStart);
 if(newLoadStart<0||roleStart<0)throw new Error('Limites de loadData não encontrados.');
 let load=template.slice(newLoadStart,roleStart);
+const legacy=removeLegacyInitialReset(load);
+load=legacy.text;
 const companyNeedle='const c = this.state.company;';
 const initialMarker='[allamo-load-initial-continuity]';
 if(!load.includes(initialMarker)){
@@ -99,4 +145,4 @@ const serialized=JSON.stringify(template).replace(/<\//gi,'<\\u002F');
 JSON.parse(serialized);
 html=html.slice(0,start)+serialized+html.slice(end);
 fs.writeFileSync(file,html);
-console.log('OK: demo removida no build; carteira/projetos preservam continuidade visual e o D1 continua sendo a fonte live.');
+console.log('OK: demo removida no build; artefato legado autocorrigido; carteira/projetos preservam continuidade visual e o D1 continua sendo a fonte live.');
