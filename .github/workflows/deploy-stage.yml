@@ -67,10 +67,13 @@ jobs:
       - name: Preflight Cloudflare final
         run: npx wrangler@4.124.0 whoami
 
+      - name: Fixar develop como branch de produção do projeto STAGE
+        run: node scripts/ensure-stage-pages-production-branch.mjs
+
       - name: Registrar autenticação Cloudflare aprovada
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-cloudflare-auth -f description='Wrangler autenticado no Cloudflare'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-cloudflare-auth -f description='Wrangler autenticado e production_branch do Stage validado'
 
       - name: Backup obrigatório do D1 Stage
         run: npx wrangler@4.124.0 d1 export DB --remote --config wrangler.stage.toml --output="backup-stage-${GITHUB_SHA}.sql"
@@ -104,10 +107,10 @@ jobs:
       - name: Registrar configuração Stage validada
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração, backup e schema de Stage validados'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração, backup, schema e tenants de Stage validados'
 
       - name: Publicar exatamente o artefato validado no STAGE canônico
-        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --commit-hash "$GITHUB_SHA" --commit-dirty=true
+        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch develop --commit-hash "$GITHUB_SHA" --commit-dirty=true
 
       - name: Confirmar que a URL canônica recebeu este commit
         run: node scripts/verify-stage-canonical-release.mjs --base=https://allamo-pmo-stage.pages.dev --sha=$GITHUB_SHA
@@ -141,6 +144,7 @@ jobs:
           echo "- Motivo: ${{ inputs.reason || github.event.head_commit.message }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deploy automático por merge em develop: ATIVO" >> "$GITHUB_STEP_SUMMARY"
           echo "- Destino canônico: https://allamo-pmo-stage.pages.dev" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Production branch do projeto Stage: develop (validada via API Cloudflare)" >> "$GITHUB_STEP_SUMMARY"
           echo "- Fingerprint pós-deploy: obrigatório" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório e retido por 14 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
