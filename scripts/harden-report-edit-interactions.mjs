@@ -16,8 +16,11 @@ if(!html.includes("await this.api('report?'+this.repQuery(), { method:'POST'")) 
 // O bundle troca o DOM inteiro no unpack. O sc-camel-on-click pode existir no markup
 // e ainda assim perder a ligação com a instância. Publicamos uma ponte a partir do
 // próprio Component sempre que renderVals() roda; o fallback pós-unpack chama essa ponte.
+// Atenção: o nome da função também aparece no script fallback; por isso a prova da
+// instalação precisa ser o marcador da instância, e não apenas o nome da função global.
+const instanceMarker='window.__allamoLegacyReportInstance=this';
 const bridgeMarker='window.__allamoOpenLegacyReportEditor';
-if(!html.includes(bridgeMarker)){
+if(!html.includes(instanceMarker)){
   const renderStart=html.indexOf('renderVals() {');
   if(renderStart<0) throw new Error('renderVals não encontrado para instalar ponte do editor.');
   const stateNeedle='const st = this.state, role = st.role, accent = this.ACCENT();';
@@ -31,6 +34,7 @@ if(!html.includes(bridgeMarker)){
 for(const marker of ['openReportEditor:()=>this.openReportEditor()','edPillars:()=>this.openReportEditor(\'sec-tap\')','edSemaf:()=>this.openReportEditor(\'sec-kpis\')','edRiscos:()=>this.openReportEditor(\'sec-riscos\')','edProx:()=>this.openReportEditor(\'sec-prox\')']){
   if(!html.includes(marker)) throw new Error('Handler nativo de edição ausente: '+marker);
 }
+if(!html.includes(instanceMarker)) throw new Error('Instância real do editor não foi publicada.');
 if(!html.includes(bridgeMarker)) throw new Error('Ponte pós-unpack do editor não instalada.');
 
 fs.writeFileSync(file,html);
