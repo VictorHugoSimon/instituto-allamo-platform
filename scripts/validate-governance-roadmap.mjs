@@ -1,0 +1,26 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(p,'utf8');
+const api=read('src/governance-roadmap-api.js'),pub=read('src/public-governance-roadmap-api.js'),ui=read('src/governance-roadmap-ui.js'),pui=read('src/public-governance-roadmap-ui.js'),schema=read('src/governance-schema-bootstrap.js'),migration=read('migrations/2026-08-23-governance-roadmap.sql'),worker=read('public/_worker.js'),index=read('public/index.html'),stage=read('src/stage-runtime-bootstrap.js');
+const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+for(const t of ['governance_events','governance_event_agenda_items','governance_event_stakeholders','governance_event_work_links','governance_event_decisions']){must(migration,`CREATE TABLE IF NOT EXISTS ${t}`,`Tabela ${t}`);must(schema,`CREATE TABLE IF NOT EXISTS ${t}`,`Bootstrap ${t}`)}
+if(/\b(?:DELETE\s+FROM|DROP\s+TABLE|TRUNCATE|DROP\s+DATABASE)\b/i.test(migration+'\n'+schema))throw new Error('Schema de governança contém operação destrutiva.');
+must(api,"String(p.company_id)!==String(companyId)",'Projeto validado contra empresa');
+must(api,"String(w.company_id)!==String(p.ev.company_id)",'Demanda validada contra empresa');
+must(api,"String(w.project_id||'')!==String(p.ev.project_id||'')",'Demanda validada contra projeto');
+must(api,"client_visible",'Visibilidade de cliente controlada no backend');
+must(pub,"client_visible=1",'API pública só retorna conteúdo visível');
+must(pub,"w.company_id=? AND w.project_id=?",'Demanda pública reforça tenant + projeto');
+must(pub,"context_locked:true",'Contexto público travado');
+must(ui,'Governança · Agendas & Reuniões','Roadmap interno exibe governança');
+must(ui,'Stakeholders / Participantes','UI interna possui stakeholders');
+must(ui,'Demandas / Ações relacionadas','UI interna possui demandas');
+must(pui,'Governança do projeto','Painel do cliente mostra governança');
+must(pui,'Próximas agendas e reuniões','Painel cliente mostra agenda futura');
+must(worker,'BEGIN ALLAMO GOVERNANCE ROADMAP','API interna injetada no Worker');
+must(worker,'BEGIN ALLAMO PUBLIC GOVERNANCE','API pública injetada no Worker');
+must(worker,'BEGIN ALLAMO GOVERNANCE SCHEMA','Schema injetado no Worker');
+must(stage,"governance_events: await stageCount('governance_events')",'Health do Stage inclui governança');
+const schemaPos=worker.indexOf('BEGIN ALLAMO GOVERNANCE SCHEMA'),healthPos=worker.indexOf('Health-check público APENAS no hostname de homologação.');
+if(schemaPos<0||healthPos<0||schemaPos>healthPos)throw new Error('Schema de governança precisa ser executado antes do stage-health.');
+must(index,'BEGIN ALLAMO GOVERNANCE ROADMAP UI','UI injetada no artefato final');
+console.log('OK: governança multitenant validada — schema antes do health, agendas, reuniões, áreas, stakeholders, decisões, demandas, cliente e persistência.');
