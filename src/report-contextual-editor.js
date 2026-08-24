@@ -1,45 +1,55 @@
 (()=>{
- if(window.__allamoContextualReportEditor)return;window.__allamoContextualReportEditor=true;
- const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
- const token=()=>{try{return JSON.parse(localStorage.getItem('allamo_session')||'{}').token||''}catch(_){return ''}};
- const ctx=()=>{const c=window.__allamoReportContext||{};return {company:String(c.company||''),project:String(c.project||''),projectName:c.projectName||''}};
- const api=async(p,o={})=>{const r=await fetch('/api/'+p,{...o,headers:{'content-type':'application/json','authorization':'Bearer '+token(),...(o.headers||{})},cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Erro '+r.status);return d};
- const specs={
-  pillars:{label:'Pilares do projeto',path:'pillars',fields:[['name','Nome','text'],['desc','Descrição','textarea'],['tag','Tag / status','text']]},
-  semaphores:{label:'Painel de situação',path:'semaphores',fields:[['label','Indicador','text'],['state','Situação','text'],['desc','Descrição','textarea']]},
-  phases:{label:'Marcos e fases',path:'phases',fields:[['title','Fase','text'],['pct','Progresso / resumo','text']],nested:{path:'items',label:'Marcos',fields:[['name','Marco','text'],['tag','Status','text']]}},
-  raci:{label:'Matriz RACI',path:'raci',fields:[['atividade','Atividade','text'],['r','R','text'],['a','A','text'],['c','C','text'],['i','I','text']]},
-  tracks:{label:'Frentes de trabalho',path:'tracks',fields:[['owner','Responsável pela frente','text']],nested:{path:'items',label:'Itens da frente',fields:[['name','Item','text'],['st','Status','text'],['tag','Tag','text']]}},
-  risks:{label:'Matriz de riscos',path:'riskMatrix',fields:[['risco','Risco','text'],['prob','Probabilidade','text'],['impacto','Impacto','text'],['resp','Responsável','text'],['mitig','Mitigação','textarea']]},
-  next:{label:'Próximos passos',path:'next',fields:[['title','Próximo passo','text'],['desc','Descrição','textarea'],['i','Ordem','text']]},
-  methodology:{label:'Metodologia / fases',path:'methodology',fields:[['name','Fase','text'],['type','Tipo','text'],['st','Status','text']]}
- };
- function detect(button){const own=(button.textContent||'').trim().toLowerCase();if(!/editar report|editar tarefas\/fases|^✎$/.test(own)&&own!=='✎')return '';
-  let node=button;const texts=[];for(let i=0;i<7&&node;i++,node=node.parentElement){const t=(node.innerText||node.textContent||'').toLowerCase();if(t&&t.length<18000)texts.push(t)}const t=texts.join('\n');
-  if(/editar tarefas\/fases|marcos e fases|fases e principais marcos/.test(t))return 'phases';
-  if(/matriz raci/.test(t))return 'raci';
-  if(/frentes de trabalho|frentes \(allamo/.test(t))return 'tracks';
-  if(/próximos passos|proximos passos/.test(t))return 'next';
-  if(/matriz de risco|riscos e alertas/.test(t))return 'risks';
-  if(/metodologia de implantação|metodologia \(fases\)/.test(t))return 'methodology';
-  if(/painel de situação/.test(t))return 'semaphores';
-  if(/pilares do projeto/.test(t))return 'pillars';return '';
- }
- function modal(html){const m=document.createElement('div');m.className='rce-modal';m.innerHTML='<div class="rce-box">'+html+'</div>';document.body.appendChild(m);m.onclick=e=>{if(e.target===m)m.remove()};return m}
- function fieldHtml(item,key,label,type,index,prefix='rce'){const val=item?.[key]??'';return `<label>${esc(label)}${type==='textarea'?`<textarea data-rce="${esc(prefix)}:${index}:${esc(key)}" rows="3">${esc(val)}</textarea>`:`<input data-rce="${esc(prefix)}:${index}:${esc(key)}" value="${esc(val)}">`}</label>`}
- function renderList(m,spec,data){const arr=Array.isArray(data[spec.path])?JSON.parse(JSON.stringify(data[spec.path])):[];const host=m.querySelector('[data-rce-list]');
-  const draw=()=>{host.innerHTML=arr.length?arr.map((item,i)=>`<article class="rce-card"><div class="rce-card-head"><b>${esc(item[spec.fields[0]?.[0]]||`${spec.label} ${i+1}`)}</b><button type="button" data-rce-del="${i}">Remover</button></div><div class="rce-grid">${spec.fields.map(([k,l,t])=>fieldHtml(item,k,l,t,i)).join('')}</div>${spec.nested?nestedHtml(item,spec.nested,i):''}</article>`).join(''):'<div class="rce-empty">Nenhum item. Use “Adicionar”.</div>';bind()};
-  const nestedHtml=(item,nest,pi)=>{const aa=Array.isArray(item[nest.path])?item[nest.path]:[];return `<div class="rce-nested"><b>${esc(nest.label)}</b><div data-rce-nested-list="${pi}">${aa.map((x,j)=>`<div class="rce-sub"><div class="rce-grid">${nest.fields.map(([k,l,t])=>fieldHtml(x,k,l,t,j,`nested:${pi}`)).join('')}</div><button type="button" data-rce-nested-del="${pi}:${j}">Remover</button></div>`).join('')}</div><button type="button" data-rce-nested-add="${pi}">＋ ${esc(nest.label.replace(/s$/,''))}</button></div>`};
-  const bind=()=>{host.querySelectorAll('[data-rce]').forEach(el=>{el.oninput=()=>{const parts=el.dataset.rce.split(':');if(parts[0]==='nested'){const pi=Number(parts[1]),j=Number(parts[2]),key=parts[3];arr[pi][spec.nested.path][j][key]=el.value}else{const i=Number(parts[1]),key=parts[2];arr[i][key]=el.value}}});host.querySelectorAll('[data-rce-del]').forEach(b=>b.onclick=()=>{arr.splice(Number(b.dataset.rceDel),1);draw()});host.querySelectorAll('[data-rce-nested-add]').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.rceNestedAdd);arr[i][spec.nested.path]=Array.isArray(arr[i][spec.nested.path])?arr[i][spec.nested.path]:[];const x={};for(const [k] of spec.nested.fields)x[k]='';arr[i][spec.nested.path].push(x);draw()});host.querySelectorAll('[data-rce-nested-del]').forEach(b=>b.onclick=()=>{const [i,j]=b.dataset.rceNestedDel.split(':').map(Number);arr[i][spec.nested.path].splice(j,1);draw()})};
-  draw();return {get:()=>arr,add:()=>{const x={};for(const [k] of spec.fields)x[k]='';if(spec.nested)x[spec.nested.path]=[];arr.push(x);draw()}}
- }
- async function open(section){const c=ctx();if(!c.company||!c.project)return;const spec=specs[section];if(!spec)return;try{const r=await api('report?project='+encodeURIComponent(c.project));const data=JSON.parse(JSON.stringify(r?.data||{}));const m=modal(`<div class="rce-head"><div><small>EDIÇÃO DIRETA</small><h3>${esc(spec.label)}</h3><p>${esc(c.projectName||'Projeto')} · você continua na mesma área do Report.</p></div><button data-rce-close>×</button></div><div data-rce-list></div><div class="rce-foot"><button data-rce-add>＋ Adicionar</button><div><button data-rce-cancel>Cancelar</button><button class="primary" data-rce-save>Salvar alterações</button></div></div>`);const list=renderList(m,spec,data);m.querySelector('[data-rce-close]').onclick=m.querySelector('[data-rce-cancel]').onclick=()=>m.remove();m.querySelector('[data-rce-add]').onclick=()=>list.add();m.querySelector('[data-rce-save]').onclick=async()=>{const b=m.querySelector('[data-rce-save]');b.disabled=true;b.textContent='Salvando…';try{data[spec.path]=list.get();await api('report?project='+encodeURIComponent(c.project),{method:'POST',body:JSON.stringify(data)});m.remove();window.dispatchEvent(new CustomEvent('allamo:reports-changed'));window.dispatchEvent(new CustomEvent('allamo:data-changed'));if(window.AllamoActionFeedback)window.AllamoActionFeedback(`${spec.label} atualizado.`)}catch(err){b.disabled=false;b.textContent='Salvar alterações';alert(err.message)}}}catch(err){alert(err.message)}}
- document.addEventListener('click',e=>{const b=e.target?.closest?.('button');if(!b)return;const s=detect(b);if(!s)return;const txt=(b.textContent||'').trim();if(txt==='✎'&&!/Editar report|Editar tarefas\/fases/i.test(b.title||'')){
-   // Os lápis que já possuem editor específico do portal continuam usando o comportamento nativo.
-   if(['pillars','semaphores'].includes(s))return;
+  if(window.__allamoContextualReportEditor)return;
+  window.__allamoContextualReportEditor=true;
+
+  // Compatibilidade: o editor contextual NÃO captura mais cliques do Portal.
+  // Os botões/lápis nativos já possuem handlers próprios e precisam receber o evento original.
+  const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const map={
+    pillars:['pilares do projeto'],
+    semaphores:['painel de situacao'],
+    phases:['marcos e fases','fases e principais marcos','editar tarefas/fases'],
+    raci:['matriz raci'],
+    tracks:['frentes de trabalho'],
+    risks:['matriz de riscos','riscos e alertas'],
+    next:['proximos passos'],
+    methodology:['metodologia de implantacao','metodologia (fases)']
+  };
+
+  function visible(el){
+    if(!el||!el.isConnected)return false;
+    const r=el.getBoundingClientRect();
+    return r.width>0&&r.height>0;
   }
-  e.preventDefault();e.stopImmediatePropagation();open(s)},true);
- const css=`.rce-modal{position:fixed;inset:0;z-index:100020;background:#0008;display:flex;align-items:center;justify-content:center;padding:16px}.rce-box{width:min(900px,96vw);max-height:92vh;overflow:auto;background:#f7f7f5;border-radius:16px;padding:16px}.rce-head{display:flex;gap:12px;align-items:flex-start}.rce-head>div{flex:1}.rce-head small{font-size:10px;font-weight:900;color:#9a6b56}.rce-head h3{margin:3px 0}.rce-head p{margin:0;color:#667085;font-size:12px}.rce-head>button{border:0;background:#fff;border-radius:8px;font-size:20px;width:34px;height:34px;cursor:pointer}.rce-card{background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:12px;margin-top:10px}.rce-card-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.rce-card-head button,.rce-nested button,.rce-foot button{border:1px solid #d0d5dd;background:#fff;border-radius:8px;padding:7px 9px;cursor:pointer;font-weight:750}.rce-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:9px}.rce-grid label{font-size:11px;font-weight:750;color:#475467}.rce-grid input,.rce-grid textarea{display:block;width:100%;box-sizing:border-box;margin-top:4px;border:1px solid #d0d5dd;border-radius:8px;padding:8px;font:inherit}.rce-nested{margin-top:10px;padding-top:10px;border-top:1px solid #eef1f4}.rce-sub{padding:8px;background:#fafafa;border-radius:9px;margin-top:7px}.rce-foot{position:sticky;bottom:-16px;background:#f7f7f5;padding:12px 0 2px;display:flex;justify-content:space-between;gap:8px}.rce-foot>div{display:flex;gap:8px}.rce-foot .primary{background:#302f39;color:#fff;border-color:#302f39}.rce-empty{padding:18px;color:#98a2b3}@media(max-width:700px){.rce-modal{padding:0}.rce-box{width:100vw;height:100dvh;max-height:100dvh;border-radius:0}.rce-grid{grid-template-columns:1fr}.rce-foot{flex-direction:column}.rce-foot>div,.rce-foot button{width:100%}}`;
- const st=document.createElement('style');st.textContent=css;(document.head||document.documentElement).appendChild(st);
- window.AllamoContextualReportEditor={open};
+
+  function sectionButton(section){
+    const needles=map[section]||[];
+    const buttons=[...document.querySelectorAll('button')].filter(visible);
+    if(!section){
+      return buttons.find(b=>/editar report/i.test((b.textContent||'').trim()))||null;
+    }
+    return buttons.find(b=>{
+      const text=(b.textContent||'').trim();
+      if(text!=='✎'&&!/editar tarefas\/fases/i.test(text))return false;
+      let node=b;
+      for(let i=0;i<5&&node;i++,node=node.parentElement){
+        const t=norm(node.innerText||node.textContent||'');
+        if(needles.some(n=>t.includes(norm(n))))return true;
+      }
+      return false;
+    })||null;
+  }
+
+  function open(section=''){
+    const b=sectionButton(section);
+    if(!b){
+      console.warn('[report-contextual-editor] controle nativo não localizado',section);
+      return false;
+    }
+    // Não há listener global/capture aqui; o clique chega diretamente ao handler nativo do Portal.
+    b.click();
+    return true;
+  }
+
+  window.AllamoContextualReportEditor={open};
 })();
