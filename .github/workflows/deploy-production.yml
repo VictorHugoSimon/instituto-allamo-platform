@@ -1,19 +1,22 @@
-name: Release PRODUCTION - Manual Gate
+name: Release PRODUCTION - Auto Main + Manual Fallback
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Digite DEPLOY-PRODUCTION para liberar a publicação após homologação do Stage'
+        description: 'Digite DEPLOY-PRODUCTION para liberar a publicação manual de fallback'
         required: true
         type: string
       reason:
         description: 'Motivo / referência da homologação aprovada'
-        required: true
+        required: false
         type: string
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: allamo-pmo-production-release
@@ -21,10 +24,15 @@ concurrency:
 
 jobs:
   release-production:
-    if: ${{ inputs.confirm == 'DEPLOY-PRODUCTION' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.confirm == 'DEPLOY-PRODUCTION') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
+      - name: Marcar release produtiva em andamento
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=pending -f context=allamo/production-deploy -f description='Release de Produção em andamento'
+
       - name: Checkout da main homologada
         uses: actions/checkout@v4
 
@@ -43,7 +51,12 @@ jobs:
       - name: Gate consolidado da plataforma
         run: npm run test:release
 
-      - name: Preparar autenticação Cloudflare
+      - name: Registrar gates produtivos aprovados
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-gates -f description='Build e gate consolidado aprovados'
+
+      - name: Preparar e validar autenticação Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
@@ -51,20 +64,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
 
-      - name: Preflight Cloudflare
+      - name: Preflight Cloudflare final
         run: npx wrangler@4.124.0 whoami
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Materializar configuração exclusiva de Produção
-        run: |
-          cp wrangler.production.toml wrangler.toml
-          grep -F 'name = "allamo-pmo"' wrangler.toml
+      - name: Registrar autenticação Cloudflare aprovada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-cloudflare-auth -f description='Wrangler autenticado no Cloudflare'
 
       - name: Backup obrigatório do D1 produtivo
-        run: npx wrangler@4.124.0 d1 export DB --remote --output="backup-production-${GITHUB_SHA}.sql"
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler@4.124.0 d1 export DB --remote --config wrangler.production.toml --output="backup-production-${GITHUB_SHA}.sql"
 
       - name: Guardar backup da Produção
         uses: actions/upload-artifact@v4
@@ -74,36 +83,58 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Aplicar migration aditiva da Governança
-        run: npx wrangler@4.124.0 d1 execute DB --remote --file=migrations/2026-08-23-governance-roadmap.sql
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Dry-run do schema e dos tenants essenciais em Produção
+        run: |
+          node scripts/ensure-additive-schema.mjs --env=production
+          node scripts/repair-core-tenants-portable.mjs --env=production
 
-      - name: Validar schema de Governança no D1 produtivo
-        run: >-
-          npx wrangler@4.124.0 d1 execute DB --remote --command
-          "SELECT id FROM governance_events LIMIT 0;
-          SELECT id FROM governance_event_agenda_items LIMIT 0;
-          SELECT id FROM governance_event_stakeholders LIMIT 0;
-          SELECT id FROM governance_event_work_links LIMIT 0;
-          SELECT id FROM governance_event_decisions LIMIT 0;"
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Aplicar somente schema aditivo em Produção
+        run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
+
+      - name: Reparar tenants essenciais de forma idempotente em Produção
+        run: |
+          node scripts/repair-core-tenants-portable.mjs --env=production --apply --confirm=REPAIR-PRODUCTION
+          node scripts/repair-core-tenants-portable.mjs --env=production
+
+      - name: Gate final antes do deploy produtivo
+        run: npm run test:release
+
+      - name: Materializar configuração exclusiva de Produção
+        run: |
+          cp wrangler.production.toml wrangler.toml
+          grep -F 'name = "allamo-pmo"' wrangler.toml
 
       - name: Publicar exatamente o artefato validado em PRODUÇÃO
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo --branch main --commit-dirty=true
+
+      - name: Smoke dos tenants essenciais em Produção
+        run: node scripts/smoke-core-tenants.mjs --base=https://allamo-pmo.pages.dev --env=production
+
+      - name: Smoke de governança multitenant em Produção
+        run: node scripts/smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production
+
+      - name: Registrar sucesso do deploy produtivo
+        if: success()
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-deploy -f description='Produção publicada e smokes concluídos com sucesso'
+
+      - name: Registrar falha do deploy produtivo
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/production-deploy -f description='Release produtiva falhou; verificar último marco aprovado e backup'
 
       - name: Resumo da release
         if: always()
         run: |
           echo "### Release PRODUÇÃO" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Motivo: ${{ inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Branch obrigatória: main" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Backup D1: obrigatório antes de qualquer migration/deploy" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Governança: migration aditiva aplicada e 5 tabelas validadas antes do Pages deploy" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Config Cloudflare: wrangler.production.toml materializada temporariamente como wrangler.toml" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Produção continua com gate manual e exige homologação do Stage" >> "$GITHUB_STEP_SUMMARY"
-          echo "- D1 reset/migration destrutiva: NÃO EXECUTADO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Motivo: ${{ inputs.reason || github.event.head_commit.message }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy automático por push/merge em main: ATIVO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Workflow manual: disponível como fallback" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup D1: obrigatório e retido por 30 dias" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Autenticação: API Token com fallback para Global API Key + e-mail quando disponível" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smokes: Dual Clima/Madrid/OPR + governança multitenant" >> "$GITHUB_STEP_SUMMARY"
