@@ -29,6 +29,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Gerar artefato final antes dos gates integrados
+        run: npm run build:work
       - name: Validar contrato da sincronização
         run: npm run test:catalog-sync
       - name: Validar isolamento de ambientes
