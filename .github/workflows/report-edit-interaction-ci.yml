@@ -1,0 +1,26 @@
+name: Report Edit Interaction CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  report-edit-interaction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate report edit interactions
+        run: npm run test:report-edit
+      - name: Validate report project scope
+        run: npm run test:report-scope
+      - name: Validate tenant persistence
+        run: npm run test:platform
