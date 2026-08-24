@@ -42,7 +42,9 @@ jobs:
           node -e "const fs=require('fs');const A=Object.getPrototypeOf(async function(){}).constructor;new A('request','DB','url','path','json',fs.readFileSync('src/stage-runtime-bootstrap.js','utf8'));console.log('stage runtime fragment ok')"
           node --check public/_worker.js
           node --check public/sw.js
-          grep -q "awm-stage-20260821-1021" public/_worker.js
+          grep -Eq "const STAGE_BUILD = 'awm-[0-9a-f]{12}';" public/_worker.js
+          test -f "public/release-${GITHUB_SHA}.json"
+          grep -q "$GITHUB_SHA" "public/release-${GITHUB_SHA}.json"
           grep -q "clean-baseline-2026-08-21-v4" public/_worker.js
           grep -q "BEGIN ALLAMO WORK MANAGEMENT" public/_worker.js
           grep -q "BEGIN ALLAMO REPORT LIST" public/_worker.js

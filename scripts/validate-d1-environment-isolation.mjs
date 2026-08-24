@@ -6,6 +6,7 @@ const stage=read('wrangler.stage.toml');
 const prod=read('wrangler.production.toml');
 const stageCmd=read('scripts/deploy-stage-safe.cmd');
 const stageWorkflow=read('.github/workflows/deploy-stage.yml');
+const stageBranchGuard=read('scripts/ensure-stage-pages-production-branch.mjs');
 const prodCmd=read('scripts/deploy-production-safe.cmd');
 const prodWorkflow=read('.github/workflows/deploy-production.yml');
 const must=(text,needle,label)=>{if(!text.includes(needle))throw new Error(`Ausente: ${label} (${needle})`)};
@@ -47,10 +48,23 @@ must(previewEnv,'database_name = "allamo-pmo-stage"','preview usa D1 não produt
 must(previewEnv,`database_id = "${STAGE_ID}"`,'preview aponta para D1 não produtivo');
 forbid(previewEnv,PROD_ID,'preview do projeto de Produção nunca pode usar D1 produtivo');
 
+// Stage Pages: a branch git develop é também a production_branch do projeto Pages de homologação.
+// Isso elimina a ambiguidade do Wrangler em workspaces Git e garante atualização de allamo-pmo-stage.pages.dev.
+must(stageBranchGuard,"const project='allamo-pmo-stage'",'guard usa somente o projeto Stage');
+must(stageBranchGuard,"const desiredBranch='develop'",'guard fixa develop como production branch do Stage');
+must(stageBranchGuard,"pages/projects/${encodeURIComponent(project)}",'guard consulta o projeto Pages via API oficial');
+must(stageBranchGuard,"request('PATCH',{production_branch:desiredBranch})",'guard corrige production_branch quando divergente');
+forbid(stageBranchGuard,'allamo-pmo.pages.dev','guard de Stage não toca a URL de Produção');
+
 must(stageCmd,'copy /Y wrangler.stage.toml wrangler.toml','Stage local materializa config no worktree');
 must(stageWorkflow,'cp wrangler.stage.toml wrangler.toml','Stage Actions materializa config no runner');
-must(stageCmd,'--project-name allamo-pmo-stage --branch production','Stage publica no projeto/branch corretos');
-must(stageWorkflow,'--project-name allamo-pmo-stage --branch production','workflow Stage publica no projeto/branch corretos');
+must(stageCmd,'pages deploy public --project-name allamo-pmo-stage --branch develop --commit-hash','Stage local publica explicitamente na production branch develop');
+must(stageWorkflow,'pages deploy public --project-name allamo-pmo-stage --branch develop --commit-hash','workflow Stage publica explicitamente na production branch develop');
+forbid(stageCmd,'--branch production','Stage local não pode usar branch preview incorreta');
+forbid(stageWorkflow,'--branch production','workflow Stage não pode usar branch preview incorreta');
+must(stageWorkflow,'ensure-stage-pages-production-branch.mjs','workflow confirma/corrige production_branch antes do deploy');
+must(stageCmd,'verify-stage-canonical-release.mjs','Stage local comprova que a URL canônica recebeu o commit');
+must(stageWorkflow,'verify-stage-canonical-release.mjs','workflow Stage comprova que a URL canônica recebeu o commit');
 forbid(stageCmd,'pages deploy public --config','Pages Stage não usa --config customizado');
 forbid(stageWorkflow,'pages deploy public --config','workflow Pages Stage não usa --config customizado');
 forbid(stageCmd,'--env stage','deploy local não pode usar env.stage');
@@ -59,6 +73,7 @@ forbid(stageCmd,'wrangler.production.toml','Stage local nunca materializa config
 forbid(stageWorkflow,'wrangler.production.toml','Stage Actions nunca materializa config de Produção');
 must(stageWorkflow,'Backup obrigatório do D1 Stage','workflow Stage faz backup antes de evolução remota');
 must(stageWorkflow,'ensure-additive-schema.mjs --env=stage','workflow Stage usa schema com config D1 dedicada');
+must(stageWorkflow,'repair-core-tenants-portable.mjs --env=stage --apply --confirm=REPAIR-STAGE','workflow Stage repara tenants essenciais de modo idempotente');
 
 must(prodCmd,'DEPLOY-PRODUCTION','produção local exige confirmação explícita');
 must(prodCmd,'if /I not "%BRANCH%"=="main"','produção local exige branch main');
@@ -81,4 +96,4 @@ must(prodWorkflow,'--project-name allamo-pmo --branch main','workflow produção
 forbid(prodWorkflow,'pages deploy public --config','workflow Pages Produção não usa --config customizado');
 forbid(prodWorkflow,'cp wrangler.stage.toml wrangler.toml','workflow produção nunca materializa config Stage');
 
-console.log('OK: Pages/D1 isolados — Stage automatizado em develop e Produção automatizada somente em main, com configs dedicadas, backup, schema aditivo e fallback manual.');
+console.log('OK: Pages/D1 isolados — Stage fixa develop como production branch do projeto de homologação, valida fingerprint canônico e preserva D1; Produção permanece governada em main.');

@@ -39,10 +39,16 @@ must(milestoneUi,'✎ Descrição / subdescrição','Fase expõe edição de des
 must(milestoneUi,'📎 Anexar arquivo','Fase expõe anexo');
 must(milestoneUi,'＋ Link','Fase expõe link');
 must(milestoneFallbackUi,'usa R2 quando disponível e D1 automaticamente','UI não exige cartão/R2');
-must(contextual,'window.AllamoContextualReportEditor={open};','Ponte contextual presente');
-must(contextual,'b.click();','Editor contextual delega ao handler nativo');
-forbid(contextual,/stopImmediatePropagation\s*\(/,'editor contextual não pode sequestrar clique nativo');
-forbid(contextual,/document\.addEventListener\(['"]click['"]/,'editor contextual não pode capturar cliques globais');
+
+// Edição contextual: preserva contrato legado, mas possui fallback pós-unpack restrito
+// aos controles reconhecidos do Status Report. Cliques alheios nunca são interceptados.
+must(contextual,'window.AllamoContextualReportEditor={open};','Contrato contextual legado preservado');
+must(contextual,'b.click();','Fallback secundário ainda delega ao handler nativo sem ponte');
+must(contextual,"document.addEventListener('click'",'Fallback pós-unpack de edição presente');
+must(contextual,'anchorForButton','Fallback identifica somente controles de edição conhecidos');
+must(contextual,"if(anchor===null)return",'Clique não relacionado não é capturado');
+must(contextual,"if(typeof window.__allamoOpenLegacyReportEditor!=='function')return",'Sem ponte real o clique permanece nativo');
+must(contextual,'stopImmediatePropagation','Com ponte ativa evita dupla abertura');
 
 must(publicClientApi,"path==='public-client-projects'",'API pública dedicada da empresa');
 must(publicClientApi,'WHERE p.company_id=?','Projetos públicos filtrados pela empresa');
@@ -68,8 +74,10 @@ must(worker,'BEGIN ALLAMO TENANT FILES','API de arquivos no Worker final');
 must(worker,'tenant_file_chunks','Fallback D1 no Worker final');
 must(index,'allamo-public-client-portal','Portal público segregado no artefato final');
 must(index,'Instalar aplicativo','Botão de instalar no artefato final');
-must(index,'window.AllamoContextualReportEditor={open};','Ponte contextual no artefato final');
+must(index,'window.AllamoContextualReportEditor={open};','Contrato contextual no artefato final');
+must(index,'window.__allamoLegacyReportInstance=this','Instância real do editor publicada no bundle');
+must(index,'window.__allamoOpenLegacyReportEditor','Ponte direta para openReportEditor publicada');
 must(index,'const reportKey = this.repKey();','Editor final usa escopo empresa/projeto correto');
 must(index,'Descrição / subdescrição','Controles de marco no artefato final');
 must(index,'window.__allamoBootSeen','Boot guard final usa APIs críticas');
-console.log('OK: multitenancy, portal público schema-compatible por projetos, Reports segregados, PWA, arquivos R2/D1, fases/anexos, edição nativa e first paint validados.');
+console.log('OK: multitenancy, portal público, Reports segregados, PWA, arquivos R2/D1, fases/anexos, edição pós-unpack segura e first paint validados.');

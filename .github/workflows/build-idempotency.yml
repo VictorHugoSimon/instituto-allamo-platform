@@ -24,7 +24,9 @@ jobs:
       - name: Validate final artifact
         run: |
           node --check public/_worker.js
-          grep -q "awm-stage-20260821-1021" public/_worker.js
+          grep -Eq "const STAGE_BUILD = 'awm-[0-9a-f]{12}';" public/_worker.js
+          test -f "public/release-${GITHUB_SHA}.json"
+          grep -q "$GITHUB_SHA" "public/release-${GITHUB_SHA}.json"
           grep -q "clean-baseline-2026-08-21-v4" public/_worker.js
           grep -q "Reports & Roadmap" public/index.html
           if grep -q "{label:'Projetos', value:'7'" public/index.html; then exit 1; fi
