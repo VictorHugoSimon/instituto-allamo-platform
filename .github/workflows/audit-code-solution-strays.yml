@@ -1,0 +1,82 @@
+name: Audit Code Solution Strays in Allamo Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-code-solution-strays.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: audit-code-solution-strays-allamo
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Cloudflare account metadata only
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT_ID"
+          test -n "$TOKEN"
+          mkdir -p /tmp/cs-strays
+
+          api() {
+            local name="$1" url="$2"
+            local http
+            http=$(curl -sS --max-time 30 -o "/tmp/cs-strays/${name}.json" -w '%{http_code}' \
+              -H "Authorization: Bearer ${TOKEN}" "$url" || true)
+            echo "$http" > "/tmp/cs-strays/${name}.http"
+          }
+
+          api account "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}"
+          api pages "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/pages/projects"
+          api d1 "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/d1/database?per_page=100"
+          api kv "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces?per_page=100"
+          api workers "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts"
+          api zones "https://api.cloudflare.com/client/v4/zones?account.id=${ACCOUNT_ID}&per_page=100"
+
+      - name: Persist Code Solution-only matches
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const read=(n)=>{try{return JSON.parse(fs.readFileSync(`/tmp/cs-strays/${n}.json`,'utf8'))}catch{return {}}};
+          const http=(n)=>Number((()=>{try{return fs.readFileSync(`/tmp/cs-strays/${n}.http`,'utf8').trim()}catch{return '0'}})());
+          const safeErrors=(x)=>Array.isArray(x?.errors)?x.errors.map(v=>({code:v.code,message:String(v.message||'').slice(0,220)})):[];
+          const arr=(x)=>Array.isArray(x?.result)?x.result:[];
+          const hasCS=(...vals)=>vals.some(v=>/code[- ]?solution|codesolution|LEADS_KV/i.test(String(v||'')));
+          const knownIds=new Set(['5f2a71bc-e3bf-4063-b52d-48ad11132e1d','8308fb9fe843456c84afa724769c00b9','68188e983aeadea279bf680ccfd260c9']);
+          const account=read('account'),pages=read('pages'),d1=read('d1'),kv=read('kv'),workers=read('workers'),zones=read('zones');
+          const out={
+            checkedAt:new Date().toISOString(),sourceCommit:process.env.SOURCE_SHA,accountId:process.env.ACCOUNT_ID,
+            account:{http:http('account'),success:account.success===true,name:account?.result?.name||''},
+            pages:{http:http('pages'),success:pages.success===true,errors:safeErrors(pages),items:arr(pages).filter(x=>hasCS(x.name,x.subdomain)||knownIds.has(String(x.id||''))).map(x=>({name:x.name||'',subdomain:x.subdomain||''}))},
+            d1:{http:http('d1'),success:d1.success===true,errors:safeErrors(d1),items:arr(d1).filter(x=>hasCS(x.name)||knownIds.has(String(x.uuid||x.id||''))).map(x=>({name:x.name||'',uuid:x.uuid||x.id||''}))},
+            kv:{http:http('kv'),success:kv.success===true,errors:safeErrors(kv),items:arr(kv).filter(x=>hasCS(x.title)||knownIds.has(String(x.id||''))).map(x=>({title:x.title||'',id:x.id||''}))},
+            workers:{http:http('workers'),success:workers.success===true,errors:safeErrors(workers),items:arr(workers).filter(x=>hasCS(x.id,x.name)).map(x=>({name:x.id||x.name||''}))},
+            zones:{http:http('zones'),success:zones.success===true,errors:safeErrors(zones),items:arr(zones).filter(x=>hasCS(x.name)||knownIds.has(String(x.id||''))).map(x=>({name:x.name||'',id:x.id||'',status:x.status||''}))}
+          };
+          out.totalMatches=out.pages.items.length+out.d1.items.length+out.kv.items.length+out.workers.items.length+out.zones.items.length;
+          fs.mkdirSync('docs',{recursive:true});
+          fs.writeFileSync('docs/code-solution-strays-audit.json',JSON.stringify(out,null,2)+'\n');
+          NODE
+
+          git config user.name "Allamo Cloudflare Audit Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/code-solution-strays-audit.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: record Code Solution stray-resource audit"
+          git pull --rebase origin main
+          git push origin HEAD:main
