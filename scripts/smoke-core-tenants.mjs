@@ -19,6 +19,17 @@ async function get(path){
   throw new Error(`${path} falhou: ${last}`);
 }
 
+async function assertNoLoginDeleteBlocked(){
+  const path='/api/companies/__allamo_smoke_never_exists__';
+  const r=await fetch(base+path,{method:'DELETE',headers:{'cache-control':'no-cache','pragma':'no-cache'},cache:'no-store'});
+  const text=await r.text();
+  let data={};try{data=JSON.parse(text)}catch{}
+  if(r.status!==403||data.code!=='authenticated_session_required'){
+    throw new Error(`Proteção destrutiva sem login inválida: DELETE retornou HTTP ${r.status} / ${data.code||text.slice(0,120)}`);
+  }
+  return {http:r.status,code:data.code};
+}
+
 const required=[['dualclima','Dual Clima'],['madrid','Madrid'],['opr','OPR']];
 const companies=await get('/api/companies');
 if(!Array.isArray(companies)) throw new Error('/api/companies não retornou array.');
@@ -46,6 +57,8 @@ for(const [token,name] of required){
   publicResults.push({token,name,id:cid,projects:(data.projects||[]).length});
 }
 
+const destructiveGuard=await assertNoLoginDeleteBlocked();
+
 console.log(JSON.stringify({
   ok:true,
   environment,
@@ -53,5 +66,6 @@ console.log(JSON.stringify({
   companies:required.map(([,name])=>name),
   company_count:companies.length,
   project_count:projects.length,
-  public_contexts:publicResults
+  public_contexts:publicResults,
+  destructive_guard:destructiveGuard
 },null,2));
