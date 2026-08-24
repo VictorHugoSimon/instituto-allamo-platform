@@ -106,8 +106,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração, backup e schema de Stage validados'
 
-      - name: Publicar exatamente o artefato validado no STAGE
-        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch production --commit-dirty=true
+      - name: Publicar exatamente o artefato validado no STAGE canônico
+        run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --commit-hash "$GITHUB_SHA" --commit-dirty=true
+
+      - name: Confirmar que a URL canônica recebeu este commit
+        run: node scripts/verify-stage-canonical-release.mjs --base=https://allamo-pmo-stage.pages.dev --sha=$GITHUB_SHA
 
       - name: Smoke de governança pós-deploy
         run: npm run smoke:governance
@@ -122,13 +125,13 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-deploy -f description='Stage publicado e smokes concluídos com sucesso'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-deploy -f description='Stage canônico publicado no commit correto e smokes concluídos'
 
       - name: Registrar falha do deploy no commit
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-deploy -f description='Release de Stage falhou; verificar último marco aprovado'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-deploy -f description='Release de Stage falhou; URL canônica pode não ter recebido o commit'
 
       - name: Resumo da release
         if: always()
@@ -137,6 +140,8 @@ jobs:
           echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
           echo "- Motivo: ${{ inputs.reason || github.event.head_commit.message }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deploy automático por merge em develop: ATIVO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Destino canônico: https://allamo-pmo-stage.pages.dev" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fingerprint pós-deploy: obrigatório" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório e retido por 14 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
