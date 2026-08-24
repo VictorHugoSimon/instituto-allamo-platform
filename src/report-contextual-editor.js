@@ -93,5 +93,7 @@
   },true);
 
   window.addEventListener('allamo:report-editor-open',e=>open((e&&e.detail&&e.detail.anchor)||''));
-  window.AllamoContextualReportEditor={open,anchorForButton};
+  // Preserva o contrato antigo consumido por validadores e integrações existentes.
+  window.AllamoContextualReportEditor={open};
+  window.AllamoContextualReportEditor.anchorForButton=anchorForButton;
 })();
