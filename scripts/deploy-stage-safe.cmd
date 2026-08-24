@@ -11,6 +11,7 @@ echo Instituto Allamo PMO - Release segura de STAGE
 echo Um build. Um gate consolidado. Um deploy canonico.
 echo Nao executa reset, DELETE, migration ou deploy de producao.
 echo Config Cloudflare: wrangler.stage.toml materializada temporariamente.
+echo Production branch do projeto Stage: develop.
 echo ============================================================
 echo.
 
@@ -52,7 +53,7 @@ findstr /C:"allamo-pmo-stage" wrangler.toml >nul || (
   echo [ERRO] wrangler.toml temporario nao aponta para o projeto de Stage.
   goto :fail
 )
-call npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --commit-hash "%REMOTE_SHA%" --commit-dirty=true || goto :fail
+call npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch develop --commit-hash "%REMOTE_SHA%" --commit-dirty=true || goto :fail
 
 echo [7/8] Confirmando que allamo-pmo-stage.pages.dev recebeu este commit...
 call node scripts/verify-stage-canonical-release.mjs --base=https://allamo-pmo-stage.pages.dev --sha=%REMOTE_SHA% || goto :fail
@@ -76,6 +77,7 @@ if not "%RESULT%"=="0" exit /b %RESULT%
 echo [8/8] STAGE canonico publicado e validado com sucesso.
 echo Commit: %REMOTE_SHA%
 echo URL: https://allamo-pmo-stage.pages.dev
+echo Branch Cloudflare Pages: develop ^(production branch do projeto Stage^).
 echo Config: wrangler.stage.toml materializada apenas no worktree temporario.
 echo Nenhuma migration/reset destrutivo foi executado.
 echo Producao nao foi alterada.
