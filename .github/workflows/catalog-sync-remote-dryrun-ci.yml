@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/catalog-sync-remote-dryrun-ci.yml'
       - 'scripts/sync-stage-catalog-to-production.mjs'
+      - 'scripts/sync-stage-catalog-to-production-portable.mjs'
       - 'wrangler.stage.toml'
       - 'wrangler.production.toml'
 
@@ -23,6 +24,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Validar contrato do sincronizador
+        run: node scripts/sync-stage-catalog-to-production-portable.mjs --self-test
       - name: Preparar autenticação Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -33,4 +36,4 @@ jobs:
       - name: Confirmar autenticação
         run: npx wrangler@4.124.0 whoami
       - name: Dry-run remoto Stage → Produção sem escrita
-        run: node scripts/sync-stage-catalog-to-production.mjs
+        run: node scripts/sync-stage-catalog-to-production-portable.mjs
