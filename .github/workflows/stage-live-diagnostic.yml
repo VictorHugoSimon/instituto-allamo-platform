@@ -12,8 +12,11 @@ permissions:
 jobs:
   diagnose-stage-live:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Diagnosticar URL canônica do Stage
         shell: bash
         run: |
@@ -37,3 +40,11 @@ jobs:
           echo '=== root headers ==='
           curl -sS -L --max-time 20 -I "$BASE/?_diag=$(date +%s)"
           exit 0
+
+      - name: Smoke de governança atual
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+        run: node scripts/smoke-governance-stage.mjs
+
+      - name: Smoke dos tenants essenciais atual
+        run: node scripts/smoke-core-tenants.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage
