@@ -1,0 +1,39 @@
+name: Stage Production Catalog Sync CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/sync-stage-catalog-to-production.mjs'
+      - 'scripts/validate-stage-production-catalog-sync.mjs'
+      - '.github/workflows/deploy-production.yml'
+      - 'package.json'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sync-stage-catalog-to-production.mjs'
+      - 'scripts/validate-stage-production-catalog-sync.mjs'
+      - '.github/workflows/deploy-production.yml'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-sync-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Gerar artefato final antes dos gates integrados
+        run: npm run build:work
+      - name: Validar contrato da sincronização
+        run: npm run test:catalog-sync
+      - name: Validar isolamento de ambientes
+        run: npm run test:env-isolation
+      - name: Validar persistência e multitenancy
+        run: npm run test:platform
