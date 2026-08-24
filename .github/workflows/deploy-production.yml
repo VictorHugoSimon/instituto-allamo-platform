@@ -51,10 +51,13 @@ jobs:
       - name: Gate consolidado da plataforma
         run: npm run test:release
 
+      - name: Gate de paridade visual Stage para Produção
+        run: node scripts/validate-production-ui-parity.mjs
+
       - name: Registrar gates produtivos aprovados
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-gates -f description='Build e gate consolidado aprovados'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-gates -f description='Build, gates e paridade visual aprovados'
 
       - name: Preparar e validar autenticação Cloudflare
         env:
@@ -113,11 +116,14 @@ jobs:
       - name: Smoke de governança multitenant em Produção
         run: node scripts/smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production
 
+      - name: Smoke de paridade visual na URL pública de Produção
+        run: node scripts/smoke-production-ui-parity.mjs --base=https://allamo-pmo.pages.dev --release=${GITHUB_SHA}
+
       - name: Registrar sucesso do deploy produtivo
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-deploy -f description='Produção publicada e smokes concluídos com sucesso'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-deploy -f description='Produção publicada, paridade visual e smokes concluídos com sucesso'
 
       - name: Registrar falha do deploy produtivo
         if: failure()
@@ -136,5 +142,6 @@ jobs:
           echo "- Backup D1: obrigatório e retido por 30 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Paridade visual: validada no artefato e na URL pública" >> "$GITHUB_STEP_SUMMARY"
           echo "- Autenticação: API Token com fallback para Global API Key + e-mail quando disponível" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Smokes: Dual Clima/Madrid/OPR + governança multitenant" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smokes: Dual Clima/Madrid/OPR + governança multitenant + interface homologada" >> "$GITHUB_STEP_SUMMARY"
