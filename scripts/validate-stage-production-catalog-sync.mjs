@@ -21,12 +21,12 @@ must(sync,'validateParity(plan)','pós-validação de empresas e projetos');
 must(sync,'Produção-only é preservado','preservação de registros exclusivos de Produção');
 
 must(portable,"'--command',sql",'SELECT remoto usa endpoint de query do D1');
-must(portable,"const query=(config,sql)=>executeSqlCommand",'query não usa mais --file');
+must(portable,"const query=(config,sql)=>executeSqlCommand",'query corrigido é gerado pelo executor portátil');
+must(portable,"if(source.includes(\"const query=(config,sql)=>executeSqlFile\"))throw new Error('query() ainda aponta para --file.')",'self-test bloqueia regressão para --file');
 must(portable,"'--file',temp",'canal de escrita controlada do sincronizador original é preservado');
 must(portable,"--self-test",'executor possui self-test estático');
 must(portable,'stdout+(stderr?','parser tolera saída Wrangler em stdout/stderr');
 must(portable,'extractD1Json','parser tolerante de envelope JSON D1');
-if(portable.includes("const query=(config,sql)=>executeSqlFile"))throw new Error('Executor portátil ainda mantém SELECT via --file.');
 
 for(const [label,text] of [['sincronizador',sync],['executor portátil',portable]]){
   if(/\bDELETE\s+FROM\b/i.test(text))throw new Error(`${label} contém DELETE FROM.`);
