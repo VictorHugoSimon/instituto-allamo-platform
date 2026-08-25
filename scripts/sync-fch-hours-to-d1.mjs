@@ -26,8 +26,9 @@ function parseCSV(text){
   return rows;
 }
 function runSql(sql){
-  const p=spawnSync('npx',['wrangler','d1','execute',db,'--remote','--config',cfg,'--command',sql,'--json'],{encoding:'utf8',env:process.env,maxBuffer:20*1024*1024});
-  if(p.status!==0) throw new Error((p.stderr||p.stdout||'wrangler falhou').slice(0,4000));
+  const wrangler = process.platform === 'win32' ? 'node_modules/.bin/wrangler.cmd' : 'node_modules/.bin/wrangler';
+  const p=spawnSync(wrangler,['d1','execute',db,'--remote','--config',cfg,'--command',sql,'--json'],{encoding:'utf8',env:process.env,maxBuffer:20*1024*1024});
+  if(p.status!==0) throw new Error(((p.stderr||'')+'\n'+(p.stdout||'')||'wrangler falhou').slice(0,6000));
   const out=(p.stdout||'').trim();
   if(!out)return [];
   const pos=[out.indexOf('['),out.indexOf('{')].filter(x=>x>=0).sort((a,b)=>a-b)[0]??0;
