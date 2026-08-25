@@ -21,11 +21,15 @@ jobs:
         run: node scripts/verify-data-persistence.mjs
       - name: Build final portal artifact
         run: npm run build:work
+      - name: Validate Report AI launcher
+        run: node scripts/validate-report-ai-launcher.mjs
       - name: Validate final artifact markers
         run: |
           grep -q "BEGIN ALLAMO LEGACY REPORT AI" public/_worker.js
           grep -q "api.openai.com/v1/responses" public/_worker.js
           grep -q "Gerar Status Report com IA" public/index.html
+          grep -q "Assistente IA do Status Report" public/index.html
+          grep -q "window.__allamoOpenReportAi" public/index.html
           grep -q "+ Adicionar campo" public/index.html
           grep -q "custom_sections" public/index.html
           grep -q "hidden_standard_fields" public/index.html
