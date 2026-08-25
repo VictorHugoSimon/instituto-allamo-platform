@@ -26,6 +26,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências travadas
+        run: npm ci
 
       - name: Validar arquivo normalizado
         run: |
