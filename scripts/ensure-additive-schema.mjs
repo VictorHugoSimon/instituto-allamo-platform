@@ -135,7 +135,7 @@ const governanceTables=[
   'governance_event_work_links',
   'governance_event_decisions'
 ];
-const hoursTables=['horas_import','sync_state'];
+const hoursTables=['horas_import','fch_entries','sync_state'];
 const missingGovernance=governanceTables.filter(t=>!tableExists(t));
 const missingHours=hoursTables.filter(t=>!tableExists(t));
 
