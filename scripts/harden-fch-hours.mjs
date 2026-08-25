@@ -36,6 +36,36 @@ w=sync(
   '    // EMPRESAS: criar (rota dedicada)',
   '    '
 );
+
+// O hardening FCH legado já atualiza Status Report, report público e Curva S.
+// Trocamos apenas a origem de OPR/MADRI: primeiro fch_entries (Drive read-only),
+// com fallback para horas_import/CSV para os demais clientes.
+const fnStart='async function importedHourRowsForCompany_(env, companyId, companyName){';
+const fnNext='\n\nasync function enrichReportWithImportedHours';
+if(w.includes(fnStart)){
+  const a=w.indexOf(fnStart),b=w.indexOf(fnNext,a);
+  if(b<0)throw new Error('Fim de importedHourRowsForCompany_ não encontrado.');
+  const replacement=`async function importedHourRowsForCompany_(env, companyId, companyName){
+  const context=norm(companyId)+' '+norm(companyName);
+  let target='';
+  if(context.includes('madri')||context.includes('madrid')) target='MADRI';
+  else if(context.includes('opr')) target='OPR';
+  if(target){
+    try{
+      const direct=(await env.DB.prepare("SELECT substr(activity_date,1,7) AS mes,SUM(hours) AS horas FROM fch_entries WHERE target_project=? GROUP BY substr(activity_date,1,7) ORDER BY mes").bind(target).all()).results||[];
+      if(direct.length) return direct;
+    }catch(e){ /* tabela ainda não sincronizada: usa fallback legado */ }
+  }
+  const keys=[norm(companyId),norm(companyName)].filter(Boolean);
+  const uniq=[...new Set(keys)];
+  if(!uniq.length) return [];
+  const ph=uniq.map(()=>'?').join(',');
+  const sql='SELECT mes, SUM(horas) AS horas FROM horas_import WHERE company_key IN ('+ph+') GROUP BY mes ORDER BY mes';
+  try{ return (await env.DB.prepare(sql).bind(...uniq).all()).results||[]; }catch(e){ return []; }
+}`;
+  w=w.slice(0,a)+replacement+w.slice(b);
+}
+
 fs.writeFileSync(worker,w);
 
 let h=fs.readFileSync(index,'utf8');
@@ -50,8 +80,8 @@ if(h.includes(start)){
 }
 fs.writeFileSync(index,h);
 
-for(const marker of ['fch-hours-ingest','fch-hours-status','fch-curve','allamo-fch-curve-card','OPR_Madri']){
-  const combined=fs.readFileSync(worker,'utf8')+'\n'+fs.readFileSync(index,'utf8');
+const combined=fs.readFileSync(worker,'utf8')+'\n'+fs.readFileSync(index,'utf8');
+for(const marker of ['fch-hours-ingest','fch-hours-status','fch-curve','allamo-fch-curve-card','OPR_Madri','FROM fch_entries WHERE target_project=?']){
   if(!combined.includes(marker))throw new Error('Integração FCH incompleta: '+marker);
 }
-console.log('OK: integração FCH read-only, ingestão segura e Curva S automática instaladas no Portal.');
+console.log('OK: FCH Drive read-only priorizado em OPR/MADRI, com ingestão segura, report e Curva S automática.');
