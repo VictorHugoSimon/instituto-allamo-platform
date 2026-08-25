@@ -21,5 +21,7 @@ jobs:
         run: npm run build:work
       - name: Validate persistence and report AI
         run: npm run test:report-ai
+      - name: Validate live report editing
+        run: npm run test:report-edit
       - name: Validate responsive usability contracts
         run: npm run test:ux
