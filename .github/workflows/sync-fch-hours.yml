@@ -31,10 +31,14 @@ jobs:
       - name: Instalar dependências travadas
         run: npm ci
 
+      - name: Instalar Wrangler fixo para sincronização
+        run: npm install --no-save --ignore-scripts wrangler@4.124.0
+
       - name: Validar arquivo normalizado
         run: |
           test -f public/data/fch-hours.csv
           head -n 1 public/data/fch-hours.csv | grep -F 'empresa,projeto,hora,mes,consultor'
+          test -x node_modules/.bin/wrangler
 
       - name: Preparar autenticação Cloudflare
         env:
