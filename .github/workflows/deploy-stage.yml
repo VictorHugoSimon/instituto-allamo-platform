@@ -76,7 +76,7 @@ jobs:
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-cloudflare-auth -f description='Wrangler autenticado e production_branch do Stage validado'
 
       - name: Backup obrigatório do D1 Stage
-        run: npx wrangler@4.124.0 d1 export DB --remote --config wrangler.stage.toml --output="backup-stage-${GITHUB_SHA}.sql"
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-${GITHUB_SHA}.sql"
 
       - name: Guardar backup do Stage
         uses: actions/upload-artifact@v4
