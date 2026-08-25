@@ -1,11 +1,18 @@
 name: Sync FCH Hours to PMO
 
 on:
-  push:
-    branches: [data-sync]
-    paths:
-      - 'public/data/fch-hours.csv'
+  schedule:
+    # Atualização automática a cada hora. A fonte no Google Drive é SOMENTE LEITURA.
+    - cron: '17 * * * *'
   workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/sync-fch-hours.yml'
+      - 'scripts/read-fch-drive-readonly.py'
+      - 'scripts/sync-fch-hours-to-d1.mjs'
+      - 'scripts/ensure-additive-schema.mjs'
+      - 'migrations/2026-08-25-fch-hours-automation.sql'
 
 permissions:
   contents: read
@@ -17,40 +24,80 @@ concurrency:
 jobs:
   sync-hours:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      # Arquivo de agosto já identificado no Drive. Ao configurar FCH_FOLDER_ID,
+      # a pasta passa a ser a fonte preferencial e os meses seguintes entram
+      # automaticamente sem alterar o FCH original.
+      FCH_FILE_ID: '1EwBf-iJyXsIKu5UoPP6iv-T9gnQQjPfH'
+      FCH_FOLDER_ID: ${{ secrets.FCH_FOLDER_ID }}
+      GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
     steps:
-      - name: Checkout data-sync
+      - name: Checkout develop
         uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar leitor read-only do FCH
+        run: python -m pip install --disable-pip-version-check --quiet openpyxl google-auth requests
+
+      - name: Validar sintaxe do coletor
+        run: python -m py_compile scripts/read-fch-drive-readonly.py
+
+      - name: Ler FCH do Google Drive sem alterar a origem
+        run: python scripts/read-fch-drive-readonly.py --output /tmp/fch-hours.csv
+
+      - name: Validar arquivo normalizado temporário
+        run: |
+          test -s /tmp/fch-hours.csv
+          head -n 1 /tmp/fch-hours.csv | tr -d '\r' | grep -F 'empresa,projeto,hora,mes,consultor,projeto_origem,origem_compartilhada'
+          echo "Linhas normalizadas: $(($(wc -l < /tmp/fch-hours.csv)-1))"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Validar arquivo normalizado
-        run: |
-          test -f public/data/fch-hours.csv
-          head -n 1 public/data/fch-hours.csv | grep -F 'empresa,projeto,hora,mes,consultor'
-
       - name: Preparar autenticação Cloudflare
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
-          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
 
+      - name: Garantir schema aditivo no D1 Stage
+        run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
+
       - name: Sincronizar horas no D1 Stage
-        run: node scripts/sync-fch-hours-to-d1.mjs --env=stage --file=public/data/fch-hours.csv
+        run: node scripts/sync-fch-hours-to-d1.mjs --env=stage --file=/tmp/fch-hours.csv
+
+      - name: Garantir schema aditivo no D1 Produção
+        run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
 
       - name: Sincronizar horas no D1 Produção
-        run: node scripts/sync-fch-hours-to-d1.mjs --env=production --file=public/data/fch-hours.csv
+        run: node scripts/sync-fch-hours-to-d1.mjs --env=production --file=/tmp/fch-hours.csv
+
+      - name: Remover arquivo temporário
+        if: always()
+        run: rm -f /tmp/fch-hours.csv
 
       - name: Resumo
         if: always()
         run: |
-          echo '### FCH → PMO' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Fonte: Google Drive, somente leitura' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Regra OPR_Madri: replicação integral para OPR e Madri' >> "$GITHUB_STEP_SUMMARY"
+          echo '### FCH → PMO → Curva S' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Fonte: Google Drive com OAuth `drive.readonly`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Arquivo FCH original: nenhuma escrita, update, rename ou delete' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Abas: Victor Hugo + Gabriel, identificadas por nome tolerante' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Colunas: detectadas por cabeçalho (Data / Tempo da Atividade / Projeto)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Regra OPR_Madri: 100% OPR + 100% MADRI; capacidade global sem dupla contagem' >> "$GITHUB_STEP_SUMMARY"
           echo '- Destinos: D1 Stage + Produção' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Atualização: horas_import + Curva S + KPIs dos reports' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Atualização: automática, a cada hora' >> "$GITHUB_STEP_SUMMARY"
