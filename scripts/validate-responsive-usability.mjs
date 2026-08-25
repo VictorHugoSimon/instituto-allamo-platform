@@ -11,6 +11,7 @@ const clientApi=fs.readFileSync('src/report-client-api-guard.js','utf8');
 const publicApi=fs.readFileSync('src/public-published-reports-api.js','utf8');
 const build=fs.readFileSync('scripts/build-work-management.mjs','utf8');
 const index=fs.readFileSync('public/index.html','utf8');
+const responsiveWorkflow=fs.readFileSync('.github/workflows/responsive-usability-ci.yml','utf8');
 new Function(responsive);new Function(admin);new Function(reportUi);new Function(raci);new Function(watchdog);new Function(clientReports);new Function(releases);new Function(feedback);
 // Os arquivos API são fragmentos injetados dentro de handleApi (async), não scripts standalone.
 new Function('return async function(){'+clientApi+'}');
@@ -39,4 +40,9 @@ if(admin.includes('setInterval(tick,500)')||raci.includes('setInterval(tick,650)
 must(watchdog,'setInterval(tick,2000)','watchdog com frequência reduzida');
 for(const marker of ['__allamoResponsiveUsabilityLoaded','__allamoReportAdminNavLoaded','__allamoRaciVisualLoaded','__allamoClientPublishedReportsLoaded','__allamoReleaseHistoryLoaded','__allamoInteractionFeedbackLoaded'])must(index,marker,'artefato final '+marker);
 if(!index.includes('Central de Reports'))throw new Error('Artefato final sem central de Reports.');
-console.log('OK: publicação autenticada/pública, Central por projeto, criação de Reports, Viradas/Versões, responsividade, RACI, feedback e performance validados.');
+const buildPos=responsiveWorkflow.indexOf('run: npm run build:work');
+const reportAiPos=responsiveWorkflow.indexOf('run: npm run test:report-ai');
+const uxPos=responsiveWorkflow.indexOf('run: npm run test:ux');
+if(buildPos<0||reportAiPos<0||uxPos<0)throw new Error('Workflow responsivo incompleto: build, report AI e UX são obrigatórios.');
+if(!(buildPos<reportAiPos&&reportAiPos<uxPos))throw new Error('Workflow responsivo deve gerar o artefato final antes de validar Report AI e UX.');
+console.log('OK: publicação autenticada/pública, Central por projeto, criação de Reports, Viradas/Versões, responsividade, RACI, feedback, performance e ordem do CI validados.');

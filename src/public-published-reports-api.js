@@ -6,6 +6,13 @@ const publicSanitizeReportData=data=>{
   if(d._milestone_evidence&&typeof d._milestone_evidence==='object'){
     d._milestone_evidence={...d._milestone_evidence,assets:Array.isArray(d._milestone_evidence.assets)?d._milestone_evidence.assets.filter(a=>Number(a?.client_visible??1)!==0):[]};
   }
+  if(d.live_task_board&&typeof d.live_task_board==='object'){
+    const b=d.live_task_board;
+    b.lanes=Array.isArray(b.lanes)?b.lanes.filter(l=>l?.client_visible!==false).map(l=>({...l,tasks:Array.isArray(l.tasks)?l.tasks.filter(t=>t?.client_visible!==false):[]})):[];
+  }
+  if(d.executive_report&&typeof d.executive_report==='object'){
+    for(const k of Object.keys(d.executive_report))if(Array.isArray(d.executive_report[k]))d.executive_report[k]=d.executive_report[k].filter(x=>x?.client_visible!==false);
+  }
   delete d.ai_audit;delete d._history;return d;
 };
 if(path==='public-published-reports'&&request.method==='GET'){

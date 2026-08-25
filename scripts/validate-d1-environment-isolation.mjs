@@ -9,6 +9,7 @@ const stageWorkflow=read('.github/workflows/deploy-stage.yml');
 const stageBranchGuard=read('scripts/ensure-stage-pages-production-branch.mjs');
 const prodCmd=read('scripts/deploy-production-safe.cmd');
 const prodWorkflow=read('.github/workflows/deploy-production.yml');
+const secureExport=read('scripts/secure-d1-export.mjs');
 const must=(text,needle,label)=>{if(!text.includes(needle))throw new Error(`Ausente: ${label} (${needle})`)};
 const forbid=(text,needle,label)=>{if(text.includes(needle))throw new Error(`Proibido: ${label} (${needle})`)};
 const forbidEnvStage=(text,label)=>{if(/^\s*\[env\.stage\]\s*$/m.test(text))throw new Error(`Proibido: ${label} ([env.stage])`)};
@@ -49,7 +50,6 @@ must(previewEnv,`database_id = "${STAGE_ID}"`,'preview aponta para D1 não produ
 forbid(previewEnv,PROD_ID,'preview do projeto de Produção nunca pode usar D1 produtivo');
 
 // Stage Pages: a branch git develop é também a production_branch do projeto Pages de homologação.
-// Isso elimina a ambiguidade do Wrangler em workspaces Git e garante atualização de allamo-pmo-stage.pages.dev.
 must(stageBranchGuard,"const project='allamo-pmo-stage'",'guard usa somente o projeto Stage');
 must(stageBranchGuard,"const desiredBranch='develop'",'guard fixa develop como production branch do Stage');
 must(stageBranchGuard,"pages/projects/${encodeURIComponent(project)}",'guard consulta o projeto Pages via API oficial');
@@ -72,6 +72,7 @@ forbid(stageWorkflow,'--env stage','workflow não pode usar env.stage');
 forbid(stageCmd,'wrangler.production.toml','Stage local nunca materializa config de Produção');
 forbid(stageWorkflow,'wrangler.production.toml','Stage Actions nunca materializa config de Produção');
 must(stageWorkflow,'Backup obrigatório do D1 Stage','workflow Stage faz backup antes de evolução remota');
+must(stageWorkflow,'secure-d1-export.mjs --config wrangler.stage.toml','workflow Stage exporta o D1 de homologação via wrapper seguro');
 must(stageWorkflow,'ensure-additive-schema.mjs --env=stage','workflow Stage usa schema com config D1 dedicada');
 must(stageWorkflow,'repair-core-tenants-portable.mjs --env=stage --apply --confirm=REPAIR-STAGE','workflow Stage repara tenants essenciais de modo idempotente');
 
@@ -89,11 +90,20 @@ must(prodWorkflow,'workflow_dispatch:','workflow produção mantém fallback man
 must(prodWorkflow,"github.ref == 'refs/heads/main'",'workflow produção exige main');
 must(prodWorkflow,"inputs.confirm == 'DEPLOY-PRODUCTION'",'fallback manual exige confirmação');
 must(prodWorkflow,'cp wrangler.production.toml wrangler.toml','workflow produção materializa config produtiva');
-must(prodWorkflow,'d1 export DB --remote --config wrangler.production.toml','workflow produção faz backup no D1 produtivo explícito');
+must(prodWorkflow,'secure-d1-export.mjs --config wrangler.production.toml','workflow produção faz backup no D1 produtivo explícito via wrapper seguro');
 must(prodWorkflow,'actions/upload-artifact@v4','workflow preserva backup como artifact');
 must(prodWorkflow,'ensure-additive-schema.mjs --env=production','workflow produção usa schema com config D1 dedicada');
 must(prodWorkflow,'--project-name allamo-pmo --branch main','workflow produção publica projeto/branch corretos');
 forbid(prodWorkflow,'pages deploy public --config','workflow Pages Produção não usa --config customizado');
 forbid(prodWorkflow,'cp wrangler.stage.toml wrangler.toml','workflow produção nunca materializa config Stage');
 
-console.log('OK: Pages/D1 isolados — Stage fixa develop como production branch do projeto de homologação, valida fingerprint canônico e preserva D1; Produção permanece governada em main.');
+// O wrapper é parte da fronteira de segurança: deve exportar DB remoto, respeitar o config explícito
+// e redigir URLs temporárias sem alterar o arquivo de backup nem mascarar falhas do Wrangler.
+must(secureExport,"'d1', 'export', 'DB', '--remote', '--config', config",'wrapper executa export D1 remoto com config explícito');
+must(secureExport,"`--output=${output}`",'wrapper preserva caminho do backup solicitado');
+must(secureExport,"replace(/https?:\\/\\/\\S+/g, '[redacted-temporary-url]')",'wrapper redige URLs temporárias');
+must(secureExport,'if (result.status !== 0) process.exit(result.status ?? 1)','wrapper preserva status de falha do Wrangler');
+forbid(secureExport,'wrangler.stage.toml','wrapper não fixa Stage internamente');
+forbid(secureExport,'wrangler.production.toml','wrapper não fixa Produção internamente');
+
+console.log('OK: Pages/D1 isolados — backups Stage/Produção usam wrapper seguro com config explícito, Stage fixa develop e Produção permanece governada em main.');
