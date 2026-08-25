@@ -135,12 +135,15 @@ const governanceTables=[
   'governance_event_work_links',
   'governance_event_decisions'
 ];
+const hoursTables=['horas_import','sync_state'];
 const missingGovernance=governanceTables.filter(t=>!tableExists(t));
+const missingHours=hoursTables.filter(t=>!tableExists(t));
 
 console.log(`Ambiente: ${envArg}`);
 console.log(`gmud existe: ${gmudExists?'sim':'não'}`);
 console.log(`gmud.project existe: ${gmudProjectExists?'sim':'não'}`);
 console.log(`Governança ausente: ${missingGovernance.length?missingGovernance.join(', '):'nenhuma'}`);
+console.log(`Horas FCH ausente: ${missingHours.length?missingHours.join(', '):'nenhuma'}`);
 
 if(!APPLY){
   console.log('[DRY-RUN] Nenhuma alteração aplicada.');
@@ -157,9 +160,16 @@ if(missingGovernance.length){
   runWrangler([WRANGLER,'d1','execute',DB,'--remote','--config',env.config,'--file','migrations/2026-08-23-governance-roadmap.sql'],{capture:false});
 }
 
+if(missingHours.length){
+  console.log('[APPLY] Aplicando migration idempotente da integração FCH/Curva S...');
+  runWrangler([WRANGLER,'d1','execute',DB,'--remote','--config',env.config,'--file','migrations/2026-08-25-fch-hours-automation.sql'],{capture:false});
+}
+
 const gmudProjectAfter=!gmudExists||columnExists('gmud','project');
 const missingAfter=governanceTables.filter(t=>!tableExists(t));
+const missingHoursAfter=hoursTables.filter(t=>!tableExists(t));
 if(!gmudProjectAfter) throw new Error('gmud.project continua ausente após aplicação.');
 if(missingAfter.length) throw new Error('Tabelas de Governança continuam ausentes: '+missingAfter.join(', '));
+if(missingHoursAfter.length) throw new Error('Tabelas da integração FCH continuam ausentes: '+missingHoursAfter.join(', '));
 
 console.log('[OK] Schema aditivo validado sem operações destrutivas.');
