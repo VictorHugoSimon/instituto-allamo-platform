@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const worker=fs.readFileSync('public/_worker.js','utf8');
 const html=fs.readFileSync('public/index.html','utf8');
+const smoke=fs.readFileSync('scripts/smoke-core-tenants.mjs','utf8');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
 
 must(worker,"portalNoLoginHost = /(^|\\.)(?:allamo-pmo-stage|allamo-pmo)\\.pages\\.dev$/i",'Bypass restrito aos dois hosts oficiais do Portal');
@@ -25,4 +26,9 @@ must(template,"if((el.textContent||'').trim()!=='Sair')return",'Guard localiza o
 must(template,"/^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/.test(t)",'Guard não esconde sino/seletor/controles interativos vizinhos');
 if(template.includes('allamo-no-login-ui'))throw new Error('Observer antigo de logout ainda permanece e pode duplicar tratamento do cabeçalho.');
 
-console.log('OK: Stage e Produção abrem sem login e sem bloco visual de usuário/logout; sino, seletor de empresa e demais controles permanecem disponíveis.');
+must(smoke,"for(let i=1;i<=12;i++)",'Smoke destrutivo possui janela de retry pós-deploy');
+must(smoke,"Aguardando propagação da proteção destrutiva",'Smoke registra propagação transitória sem falso negativo imediato');
+must(smoke,"r.status===403&&data.code==='authenticated_session_required'",'Smoke continua exigindo bloqueio destrutivo real');
+must(smoke,"após 12 tentativas",'Falha persistente continua derrubando a release');
+
+console.log('OK: Stage e Produção abrem sem login e sem bloco visual de usuário/logout; controles permanecem disponíveis e o smoke destrutivo tolera somente propagação transitória, sem relaxar o bloqueio 403.');

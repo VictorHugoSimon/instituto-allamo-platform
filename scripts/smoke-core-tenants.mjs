@@ -21,13 +21,25 @@ async function get(path){
 
 async function assertNoLoginDeleteBlocked(){
   const path='/api/companies/__allamo_smoke_never_exists__';
-  const r=await fetch(base+path,{method:'DELETE',headers:{'cache-control':'no-cache','pragma':'no-cache'},cache:'no-store'});
-  const text=await r.text();
-  let data={};try{data=JSON.parse(text)}catch{}
-  if(r.status!==403||data.code!=='authenticated_session_required'){
-    throw new Error(`Proteção destrutiva sem login inválida: DELETE retornou HTTP ${r.status} / ${data.code||text.slice(0,120)}`);
+  let last='';
+  for(let i=1;i<=12;i++){
+    try{
+      const r=await fetch(base+path,{method:'DELETE',headers:{'cache-control':'no-cache','pragma':'no-cache'},cache:'no-store'});
+      const text=await r.text();
+      let data={};try{data=JSON.parse(text)}catch{}
+      if(r.status===403&&data.code==='authenticated_session_required'){
+        return {http:r.status,code:data.code,attempts:i};
+      }
+      last=`HTTP ${r.status} / ${data.code||text.slice(0,120)}`;
+    }catch(e){
+      last=String(e?.message||e);
+    }
+    if(i<12){
+      console.log(`Aguardando propagação da proteção destrutiva (${i}/12): ${last}`);
+      await sleep(3000);
+    }
   }
-  return {http:r.status,code:data.code};
+  throw new Error(`Proteção destrutiva sem login inválida após 12 tentativas: ${last}`);
 }
 
 const required=[['dualclima','Dual Clima'],['madrid','Madrid'],['opr','OPR']];
