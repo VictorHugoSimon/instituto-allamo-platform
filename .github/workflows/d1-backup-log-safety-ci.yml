@@ -1,0 +1,25 @@
+name: D1 Backup Log Safety CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+
+jobs:
+  d1-backup-log-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate redaction helper
+        run: node scripts/secure-d1-export.mjs --self-test
+      - name: Ensure release workflows use redacted exporter
+        run: |
+          grep -F 'node scripts/secure-d1-export.mjs' .github/workflows/deploy-stage.yml
+          grep -F 'node scripts/secure-d1-export.mjs' .github/workflows/deploy-production.yml
+          if grep -E 'run: .*wrangler@4\.124\.0 d1 export' .github/workflows/deploy-stage.yml .github/workflows/deploy-production.yml; then
+            echo 'Direct D1 export would expose temporary signed URLs in logs.' >&2
+            exit 1
+          fi

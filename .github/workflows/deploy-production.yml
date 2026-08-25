@@ -73,7 +73,7 @@ jobs:
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/production-cloudflare-auth -f description='Wrangler autenticado no Cloudflare'
 
       - name: Backup obrigatório do D1 produtivo
-        run: npx wrangler@4.124.0 d1 export DB --remote --config wrangler.production.toml --output="backup-production-${GITHUB_SHA}.sql"
+        run: node scripts/secure-d1-export.mjs --config wrangler.production.toml --output "backup-production-${GITHUB_SHA}.sql"
 
       - name: Guardar backup da Produção
         uses: actions/upload-artifact@v4
