@@ -3,6 +3,7 @@ const read=p=>fs.readFileSync(p,'utf8');
 const portal=read('src/public-client-portal.js');
 const portalApi=read('src/public-client-portal-api.js');
 const reportsApi=read('src/public-published-reports-api.js');
+const richReport=read('src/rich-report-viewer.js');
 const loginGuard=read('src/login-interaction-guard.js');
 const worker=read('public/_worker.js');
 const pkg=JSON.parse(read('package.json'));
@@ -13,6 +14,12 @@ must(portal,"params.get('projeto')||params.get('project')",'link público pode a
 must(portal,"public-client-projects?company=",'empresa pública carregada sem sessão');
 must(portal,"public-published-reports?company=",'reports públicos por empresa/projeto');
 must(portal,"public-published-reports/",'detalhe do report público');
+must(portal,"data-allamo-public-client-shell",'shell administrativo oculto no contexto público');
+must(portal,"data-pc-report-stage",'área do Report embutido dentro do projeto');
+must(portal,"AllamoRichReport.renderInto",'viewer rico reutilizado inline no portal público');
+must(portal,"state.reports[0]",'Report mais recente abre automaticamente ao entrar no projeto');
+must(richReport,"renderInto(container,report)",'viewer rico oferece modo inline reutilizável');
+must(richReport,"arrv-inline",'layout inline preserva tabs executivas do Report');
 
 must(portalApi,"path==='public-client-projects'",'endpoint público de empresa/projetos');
 must(portalApi,'context_locked:true','contexto público travado no tenant resolvido');
@@ -31,4 +38,4 @@ if(publicApiPos<0||authPos<0||publicApiPos>authPos)throw new Error('Endpoints p�
 
 const build=String(pkg.scripts['build:work']||'');
 must(build,'build-work-management.mjs','portal público entra no artefato final');
-console.log('OK: link público Empresa/Projeto funciona sem login, sem token e com isolamento por tenant/projeto.');
+console.log('OK: link público Empresa/Projeto funciona sem login, shell interno oculto e Report executivo embutido por projeto.');
