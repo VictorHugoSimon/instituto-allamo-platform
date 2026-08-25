@@ -30,7 +30,6 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
-import requests
 from google.auth.transport.requests import AuthorizedSession
 from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
@@ -99,9 +98,10 @@ def drive_get_json(session: AuthorizedSession, url: str, *, params: dict[str, st
 def list_sources(session: AuthorizedSession, file_id: str, folder_id: str) -> list[dict[str, Any]]:
     fields = "id,name,mimeType,modifiedTime,size,parents"
     if folder_id:
+        prefix_q = FCH_PREFIX.replace("'", "\\'")
         q = (
             f"'{folder_id}' in parents and trashed=false and "
-            f"name contains '{FCH_PREFIX.replace("'", "\\'")}'"
+            f"name contains '{prefix_q}'"
         )
         files: list[dict[str, Any]] = []
         token = ""
@@ -248,7 +248,7 @@ def parse_file(meta: dict[str, Any], content: bytes) -> list[CsvRow]:
                 print(f"[fch] aviso: cabeçalho não encontrado em {ws.title}", file=sys.stderr)
                 continue
             header_row, date_idx, hours_idx, project_idx = hdr
-            for row_no, row in enumerate(ws.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1):
+            for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
                 if max(date_idx, hours_idx, project_idx) >= len(row):
                     continue
                 project = str(row[project_idx] or "").strip()
