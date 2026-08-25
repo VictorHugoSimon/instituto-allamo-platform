@@ -5,6 +5,7 @@ const stage=read('src/stage-runtime-bootstrap.js');
 const migration=read('migrations/2026-08-23-governance-roadmap.sql');
 const prod=read('.github/workflows/deploy-production.yml');
 const stageWorkflow=read('.github/workflows/deploy-stage.yml');
+const canonicalVerifier=read('scripts/verify-stage-canonical-release.mjs');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
 
 must(hardener,"'    // Health-check público APENAS no hostname de homologação.'",'injeção do schema antes do health');
@@ -40,8 +41,21 @@ must(stageWorkflow,'branches: [develop]','Auto deploy Stage somente em develop')
 must(stageWorkflow,'npm run test:release','Stage executa gate consolidado');
 must(stageWorkflow,'Backup obrigatório do D1 Stage','Stage possui backup antes da preparação do schema');
 must(stageWorkflow,'ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE','Stage aplica somente schema aditivo');
+must(stageWorkflow,'verify-stage-canonical-release.mjs','Stage confirma fingerprint na URL canônica');
 must(stageWorkflow,'npm run smoke:governance','Stage executa smoke de governança pós-deploy');
 must(stageWorkflow,'smoke-core-tenants.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage','Stage executa smoke dos tenants essenciais');
 if(stageWorkflow.includes('--project-name allamo-pmo --branch main'))throw new Error('Workflow de Stage aponta para Produção.');
 
-console.log('OK: release governado — Stage automático em develop e Produção automática em main, ambos com gates, backup, evolução aditiva e smoke pós-deploy.');
+// O Pages pode devolver temporariamente HTML/artefato antigo logo após o upload.
+// O gate canônico deve RETENTAR a resposta transitória, mas nunca relaxar o SHA exigido.
+must(canonicalVerifier,'async function fetchUntil','verificador canônico possui retry orientado a conteúdo');
+must(canonicalVerifier,'attempts=12','verificador possui janela de propagação');
+must(canonicalVerifier,"cache:'no-store'",'fingerprint ignora cache do browser/CDN');
+must(canonicalVerifier,"'accept':'application/json'",'fingerprint pede JSON explicitamente');
+must(canonicalVerifier,'JSON.parse(text)','fingerprint valida JSON dentro do retry');
+must(canonicalVerifier,'String(data?.sha)!==sha','fingerprint exige exatamente o SHA esperado');
+must(canonicalVerifier,'fingerprint ainda não é JSON','HTML transitório não encerra o retry na primeira resposta 200');
+must(canonicalVerifier,'/api/companies ainda não é JSON','API live também aguarda propagação de JSON');
+if(/if\(res\.ok\)\s*return\s*\{res,text\}/.test(canonicalVerifier))throw new Error('Verificador canônico voltou a aceitar qualquer HTTP 200 antes de validar conteúdo/SHA.');
+
+console.log('OK: release governado — Stage automático em develop e Produção automática em main, com gates, backup, evolução aditiva, fingerprint canônico estrito com retry e smoke pós-deploy.');

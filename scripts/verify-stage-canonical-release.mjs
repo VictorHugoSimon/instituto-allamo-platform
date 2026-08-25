@@ -10,34 +10,56 @@ const base=(arg('base')||'https://allamo-pmo-stage.pages.dev').replace(/\/$/,'')
 const sha=String(arg('sha')||process.env.GITHUB_SHA||execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'})).trim();
 if(!/^[0-9a-f]{40}$/i.test(sha)) throw new Error('SHA esperado inválido.');
 
-async function fetchRetry(url,{attempts=12,delay=5000}={}){
-  let last='';
+const safeSnippet=(text)=>String(text||'').replace(/\s+/g,' ').slice(0,160);
+
+async function fetchUntil(url,accept,{attempts=12,delay=3000,label='recurso'}={}){
+  let last='sem resposta';
   for(let i=1;i<=attempts;i++){
     try{
-      const res=await fetch(`${url}${url.includes('?')?'&':'?'}_release=${encodeURIComponent(sha)}_${i}`,{
-        headers:{'cache-control':'no-cache, no-store, max-age=0','pragma':'no-cache'},
-        cache:'no-store'
+      const target=`${url}${url.includes('?')?'&':'?'}_release=${encodeURIComponent(sha)}_${Date.now()}_${i}`;
+      const res=await fetch(target,{
+        headers:{'cache-control':'no-cache, no-store, max-age=0','pragma':'no-cache','accept':'application/json'},
+        cache:'no-store',
+        redirect:'follow'
       });
       const text=await res.text();
-      if(res.ok) return {res,text};
-      last=`HTTP ${res.status}: ${text.slice(0,160)}`;
-    }catch(e){ last=String(e?.message||e); }
+      const contentType=res.headers.get('content-type')||'';
+      const verdict=await accept({res,text,contentType,attempt:i});
+      if(verdict?.ok) return verdict.value;
+      last=verdict?.reason||`HTTP ${res.status}; content-type ${contentType||'ausente'}; corpo ${safeSnippet(text)}`;
+    }catch(e){
+      last=String(e?.message||e);
+    }
     if(i<attempts) await sleep(delay);
   }
-  throw new Error(`Falha ao consultar ${url}: ${last}`);
+  throw new Error(`${label} não convergiu na URL canônica após ${attempts} tentativas: ${last}`);
 }
 
 const fingerprintUrl=`${base}/release-${sha}.json`;
-const fp=await fetchRetry(fingerprintUrl);
-let release;
-try{ release=JSON.parse(fp.text); }catch{ throw new Error('Fingerprint de release não retornou JSON válido.'); }
-if(String(release.sha)!==sha) throw new Error(`URL canônica está em outro commit: esperado ${sha}, recebido ${release.sha||'sem sha'}.`);
+const release=await fetchUntil(fingerprintUrl,({res,text,contentType})=>{
+  if(!res.ok) return {ok:false,reason:`fingerprint HTTP ${res.status}; ${safeSnippet(text)}`};
+  let data;
+  try{ data=JSON.parse(text); }
+  catch{
+    return {ok:false,reason:`fingerprint ainda não é JSON (${contentType||'content-type ausente'}); ${safeSnippet(text)}`};
+  }
+  if(String(data?.sha)!==sha){
+    return {ok:false,reason:`fingerprint em outro commit: esperado ${sha}, recebido ${data?.sha||'sem sha'}`};
+  }
+  return {ok:true,value:data};
+},{attempts:12,delay:3000,label:'Fingerprint da release'});
 
 // Nos hosts oficiais o portal atual opera sem tela de login e o backend injeta identidade PMO sintética.
 // Portanto /api/companies deve responder 200 sem Authorization. Isso também comprova Worker + D1 da release atual.
-const companies=await fetchRetry(`${base}/api/companies`);
-let data;
-try{ data=JSON.parse(companies.text); }catch{ throw new Error('/api/companies não retornou JSON válido.'); }
-if(!Array.isArray(data)) throw new Error(`/api/companies não está em modo live/no-login: ${companies.text.slice(0,180)}`);
+const data=await fetchUntil(`${base}/api/companies`,({res,text,contentType})=>{
+  if(!res.ok) return {ok:false,reason:`/api/companies HTTP ${res.status}; ${safeSnippet(text)}`};
+  let parsed;
+  try{ parsed=JSON.parse(text); }
+  catch{
+    return {ok:false,reason:`/api/companies ainda não é JSON (${contentType||'content-type ausente'}); ${safeSnippet(text)}`};
+  }
+  if(!Array.isArray(parsed)) return {ok:false,reason:`/api/companies ainda não está live/no-login: ${safeSnippet(text)}`};
+  return {ok:true,value:parsed};
+},{attempts:12,delay:3000,label:'API live do Stage'});
 
-console.log(`OK: URL canônica ${base} serve o commit ${sha} e API live sem login (${data.length} empresa(s)).`);
+console.log(`OK: URL canônica ${base} serve o commit ${release.sha} e API live sem login (${data.length} empresa(s)).`);
