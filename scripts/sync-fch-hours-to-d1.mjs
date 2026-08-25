@@ -26,7 +26,7 @@ function parseCSV(text){
   return rows;
 }
 function runSql(sql){
-  const p=spawnSync('npx',['wrangler@4.124.0','d1','execute',db,'--remote','--config',cfg,'--command',sql,'--json'],{encoding:'utf8',env:process.env,maxBuffer:20*1024*1024});
+  const p=spawnSync('npx',['wrangler','d1','execute',db,'--remote','--config',cfg,'--command',sql,'--json'],{encoding:'utf8',env:process.env,maxBuffer:20*1024*1024});
   if(p.status!==0) throw new Error((p.stderr||p.stdout||'wrangler falhou').slice(0,4000));
   const out=(p.stdout||'').trim();
   if(!out)return [];
@@ -46,7 +46,6 @@ function monthKey(label){
   if(m&&monthNames[norm(m[1]).slice(0,3)]){ const yy=m[2].length===2?'20'+m[2]:m[2]; return yy+'-'+monthNames[norm(m[1]).slice(0,3)]; }
   return '';
 }
-function currentMonth(){ return new Date().toISOString().slice(0,7); }
 
 const raw=readFileSync(csvPath,'utf8').replace(/^\uFEFF/,'');
 const rows=parseCSV(raw).filter(r=>r.some(c=>String(c||'').trim()));
