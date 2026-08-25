@@ -1,0 +1,49 @@
+name: FCH Hours Sync - OPR e MADRI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: allamo-fch-hours-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Sincronizar FCH read-only com o Painel PMO
+        env:
+          FCH_DRIVE_FILE_ID: ${{ vars.FCH_DRIVE_FILE_ID || '1EwBf-iJyXsIKu5UoPP6iv-T9gnQQjPfH' }}
+          FCH_DRIVE_FILE_NAME: 'FCH - Formulário de Controle de Horas_Agosto 26.xlsx'
+          FCH_SHEETS: 'FCH - Victor Hugo,FCH - Gabriel'
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          FCH_DRIVE_DOWNLOAD_URL: ${{ secrets.FCH_DRIVE_DOWNLOAD_URL }}
+          PANEL_HOURS_INGEST_URLS: ${{ secrets.PANEL_HOURS_INGEST_URLS }}
+          HOURS_INGEST_TOKEN: ${{ secrets.HOURS_INGEST_TOKEN }}
+        run: python scripts/sync-fch-drive.py
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### FCH → Curva S" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fonte: Google Drive, somente leitura" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Abas: FCH - Victor Hugo e FCH - Gabriel" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Regra compartilhada: OPR_Madri = 100% OPR + 100% MADRI" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Capacidade interna: entrada original única, sem duplicação" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Frequência: a cada hora, no minuto 15" >> "$GITHUB_STEP_SUMMARY"
