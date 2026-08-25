@@ -68,6 +68,9 @@ for(let i=1;i<rows.length;i++){
 const list=[...agg.values()];
 console.log(`[fch] ${envName}: ${list.length} agregados de horas`);
 
+// Schema aditivo: nunca apaga estruturas existentes; cria apenas o que faltar.
+runSql("CREATE TABLE IF NOT EXISTS horas_import (id INTEGER PRIMARY KEY AUTOINCREMENT, company_key TEXT NOT NULL DEFAULT '', project_key TEXT NOT NULL DEFAULT '', mes TEXT NOT NULL DEFAULT '', pessoa TEXT NOT NULL DEFAULT '', horas REAL NOT NULL DEFAULT 0, updated_at TEXT);");
+runSql("CREATE TABLE IF NOT EXISTS sync_state (source TEXT PRIMARY KEY, last_run TEXT, detail TEXT);");
 runSql('DELETE FROM horas_import;');
 for(let i=0;i<list.length;i+=80){
   const vals=list.slice(i,i+80).map(a=>`('${esc(a.company_key)}','${esc(a.project_key)}','${esc(a.mes)}','${esc(a.pessoa)}',${Number(a.horas.toFixed(4))},datetime('now'))`).join(',');
