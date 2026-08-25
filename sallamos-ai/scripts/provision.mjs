@@ -15,7 +15,15 @@ function run(args,capture=false){console.log('> npx wrangler '+args.join(' '));r
 function tryRun(args){try{run(args);return true}catch{return false}}
 function readJson(args,fallback=[]){try{return JSON.parse(run(args,true))}catch{return fallback}}
 function putSecret(name,value){if(!value)return;const cp=spawnSync(NPX,['wrangler','secret','put',name,'--env',environment],{input:value+'\n',encoding:'utf8',stdio:['pipe','inherit','inherit']});if(cp.status!==0)throw new Error('falha ao gravar secret '+name+' em '+environment)}
-run(['whoami']);let databases=readJson(['d1','list','--json']);let db=Array.isArray(databases)?databases.find(x=>x.name===spec.db):null;if(!db){run(['d1','create',spec.db]);databases=readJson(['d1','list','--json']);db=databases.find(x=>x.name===spec.db)}const dbId=db?.uuid||db?.id||db?.database_id;if(!dbId)throw new Error('Não consegui resolver o database_id de '+spec.db);
+
+// Capability preflight is deliberately read-only. Never create a D1, Vectorize index
+// or R2 bucket until the token proves it can inspect every required Cloudflare service.
+run(['whoami']);
+run(['d1','list']);
+run(['vectorize','list']);
+run(['r2','bucket','list']);
+
+let databases=readJson(['d1','list','--json']);let db=Array.isArray(databases)?databases.find(x=>x.name===spec.db):null;if(!db){run(['d1','create',spec.db]);databases=readJson(['d1','list','--json']);db=databases.find(x=>x.name===spec.db)}const dbId=db?.uuid||db?.id||db?.database_id;if(!dbId)throw new Error('Não consegui resolver o database_id de '+spec.db);
 const cfg=JSON.parse(readFileSync(configPath,'utf8')),target=cfg?.env?.[environment]?.d1_databases?.find(x=>x.binding==='META');if(!target)throw new Error('Binding META não encontrado para '+environment);target.database_id=dbId;writeFileSync(configPath,JSON.stringify(cfg,null,2)+'\n');
 if(!tryRun(['vectorize','get',spec.vector]))run(['vectorize','create',spec.vector,'--dimensions=768','--metric=cosine']);tryRun(['r2','bucket','create',spec.bucket]);
 const secretList=readJson(['secret','list','--env',environment,'--json'],[]),existing=new Set((Array.isArray(secretList)?secretList:[]).map(x=>x.name));ensureGeneratedSecret('SALLAMOS_SESSION_SECRET',process.env.SALLAMOS_SESSION_SECRET,existing);ensureGeneratedSecret('ADMIN_TOKEN',process.env.ADMIN_TOKEN,existing);ensureGeneratedSecret('EVIDENCE_INGEST_TOKEN',process.env.EVIDENCE_INGEST_TOKEN,existing);putOptionalSecret('SALLAMOS_API_BASE',process.env.SALLAMOS_API_BASE,existing);putOptionalSecret('SALLAMOS_AUTH_VALIDATE_URL',process.env.SALLAMOS_AUTH_VALIDATE_URL,existing);putOptionalSecret('SALLAMOS_API_TOKEN',process.env.SALLAMOS_API_TOKEN,existing);putOptionalSecret('REPO_READ_TOKEN',process.env.REPO_READ_TOKEN,existing);
