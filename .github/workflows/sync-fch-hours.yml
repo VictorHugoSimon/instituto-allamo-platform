@@ -1,0 +1,56 @@
+name: Sync FCH Hours to PMO
+
+on:
+  push:
+    branches: [data-sync]
+    paths:
+      - 'public/data/fch-hours.csv'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fch-hours-sync
+  cancel-in-progress: true
+
+jobs:
+  sync-hours:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout data-sync
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validar arquivo normalizado
+        run: |
+          test -f public/data/fch-hours.csv
+          head -n 1 public/data/fch-hours.csv | grep -F 'empresa,projeto,hora,mes,consultor'
+
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Sincronizar horas no D1 Stage
+        run: node scripts/sync-fch-hours-to-d1.mjs --env=stage --file=public/data/fch-hours.csv
+
+      - name: Sincronizar horas no D1 Produção
+        run: node scripts/sync-fch-hours-to-d1.mjs --env=production --file=public/data/fch-hours.csv
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo '### FCH → PMO' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Fonte: Google Drive, somente leitura' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Regra OPR_Madri: replicação integral para OPR e Madri' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Destinos: D1 Stage + Produção' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Atualização: horas_import + Curva S + KPIs dos reports' >> "$GITHUB_STEP_SUMMARY"
