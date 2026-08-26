@@ -20,9 +20,7 @@ const tokenLooksLegacyKey = /^[a-f0-9]{32}$/i.test(token);
 const explicitLegacyReady = Boolean(apiKey && email);
 
 if (tokenEqualsAccountId) {
-  if (!explicitLegacyReady) {
-    throw new Error('CLOUDFLARE_API_TOKEN é igual ao CLOUDFLARE_ACCOUNT_ID. Cadastre um API Token real ou CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL.');
-  }
+  if (!explicitLegacyReady) throw new Error('CLOUDFLARE_API_TOKEN é igual ao CLOUDFLARE_ACCOUNT_ID. Cadastre um API Token real ou CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL.');
   token = '';
 }
 if (tokenLooksLegacyKey) {
@@ -34,23 +32,18 @@ if (tokenLooksLegacyKey) {
   }
 }
 
-mask(token);
-mask(apiKey);
-mask(email);
+mask(token); mask(apiKey); mask(email);
 
-// Nesta branch operacional, a Global API Key existente é preferida porque um API Token
-// pode autenticar no whoami e ainda assim não possuir D1/Pages Edit. Os valores nunca são impressos.
+// Esta alteração existe apenas na branch operacional da ponte do perfil.
+// Global API Key já autorizada é preferida porque um API Token pode autenticar no whoami
+// e ainda assim não possuir D1/Pages Write. Nenhum valor é impresso.
 const candidates = [];
-if (apiKey && email) {
-  candidates.push({ mode: 'api_key_email', env: { CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_API_KEY: apiKey, CLOUDFLARE_EMAIL: email } });
-}
+if (apiKey && email) candidates.push({ mode: 'api_key_email', env: { CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_API_KEY: apiKey, CLOUDFLARE_EMAIL: email } });
 if (token) {
   if (token.length < 20) throw new Error('CLOUDFLARE_API_TOKEN parece inválido: comprimento insuficiente');
   candidates.push({ mode: 'api_token', env: { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_API_KEY: '', CLOUDFLARE_EMAIL: '' } });
 }
-if (!candidates.length) {
-  throw new Error('Credencial Cloudflare incompleta: configure CLOUDFLARE_API_TOKEN ou o par CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL.');
-}
+if (!candidates.length) throw new Error('Credencial Cloudflare incompleta: configure CLOUDFLARE_API_TOKEN ou o par CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL.');
 
 let selected = candidates[0];
 if (verifyOnline) {
@@ -66,21 +59,27 @@ if (verifyOnline) {
     if (access.ok) { selected = candidate; break; }
     console.warn(`[cloudflare-auth] ${candidate.mode} autenticou, mas não tem acesso simultâneo a Workers, D1 e Pages; tentando próximo modo.`);
   }
-  if (!selected) {
-    throw new Error('Nenhuma credencial Cloudflare existente possui acesso simultâneo a Workers, D1 e Pages nesta conta.');
-  }
+  if (!selected) throw new Error('Nenhuma credencial Cloudflare existente possui acesso simultâneo a Workers, D1 e Pages nesta conta.');
+}
+
+// Para a ponte temporária, provisiona os dois recursos obrigatórios usando o Wrangler oficial.
+// O bootstrap do perfil depois apenas confirma os recursos e resolve o UUID.
+if (workflowName === 'Victor Profile STAGE Bridge') {
+  ensureProfileResources(selected.env);
 }
 
 writeEnv('CLOUDFLARE_API_TOKEN', selected.env.CLOUDFLARE_API_TOKEN);
 writeEnv('CLOUDFLARE_API_KEY', selected.env.CLOUDFLARE_API_KEY);
 writeEnv('CLOUDFLARE_EMAIL', selected.env.CLOUDFLARE_EMAIL);
 writeEnv('CLOUDFLARE_ACCOUNT_ID', accountId);
+writeEnv('PROFILE_CF_AUTH_MODE', selected.mode);
 
 console.log(JSON.stringify({
   cloudflareAuthPreparation: 'ok',
   authMode: selected.mode,
   verifiedWithWrangler: verifyOnline,
   resourceAccessVerified: verifyOnline,
+  profileResourcesProvisioned: workflowName === 'Victor Profile STAGE Bridge',
   accountIdLength: accountId.length,
   tokenProvided: Boolean(rawToken.trim()),
   tokenLength: selected.mode === 'api_token' ? token.length : null,
@@ -92,12 +91,8 @@ console.log(JSON.stringify({
 }, null, 2));
 
 function verifyWrangler(authEnv) {
-  const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const result = spawnSync(cmd, ['--yes', 'wrangler@4.124.0', 'whoami'], {
-    cwd: process.cwd(), encoding: 'utf8', shell: false, windowsHide: true,
-    env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: accountId, ...authEnv }
-  });
-  return { ok: !result.error && result.status === 0 };
+  const result = wrangler(['whoami'], authEnv);
+  return { ok: result.ok };
 }
 
 async function verifyResourceAccess(authEnv) {
@@ -121,6 +116,67 @@ async function verifyResourceAccess(authEnv) {
     }
   }
   return { ...statuses, ok: statuses.workers === 'ok' && statuses.d1 === 'ok' && statuses.pages === 'ok' };
+}
+
+function ensureProfileResources(authEnv) {
+  const databaseName = String(process.env.D1_DATABASE_NAME || 'vhs-db-staging');
+  const pagesProjectName = String(process.env.PAGES_PROJECT_NAME || 'victor-simon-site-staging');
+  const productionBranch = String(process.env.PAGES_PRODUCTION_BRANCH || 'staging');
+
+  const d1List = wrangler(['d1', 'list', '--json'], authEnv, true);
+  if (!d1List.ok) throw new Error(`Wrangler não conseguiu listar D1 (${safeError(d1List)}).`);
+  const databases = parseJsonOutput(d1List.stdout, 'd1 list');
+  const databaseExists = Array.isArray(databases) && databases.some((item) => item?.name === databaseName);
+  if (!databaseExists) {
+    const created = wrangler(['d1', 'create', databaseName, '--location', 'enam'], authEnv, true);
+    if (!created.ok) throw new Error(`Wrangler não conseguiu criar D1 ${databaseName} (${safeError(created)}).`);
+    console.log(`[profile-cloudflare-auth] D1 criado via Wrangler: ${databaseName}`);
+  } else {
+    console.log(`[profile-cloudflare-auth] D1 existente: ${databaseName}`);
+  }
+
+  const pagesList = wrangler(['pages', 'project', 'list', '--json'], authEnv, true);
+  if (!pagesList.ok) throw new Error(`Wrangler não conseguiu listar Pages (${safeError(pagesList)}).`);
+  const projects = parseJsonOutput(pagesList.stdout, 'pages project list');
+  const pagesExists = Array.isArray(projects) && projects.some((item) => (item?.name || item?.project_name) === pagesProjectName);
+  if (!pagesExists) {
+    const created = wrangler(['pages', 'project', 'create', pagesProjectName, '--production-branch', productionBranch], authEnv, true);
+    if (!created.ok) throw new Error(`Wrangler não conseguiu criar Pages ${pagesProjectName} (${safeError(created)}).`);
+    console.log(`[profile-cloudflare-auth] Pages criado via Wrangler: ${pagesProjectName}`);
+  } else {
+    console.log(`[profile-cloudflare-auth] Pages existente: ${pagesProjectName}`);
+  }
+}
+
+function wrangler(args, authEnv, capture = false) {
+  const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  const result = spawnSync(cmd, ['--yes', 'wrangler@4.124.0', ...args], {
+    cwd: process.cwd(), encoding: 'utf8', shell: false, windowsHide: true,
+    stdio: capture ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'ignore', 'ignore'],
+    env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: accountId, ...authEnv }
+  });
+  return { ok: !result.error && result.status === 0, status: result.status, stdout: result.stdout || '', stderr: result.stderr || '' };
+}
+
+function parseJsonOutput(output, label) {
+  const value = String(output || '').trim();
+  try { return JSON.parse(value); } catch {
+    const startArray = value.indexOf('[');
+    const endArray = value.lastIndexOf(']');
+    if (startArray >= 0 && endArray > startArray) {
+      try { return JSON.parse(value.slice(startArray, endArray + 1)); } catch {}
+    }
+    throw new Error(`Saída JSON inválida de ${label}.`);
+  }
+}
+
+function safeError(result) {
+  const message = `${result.stderr || ''} ${result.stdout || ''}`
+    .replace(/Bearer\s+\S+/gi, 'Bearer [masked]')
+    .replace(/[A-Za-z0-9_-]{24,}/g, '[masked]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return message.slice(0, 300) || `exit_${result.status ?? 'unknown'}`;
 }
 
 function normalizeToken(value) {
