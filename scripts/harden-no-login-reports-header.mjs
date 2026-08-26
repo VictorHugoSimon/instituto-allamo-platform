@@ -18,7 +18,25 @@ const navNew=`const allamoNoLoginAdminHost=()=>${officialHost};const api=async p
 if(html.includes(navOld)) html=html.replace(navOld,navNew);
 else if(!html.includes('allamoNoLoginAdminHost')) throw new Error('API de navegação dos Reports não encontrada para modo sem login.');
 
-// 3) Cabeçalho: o guard antigo dependia da existência do botão Sair.
+// 3) Assistente IA: no modo oficial sem login o backend já fornece identidade PMO sintética.
+// O launcher não pode exigir allamo_session antes de chamar /api/report-ai/status.
+const aiApi=/async function api\(path,opts=\{\}\)\{\s*const t=token\(\);\s*if\(!t\)throw new Error\('Sua sessão não foi encontrada\. Entre novamente no portal\.'\);\s*const r=await transport\('\/api\/'\+path,\{\.\.\.opts,headers:\{'content-type':'application\/json','authorization':'Bearer '\+t,\.\.\.\(opts\.headers\|\|\{\}\)\},cache:'no-store',credentials:'same-origin'\}\);\s*const d=await r\.json\(\)\.catch\(\(\)=>\(\{\}\)\);\s*if\(!r\.ok\)throw new Error\(d\.error\|\|\('HTTP '\+r\.status\)\);\s*return d;\s*\}/;
+const aiNew=`const allamoNoLoginAiHost=()=>${officialHost};
+  async function api(path,opts={}){
+    const noLogin=allamoNoLoginAiHost();
+    const t=noLogin?'':token();
+    if(!t&&!noLogin)throw new Error('Sua sessão não foi encontrada. Entre novamente no portal.');
+    const headers={'content-type':'application/json',...(opts.headers||{})};
+    if(t)headers.authorization='Bearer '+t;
+    const r=await transport('/api/'+path,{...opts,headers,cache:'no-store',credentials:'same-origin'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    return d;
+  }`;
+if(aiApi.test(html)) html=html.replace(aiApi,aiNew);
+else if(!html.includes('allamoNoLoginAiHost')) throw new Error('API do Assistente IA não encontrada para modo sem login.');
+
+// 4) Cabeçalho: o guard antigo dependia da existência do botão Sair.
 // O novo guard remove perfil/cargo/avatar independentemente do botão Sair e sobrevive ao pós-unpack.
 const templateOpen='<script type="__bundler/template">';
 const templateClose='</script>';
@@ -41,9 +59,11 @@ html=html.slice(0,js)+serialized+html.slice(b);
 
 if(html.includes(reportOld)) throw new Error('Central de Reports ainda exige sessão local.');
 if(html.includes(navOld)) throw new Error('Navegação dos Reports ainda exige sessão local.');
+if(aiApi.test(html)) throw new Error('Assistente IA ainda exige sessão local nos hosts oficiais.');
 if(!html.includes('allamoNoLoginReportHost')) throw new Error('Marker do Report sem login ausente.');
 if(!html.includes('allamoNoLoginAdminHost')) throw new Error('Marker da navegação sem login ausente.');
+if(!html.includes('allamoNoLoginAiHost')) throw new Error('Marker do Assistente IA sem login ausente.');
 if(!html.includes('allamo-no-login-profile-cleaner')) throw new Error('Cleaner de perfil do cabeçalho ausente.');
 
 fs.writeFileSync(file,html);
-console.log('OK: Central de Reports funciona sem sessão local e cabeçalho oficial não exibe identidade de usuário.');
+console.log('OK: Reports e Assistente IA funcionam no modo sem login oficial; cabeçalho não exibe identidade de usuário.');
