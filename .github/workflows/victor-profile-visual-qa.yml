@@ -29,30 +29,48 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Aguardar STAGING e validar conteúdo esperado
+      - name: Baixar Home STAGING
         run: |
           set -euo pipefail
-          URL='https://victor-simon-site-staging.pages.dev'
+          URL='https://victor-simon-site-staging.pages.dev/'
+          ok=0
           for i in {1..8}; do
-            if curl -fsSL "$URL/" -o /tmp/home.html; then break; fi
+            if curl -fsSL "$URL" -o /tmp/home.html; then ok=1; break; fi
             sleep $((i * 2))
           done
-          grep -Fq 'Clareza para decidir. Método para executar. Resultado para crescer.' /tmp/home.html
-          grep -Fq 'id="consultoria"' /tmp/home.html
-          grep -Fq 'id="servicos"' /tmp/home.html
-          grep -Fq 'id="metodo"' /tmp/home.html
-          grep -Fq 'id="projetos"' /tmp/home.html
-          grep -Fq 'id="ifarm"' /tmp/home.html
-          grep -Fq '/assets/profile-v2.css' /tmp/home.html
+          test "$ok" = '1'
+          test -s /tmp/home.html
+          echo "HOME_BYTES=$(wc -c < /tmp/home.html)" >> "$GITHUB_ENV"
+
+      - name: Validar hero V2 publicado
+        run: grep -Fq 'Clareza para decidir. Método para executar. Resultado para crescer.' /tmp/home.html
+
+      - name: Validar seções V2 publicadas
+        run: |
+          set -euo pipefail
+          for marker in 'id="consultoria"' 'id="servicos"' 'id="metodo"' 'id="projetos"' 'id="ifarm"'; do
+            grep -Fq "$marker" /tmp/home.html
+          done
+
+      - name: Validar CSS V2 publicado
+        run: grep -Fq '/assets/profile-v2.css' /tmp/home.html
+
+      - name: Bloquear placeholder visual antigo
+        run: |
           if grep -Fq 'class="initials">VS</span>' /tmp/home.html; then
             echo 'Placeholder visual antigo VS encontrado em STAGING.' >&2
             exit 1
           fi
-          curl -fsSL "$URL/blog.html" -o /tmp/blog.html
+
+      - name: Validar Blog publicado
+        run: |
+          curl -fsSL 'https://victor-simon-site-staging.pages.dev/blog.html' -o /tmp/blog.html
           grep -Fq 'articleView' /tmp/blog.html
-          curl -fsSL "$URL/painel.html" -o /tmp/painel.html
+
+      - name: Validar painel Growth OS publicado
+        run: |
+          curl -fsSL 'https://victor-simon-site-staging.pages.dev/painel.html' -o /tmp/painel.html
           grep -Fq 'Growth OS' /tmp/painel.html
-          echo 'Conteúdo e assets V2 confirmados no STAGING publicado.'
 
       - name: Instalar Chromium para QA visual
         run: npx --yes playwright@1.55.0 install --with-deps chromium
@@ -84,6 +102,7 @@ jobs:
       - name: Resumo
         run: |
           echo '### Visual QA concluída' >> "$GITHUB_STEP_SUMMARY"
+          echo "- Home bytes: ${HOME_BYTES:-n/a}" >> "$GITHUB_STEP_SUMMARY"
           echo '- Home desktop: qa/screenshots/home-desktop.png' >> "$GITHUB_STEP_SUMMARY"
           echo '- Home mobile: qa/screenshots/home-mobile.png' >> "$GITHUB_STEP_SUMMARY"
           echo '- Blog: qa/screenshots/blog-desktop.png' >> "$GITHUB_STEP_SUMMARY"
