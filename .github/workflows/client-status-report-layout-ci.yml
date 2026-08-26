@@ -1,0 +1,24 @@
+name: Client Status Report Layout CI
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+
+jobs:
+  client-status-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate official client Status Report layout
+        run: node scripts/validate-client-status-report-layout.mjs
+      - name: Validate public tenant isolation
+        run: npm run test:tenant

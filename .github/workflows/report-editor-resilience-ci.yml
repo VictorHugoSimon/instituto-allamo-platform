@@ -1,0 +1,36 @@
+name: Report Editor Resilience CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'src/report-editor-resilience.js'
+      - 'src/report-live-editable-ui.js'
+      - 'src/report-management-api.js'
+      - 'scripts/harden-live-editable-report.mjs'
+      - 'scripts/validate-report-editor-resilience.mjs'
+      - 'package.json'
+      - '.github/workflows/report-editor-resilience-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report-editor-resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate draft recovery and version comparison
+        run: npm run test:report-resilience
+      - name: Validate complete Report editing contract
+        run: npm run test:report-edit

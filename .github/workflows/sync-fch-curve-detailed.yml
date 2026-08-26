@@ -1,0 +1,85 @@
+name: Sync FCH Detailed Curve Data
+
+on:
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/sync-fch-curve-detailed.yml'
+      - 'scripts/read-fch-detailed-readonly.py'
+      - 'scripts/sync-fch-detailed-to-d1.mjs'
+      - 'migrations/2026-08-25-fch-hours-automation.sql'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fch-detailed-curve-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      FCH_FILE_ID: '1EwBf-iJyXsIKu5UoPP6iv-T9gnQQjPfH'
+      FCH_FOLDER_ID: ${{ secrets.FCH_FOLDER_ID }}
+      GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dependências do leitor read-only
+        run: python -m pip install --disable-pip-version-check --quiet openpyxl google-auth requests
+      - name: Validar leitor
+        run: python -m py_compile scripts/read-fch-detailed-readonly.py
+      - name: Ler FCH sem modificar origem
+        run: python scripts/read-fch-detailed-readonly.py --output /tmp/fch-detail.json
+      - name: Validar payload detalhado
+        run: |
+          test -s /tmp/fch-detail.json
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/fch-detail.json',encoding='utf-8'))
+          assert p.get('policy')=='google-drive-readonly'
+          assert p.get('entries')
+          assert all(x.get('source_entry_hash') and x.get('activity_date') and x.get('target_project') in ('OPR','MADRI') for x in p['entries'])
+          print(p['summary'])
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Preparar autenticação Cloudflare
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Garantir schema Stage
+        run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
+      - name: Atualizar fatos da Curva S no Stage
+        run: node scripts/sync-fch-detailed-to-d1.mjs --env=stage --file=/tmp/fch-detail.json
+      - name: Garantir schema Produção
+        run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
+      - name: Atualizar fatos da Curva S em Produção
+        run: node scripts/sync-fch-detailed-to-d1.mjs --env=production --file=/tmp/fch-detail.json
+      - name: Limpar arquivo temporário
+        if: always()
+        run: rm -f /tmp/fch-detail.json
+      - name: Resumo
+        if: always()
+        run: |
+          echo '### FCH detalhado → Curva S' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Google Drive: somente leitura (`drive.readonly`)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Detecção de colunas: por cabeçalho, não por letra fixa' >> "$GITHUB_STEP_SUMMARY"
+          echo '- OPR_Madri: 100% OPR + 100% MADRI' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Capacidade física: deduplicada por `source_entry_hash`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Atualização: Stage + Produção, somente tabelas derivadas do PMO' >> "$GITHUB_STEP_SUMMARY"
