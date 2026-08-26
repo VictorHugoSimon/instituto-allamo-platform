@@ -1,8 +1,10 @@
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 const responsive=fs.readFileSync('src/responsive-usability.js','utf8');
 const admin=fs.readFileSync('src/report-admin-navigation.js','utf8');
 const reportUi=fs.readFileSync('src/report-management-ui.js','utf8');
 const richReport=fs.readFileSync('src/rich-report-viewer.js','utf8');
+const masterSource=fs.readFileSync('src/status-report-master-source.js','utf8');
 const raci=fs.readFileSync('src/raci-visual.js','utf8');
 const watchdog=fs.readFileSync('src/post-unpack-watchdog.js','utf8');
 const clientReports=fs.readFileSync('src/client-published-reports.js','utf8');
@@ -17,12 +19,30 @@ new Function(responsive);new Function(admin);new Function(reportUi);new Function
 new Function('return async function(){'+clientApi+'}');
 new Function('return async function(){'+publicApi+'}');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+
+function decodeMaster(){
+  const m=masterSource.match(/const GZIP_B64='([^']+)'/);if(!m)throw new Error('Fonte mestre comprimida ausente.');
+  const buf=Buffer.from(m[1],'base64');
+  try{return zlib.gunzipSync(buf).toString('utf8')}catch(_){
+    if(buf.length<18||buf[0]!==0x1f||buf[1]!==0x8b)throw new Error('Header gzip do template mestre inválido.');
+    const flags=buf[3];let p=10;
+    if(flags&4){const n=buf.readUInt16LE(p);p+=2+n}
+    const skip=()=>{while(p<buf.length&&buf[p]!==0)p++;p++};
+    if(flags&8)skip();if(flags&16)skip();if(flags&2)p+=2;
+    return zlib.inflateRawSync(buf.subarray(p,buf.length-8)).toString('utf8');
+  }
+}
+const masterHtml=decodeMaster();
+
 for(const [n,l] of [
   ['width=device-width','viewport responsivo'],['100dvh','altura móvel segura'],['allamo-report-editor','editor de report responsivo'],['allamo-responsive-modal-box','modal responsivo'],['overflow-x:auto','scroll horizontal controlado'],['@media(max-width:767px)','breakpoint mobile'],['@media(max-width:1023px)','breakpoint tablet'],['removeFloatingLaunchers','remoção defensiva dos launchers'],['allamo-raci-r','cor R'],['allamo-raci-a','cor A'],['allamo-raci-c','cor C'],['allamo-raci-i','cor I'],['#awm','Work Management responsivo'],['#arm','Central de Reports responsiva']
 ])must(responsive,n,l);
 for(const [n,l] of [
-  ['allamo-status-report-master-v1','template mestre de Status Report'],['arm-inline','Report embutido sem quebrar o portal'],['@media(max-width:900px)','template responsivo tablet'],['@media(max-width:560px)','template responsivo mobile'],['overflow:auto','conteúdo/tabelas podem rolar sem estourar viewport'],['arm-tabs','navegação interna do Report'],['arm-table-wrap','tabelas protegidas por scroll']
+  ['allamo-status-report-master-v1','template mestre de Status Report'],['arm-inline','Report embutido sem quebrar o portal'],['width:100%','iframe ocupa largura disponível'],['min-width:0','container permite redução de largura'],['frame.style.height=Math.max','altura do iframe acompanha conteúdo'],['ResizeObserver','altura reage a mudanças do template'],["querySelectorAll('.tab-btn')",'troca de abas recalcula altura'],['dataset.reportTemplate','versão visual registrada no DOM']
 ])must(richReport,n,l);
+for(const [n,l] of [
+  ['.tabbar','barra de abas do HTML mestre'],['.tab-btn','abas do HTML mestre'],['max-width:1180px','conteúdo mestre com largura máxima'],['@media(max-width:900px)','template responsivo tablet'],['@media(max-width:560px)','template responsivo mobile'],['@media print','template preparado para impressão/PDF'],['id="cronoTable"','tabela principal do cronograma presente']
+])must(masterHtml,n,l);
 for(const [n,l] of [
   ['Central de Reports','central administrativa'],['acompanhar report','interceptação por projeto'],["txt==='acompanhar'",'interceptação por empresa'],['data-open-legacy-report','acesso ao report principal'],['Pesquise e abra qualquer Report','orientação da central'],['Abrindo a Central de Reports','feedback imediato'],['window.__allamoReportContext','contexto para painel publicado'],['projects.find','clique direto no projeto']
 ])must(admin,n,l);
@@ -48,4 +68,4 @@ const reportAiPos=responsiveWorkflow.indexOf('run: npm run test:report-ai');
 const uxPos=responsiveWorkflow.indexOf('run: npm run test:ux');
 if(buildPos<0||reportAiPos<0||uxPos<0)throw new Error('Workflow responsivo incompleto: build, report AI e UX são obrigatórios.');
 if(!(buildPos<reportAiPos&&reportAiPos<uxPos))throw new Error('Workflow responsivo deve gerar o artefato final antes de validar Report AI e UX.');
-console.log('OK: template mestre responsivo, histórico por ciclos, publicação autenticada/pública, RACI, feedback e ordem do CI validados.');
+console.log('OK: template mestre responsivo no iframe, histórico por ciclos, publicação autenticada/pública, RACI, feedback e ordem do CI validados.');
