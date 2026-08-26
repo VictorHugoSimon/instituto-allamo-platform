@@ -9,4 +9,5 @@
     if(publicStage)return client.renderInto(container,report);
     return original(container,report);
   };
+  setTimeout(()=>{try{window.AllamoPublicClientPortal?.mount?.()}catch(_){}},0);
 })();
