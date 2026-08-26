@@ -1,0 +1,90 @@
+name: Victor Profile Visual QA
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: victor-profile-visual-qa
+  cancel-in-progress: true
+
+jobs:
+  visual-qa:
+    if: ${{ github.event_name != 'pull_request' || github.head_ref == 'ops/victor-profile-cloudflare-bridge-v2' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch operacional
+        uses: actions/checkout@v4
+        with:
+          ref: ops/victor-profile-cloudflare-bridge-v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Aguardar STAGING e validar conteúdo esperado
+        run: |
+          set -euo pipefail
+          URL='https://victor-simon-site-staging.pages.dev'
+          for i in {1..8}; do
+            if curl -fsSL "$URL/" -o /tmp/home.html; then break; fi
+            sleep $((i * 2))
+          done
+          grep -Fq 'Clareza para decidir. Método para executar. Resultado para crescer.' /tmp/home.html
+          grep -Fq 'id="consultoria"' /tmp/home.html
+          grep -Fq 'id="servicos"' /tmp/home.html
+          grep -Fq 'id="metodo"' /tmp/home.html
+          grep -Fq 'id="projetos"' /tmp/home.html
+          grep -Fq 'id="ifarm"' /tmp/home.html
+          grep -Fq '/assets/profile-v2.css' /tmp/home.html
+          if grep -Fq 'class="initials">VS</span>' /tmp/home.html; then
+            echo 'Placeholder visual antigo VS encontrado em STAGING.' >&2
+            exit 1
+          fi
+          curl -fsSL "$URL/blog.html" -o /tmp/blog.html
+          grep -Fq 'articleView' /tmp/blog.html
+          curl -fsSL "$URL/painel.html" -o /tmp/painel.html
+          grep -Fq 'Growth OS' /tmp/painel.html
+          echo 'Conteúdo e assets V2 confirmados no STAGING publicado.'
+
+      - name: Instalar Chromium para QA visual
+        run: npx --yes playwright@1.55.0 install --with-deps chromium
+
+      - name: Capturar screenshots
+        run: |
+          set -euo pipefail
+          mkdir -p qa/screenshots
+          URL='https://victor-simon-site-staging.pages.dev'
+          npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --viewport-size='1440,1000' "$URL/" qa/screenshots/home-desktop.png
+          npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --device='iPhone 13' "$URL/" qa/screenshots/home-mobile.png
+          npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --viewport-size='1440,1000' "$URL/blog.html" qa/screenshots/blog-desktop.png
+          npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --viewport-size='1440,1000' "$URL/painel.html" qa/screenshots/painel-login.png
+          ls -lh qa/screenshots
+
+      - name: Registrar evidências visuais na branch isolada
+        run: |
+          set -euo pipefail
+          git config user.name 'Victor Profile QA Bot'
+          git config user.email '111150704+VictorHugoSimon@users.noreply.github.com'
+          git add qa/screenshots
+          if git diff --cached --quiet; then
+            echo 'Screenshots sem alteração.'
+            exit 0
+          fi
+          git commit -m '[skip ci] qa: capture Victor profile STAGING visuals'
+          git push origin HEAD:ops/victor-profile-cloudflare-bridge-v2
+
+      - name: Resumo
+        run: |
+          echo '### Visual QA concluída' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Home desktop: qa/screenshots/home-desktop.png' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Home mobile: qa/screenshots/home-mobile.png' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Blog: qa/screenshots/blog-desktop.png' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Painel/login: qa/screenshots/painel-login.png' >> "$GITHUB_STEP_SUMMARY"
