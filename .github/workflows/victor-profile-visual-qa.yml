@@ -62,10 +62,22 @@ jobs:
             exit 1
           fi
 
-      - name: Validar Blog publicado
+      - name: Aguardar e validar Blog publicado
         run: |
-          curl -fsSL 'https://victor-simon-site-staging.pages.dev/blog.html' -o /tmp/blog.html
-          grep -Fq 'articleView' /tmp/blog.html
+          set -euo pipefail
+          URL='https://victor-simon-site-staging.pages.dev/blog'
+          ok=0
+          for i in {1..15}; do
+            if curl -fsSL "$URL" -o /tmp/blog.html && grep -Fq 'articleView' /tmp/blog.html; then
+              ok=1
+              break
+            fi
+            echo "Blog ainda não propagado na tentativa $i/15."
+            sleep 4
+          done
+          test "$ok" = '1'
+          grep -Fq 'postsGrid' /tmp/blog.html
+          echo "BLOG_BYTES=$(wc -c < /tmp/blog.html)" >> "$GITHUB_ENV"
 
       - name: Validar painel Growth OS publicado
         run: |
@@ -82,7 +94,7 @@ jobs:
           URL='https://victor-simon-site-staging.pages.dev'
           npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --viewport-size='1440,1000' "$URL/" qa/screenshots/home-desktop.png
           npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --device='iPhone 13' "$URL/" qa/screenshots/home-mobile.png
-          npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --viewport-size='1440,1000' "$URL/blog.html" qa/screenshots/blog-desktop.png
+          npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --viewport-size='1440,1000' "$URL/blog" qa/screenshots/blog-desktop.png
           npx --yes playwright@1.55.0 screenshot --browser=chromium --full-page --viewport-size='1440,1000' "$URL/painel.html" qa/screenshots/painel-login.png
           ls -lh qa/screenshots
 
@@ -103,6 +115,7 @@ jobs:
         run: |
           echo '### Visual QA concluída' >> "$GITHUB_STEP_SUMMARY"
           echo "- Home bytes: ${HOME_BYTES:-n/a}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Blog bytes: ${BLOG_BYTES:-n/a}" >> "$GITHUB_STEP_SUMMARY"
           echo '- Home desktop: qa/screenshots/home-desktop.png' >> "$GITHUB_STEP_SUMMARY"
           echo '- Home mobile: qa/screenshots/home-mobile.png' >> "$GITHUB_STEP_SUMMARY"
           echo '- Blog: qa/screenshots/blog-desktop.png' >> "$GITHUB_STEP_SUMMARY"
