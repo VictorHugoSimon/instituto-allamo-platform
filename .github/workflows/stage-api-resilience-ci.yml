@@ -1,0 +1,32 @@
+name: Stage API Resilience CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  stage-api-resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate Stage API resilience
+        run: npm run test:stage-api-resilience
+      - name: Validate runtime readiness
+        run: npm run test:runtime-readiness
+      - name: Validate data freshness
+        run: npm run test:freshness
+      - name: Validate persistence guard
+        run: npm run test:platform

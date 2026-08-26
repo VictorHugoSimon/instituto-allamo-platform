@@ -28,39 +28,58 @@ const stageEnsureColumn = async (table, column, definition) => {
 };
 
 if (isAllamoStage) {
-  await stageSafe("CREATE TABLE IF NOT EXISTS stage_runtime_flags (key TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')), detail TEXT)");
+  // O bootstrap é fallback de segurança. O deploy oficial já aplica schema aditivo antes
+  // da publicação. Em runtime, uma única Promise compartilhada por isolate evita dezenas
+  // de DDLs concorrentes quando a tela dispara várias APIs em paralelo (Reports, dashboard,
+  // projetos etc.). Requisições simultâneas aguardam a mesma inicialização.
+  if (!globalThis.__allamoStageCoreSchemaPromise) {
+    globalThis.__allamoStageCoreSchemaPromise = (async () => {
+      await stageSafe("CREATE TABLE IF NOT EXISTS stage_runtime_flags (key TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')), detail TEXT)");
 
-  // Compatibilidade de schema legado. /api/releases e o cadastro de GMUD usam
-  // gmud.project; bases antigas podem não possuir a coluna. A evolução é aditiva,
-  // idempotente e preserva todas as linhas existentes.
-  const gmudProjectReady = await stageEnsureColumn('gmud', 'project', "TEXT NOT NULL DEFAULT ''");
-  if (gmudProjectReady) {
-    await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES (?,datetime('now'),?)", 'schema-gmud-project', 'Coluna gmud.project disponível para associação de GMUD a projeto');
+      // Compatibilidade de schema legado. /api/releases e o cadastro de GMUD usam
+      // gmud.project; bases antigas podem não possuir a coluna. A evolução é aditiva,
+      // idempotente e preserva todas as linhas existentes.
+      const gmudProjectReady = await stageEnsureColumn('gmud', 'project', "TEXT NOT NULL DEFAULT ''");
+      if (gmudProjectReady) {
+        await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES (?,datetime('now'),?)", 'schema-gmud-project', 'Coluna gmud.project disponível para associação de GMUD a projeto');
+      }
+
+      // Work Management nativo — apenas criação idempotente de estrutura, sem limpeza de dados.
+      await stageSafe("CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, project TEXT, parent_id TEXT, sprint_id TEXT, item_type TEXT NOT NULL DEFAULT 'TASK', title TEXT NOT NULL, description TEXT DEFAULT '', acceptance_criteria TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'BACKLOG', priority TEXT NOT NULL DEFAULT 'Média', owner TEXT DEFAULT '', reporter TEXT DEFAULT '', start_date TEXT, due_date TEXT, story_points REAL, estimate_hours REAL, rank REAL NOT NULL DEFAULT 0, labels TEXT DEFAULT '[]', blocked INTEGER NOT NULL DEFAULT 0, blocked_reason TEXT DEFAULT '', created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), archived_at TEXT)");
+      await stageSafe("CREATE TABLE IF NOT EXISTS work_sprints (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, name TEXT NOT NULL, goal TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'PLANEJADA', start_date TEXT, end_date TEXT, capacity_points REAL, capacity_hours REAL, created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), started_at TEXT, completed_at TEXT)");
+      await stageSafe("CREATE TABLE IF NOT EXISTS work_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT NOT NULL, work_item_id TEXT NOT NULL, author TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT, deleted_at TEXT)");
+      await stageSafe("CREATE TABLE IF NOT EXISTS work_checklist (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT NOT NULL, work_item_id TEXT NOT NULL, text TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, rank REAL NOT NULL DEFAULT 0, created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT, deleted_at TEXT)");
+      await stageSafe("CREATE TABLE IF NOT EXISTS work_links (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT NOT NULL, source_item_id TEXT NOT NULL, target_item_id TEXT NOT NULL, link_type TEXT NOT NULL, created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(source_item_id,target_item_id,link_type))");
+      await stageSafe("CREATE TABLE IF NOT EXISTS work_events (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT, project_id INTEGER, work_item_id TEXT, event_type TEXT NOT NULL DEFAULT 'usage', event_name TEXT NOT NULL, actor TEXT, metadata_json TEXT DEFAULT '{}', created_at TEXT NOT NULL DEFAULT (datetime('now')))");
+      await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_items_company_project ON work_items(company_id,project_id,archived_at)");
+      await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(company_id,status,rank)");
+      await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_sprints_company_project ON work_sprints(company_id,project_id,status)");
+
+      // Reports, histórico e Roadmap — somente criação idempotente de estrutura.
+      await stageSafe("CREATE TABLE IF NOT EXISTS report_records (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, title TEXT NOT NULL, reference TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'RASCUNHO', executive_summary TEXT DEFAULT '', data_json TEXT DEFAULT '{}', created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), published_at TEXT, archived_at TEXT)");
+      await stageSafe("CREATE TABLE IF NOT EXISTS report_versions (id INTEGER PRIMARY KEY AUTOINCREMENT, report_id TEXT NOT NULL, company_id TEXT NOT NULL, project_id INTEGER, version_no INTEGER NOT NULL, snapshot_json TEXT NOT NULL, change_note TEXT DEFAULT '', created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(report_id,version_no))");
+      await stageSafe("CREATE TABLE IF NOT EXISTS report_roadmap_items (id TEXT PRIMARY KEY, report_id TEXT NOT NULL, company_id TEXT NOT NULL, project_id INTEGER, title TEXT NOT NULL, description TEXT DEFAULT '', responsible_party TEXT NOT NULL DEFAULT 'DEV', responsible_name TEXT DEFAULT '', external_party TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'PLANEJADO', start_date TEXT, due_date TEXT, progress INTEGER NOT NULL DEFAULT 0, work_item_id TEXT, rank REAL NOT NULL DEFAULT 0, created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), archived_at TEXT)");
+      await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_records_company ON report_records(company_id,archived_at,updated_at)");
+      await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_records_project ON report_records(project_id,archived_at,updated_at)");
+      await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_versions_report ON report_versions(report_id,version_no DESC)");
+      await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_roadmap_report ON report_roadmap_items(report_id,archived_at,rank)");
+      await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_roadmap_work ON report_roadmap_items(work_item_id,archived_at)");
+
+      // IMPORTANTE: o antigo baseline v4 foi desativado. Nenhum DELETE/reset acontece no deploy.
+      await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES (?,datetime('now'),?)", 'data-persistence-enabled', 'Deploy persistente: nenhum reset automático; chave histórica '+legacyResetKey+' desativada');
+      const state = { gmudProjectReady: !!gmudProjectReady, readyAt: Date.now(), mode: 'once-per-isolate' };
+      globalThis.__allamoStageCoreSchemaState = state;
+      return state;
+    })().catch((e) => {
+      // Permite nova tentativa em uma próxima requisição se houve falha inesperada do runtime.
+      globalThis.__allamoStageCoreSchemaPromise = null;
+      console.error('[stage-bootstrap] falha inesperada', String(e));
+      return { gmudProjectReady:false, readyAt:0, mode:'retry-next-request', error:String(e) };
+    });
   }
 
-  // Work Management nativo — apenas criação idempotente de estrutura, sem limpeza de dados.
-  await stageSafe("CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, project TEXT, parent_id TEXT, sprint_id TEXT, item_type TEXT NOT NULL DEFAULT 'TASK', title TEXT NOT NULL, description TEXT DEFAULT '', acceptance_criteria TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'BACKLOG', priority TEXT NOT NULL DEFAULT 'Média', owner TEXT DEFAULT '', reporter TEXT DEFAULT '', start_date TEXT, due_date TEXT, story_points REAL, estimate_hours REAL, rank REAL NOT NULL DEFAULT 0, labels TEXT DEFAULT '[]', blocked INTEGER NOT NULL DEFAULT 0, blocked_reason TEXT DEFAULT '', created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), archived_at TEXT)");
-  await stageSafe("CREATE TABLE IF NOT EXISTS work_sprints (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, name TEXT NOT NULL, goal TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'PLANEJADA', start_date TEXT, end_date TEXT, capacity_points REAL, capacity_hours REAL, created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), started_at TEXT, completed_at TEXT)");
-  await stageSafe("CREATE TABLE IF NOT EXISTS work_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT NOT NULL, work_item_id TEXT NOT NULL, author TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT, deleted_at TEXT)");
-  await stageSafe("CREATE TABLE IF NOT EXISTS work_checklist (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT NOT NULL, work_item_id TEXT NOT NULL, text TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, rank REAL NOT NULL DEFAULT 0, created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT, deleted_at TEXT)");
-  await stageSafe("CREATE TABLE IF NOT EXISTS work_links (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT NOT NULL, source_item_id TEXT NOT NULL, target_item_id TEXT NOT NULL, link_type TEXT NOT NULL, created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(source_item_id,target_item_id,link_type))");
-  await stageSafe("CREATE TABLE IF NOT EXISTS work_events (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id TEXT, project_id INTEGER, work_item_id TEXT, event_type TEXT NOT NULL DEFAULT 'usage', event_name TEXT NOT NULL, actor TEXT, metadata_json TEXT DEFAULT '{}', created_at TEXT NOT NULL DEFAULT (datetime('now')))");
-  await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_items_company_project ON work_items(company_id,project_id,archived_at)");
-  await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(company_id,status,rank)");
-  await stageSafe("CREATE INDEX IF NOT EXISTS idx_work_sprints_company_project ON work_sprints(company_id,project_id,status)");
-
-  // Reports, histórico e Roadmap — somente criação idempotente de estrutura.
-  await stageSafe("CREATE TABLE IF NOT EXISTS report_records (id TEXT PRIMARY KEY, company_id TEXT NOT NULL, project_id INTEGER, title TEXT NOT NULL, reference TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'RASCUNHO', executive_summary TEXT DEFAULT '', data_json TEXT DEFAULT '{}', created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), published_at TEXT, archived_at TEXT)");
-  await stageSafe("CREATE TABLE IF NOT EXISTS report_versions (id INTEGER PRIMARY KEY AUTOINCREMENT, report_id TEXT NOT NULL, company_id TEXT NOT NULL, project_id INTEGER, version_no INTEGER NOT NULL, snapshot_json TEXT NOT NULL, change_note TEXT DEFAULT '', created_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(report_id,version_no))");
-  await stageSafe("CREATE TABLE IF NOT EXISTS report_roadmap_items (id TEXT PRIMARY KEY, report_id TEXT NOT NULL, company_id TEXT NOT NULL, project_id INTEGER, title TEXT NOT NULL, description TEXT DEFAULT '', responsible_party TEXT NOT NULL DEFAULT 'DEV', responsible_name TEXT DEFAULT '', external_party TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'PLANEJADO', start_date TEXT, due_date TEXT, progress INTEGER NOT NULL DEFAULT 0, work_item_id TEXT, rank REAL NOT NULL DEFAULT 0, created_by TEXT, updated_by TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), archived_at TEXT)");
-  await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_records_company ON report_records(company_id,archived_at,updated_at)");
-  await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_records_project ON report_records(project_id,archived_at,updated_at)");
-  await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_versions_report ON report_versions(report_id,version_no DESC)");
-  await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_roadmap_report ON report_roadmap_items(report_id,archived_at,rank)");
-  await stageSafe("CREATE INDEX IF NOT EXISTS idx_report_roadmap_work ON report_roadmap_items(work_item_id,archived_at)");
-
-  // IMPORTANTE: o antigo baseline v4 foi desativado. Nenhum DELETE/reset acontece no deploy.
-  await stageSafe("INSERT OR REPLACE INTO stage_runtime_flags(key,applied_at,detail) VALUES (?,datetime('now'),?)", 'data-persistence-enabled', 'Deploy persistente: nenhum reset automático; chave histórica '+legacyResetKey+' desativada');
+  const stageCoreState = await globalThis.__allamoStageCoreSchemaPromise;
+  const gmudProjectReady = !!stageCoreState?.gmudProjectReady;
 
   // Health-check público APENAS no hostname de homologação.
   if (path === 'stage-health' && request.method === 'GET') {
@@ -71,6 +90,11 @@ if (isAllamoStage) {
       host: stageHost,
       data_persistence: DATA_PERSISTENCE_MODE,
       reset_disabled: true,
+      runtime_bootstrap: {
+        mode: stageCoreState?.mode || 'unknown',
+        ready: !!stageCoreState?.readyAt,
+        ready_at_ms: Number(stageCoreState?.readyAt || 0)
+      },
       schema: { gmud_project: gmudProjectReady },
       counts: {
         companies: await stageCount('companies'),

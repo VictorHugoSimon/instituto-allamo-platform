@@ -19,10 +19,21 @@
     headers.set('cache-control','no-cache, no-store, max-age=0');
     headers.set('pragma','no-cache');
     const next={...init,headers,cache:'no-store',credentials:'same-origin'};
-    return previousFetch(input,next).then(res=>{
+    const retryableRead=method==='GET'||method==='HEAD';
+    const execute=attempt=>previousFetch(input,next).then(res=>{
+      // O Worker devolve 503 + Retry-After quando o binding D1 ainda está propagando.
+      // Somente leituras podem ser repetidas automaticamente; mutações nunca são refeitas
+      // para não correr risco de duplicar gravações.
+      if(retryableRead&&res.status===503&&attempt<2){
+        const retryAfter=Number(res.headers.get('retry-after')||0);
+        const wait=Math.max(250,Math.min(1200,retryAfter>0?retryAfter*1000:350*(attempt+1)));
+        emit('allamo:api-retry',{url:raw,status:503,attempt:attempt+1,wait});
+        return new Promise(resolve=>setTimeout(resolve,wait)).then(()=>execute(attempt+1));
+      }
       if(res.ok&&!['GET','HEAD','OPTIONS'].includes(method))setTimeout(()=>refresh(`write:${method}`),20);
       return res;
     });
+    return execute(0);
   };
 
   // O localStorage é compartilhado entre abas. Alterar somente tab/company não pode
