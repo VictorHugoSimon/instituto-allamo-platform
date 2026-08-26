@@ -1,4 +1,4 @@
-name: Sync FCH Detailed Curve Data
+name: FCH Sync Oficial - Curva S
 
 on:
   schedule:
@@ -10,13 +10,14 @@ on:
       - '.github/workflows/sync-fch-curve-detailed.yml'
       - 'scripts/read-fch-detailed-readonly.py'
       - 'scripts/sync-fch-detailed-to-d1.mjs'
+      - 'scripts/validate-fch-workflow-governance.mjs'
       - 'migrations/2026-08-25-fch-hours-automation.sql'
 
 permissions:
   contents: read
 
 concurrency:
-  group: fch-detailed-curve-sync
+  group: fch-official-curve-sync
   cancel-in-progress: true
 
 jobs:
@@ -38,15 +39,41 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: develop
+
+      - name: Preflight Google Drive read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON:-}" ]]; then
+            echo "FCH_AUTH_MODE=service-account" >> "$GITHUB_ENV"
+            echo "Google Drive: service account read-only configurada."
+          elif [[ -n "${GOOGLE_CLIENT_ID:-}" && -n "${GOOGLE_CLIENT_SECRET:-}" && -n "${GOOGLE_REFRESH_TOKEN:-}" ]]; then
+            echo "FCH_AUTH_MODE=oauth-refresh-token" >> "$GITHUB_ENV"
+            echo "Google Drive: OAuth read-only configurado."
+          else
+            echo "::error title=FCH sem credencial Google::Configure GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON (preferencial) ou o trio GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/GOOGLE_REFRESH_TOKEN."
+            {
+              echo '### FCH bloqueado antes de qualquer escrita'
+              echo '- Motivo: credencial Google Drive read-only ausente.'
+              echo '- Preferencial: secret `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` de uma service account com acesso somente ao arquivo/pasta FCH.'
+              echo '- Nenhum dado foi alterado no Stage ou em Produção.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 78
+          fi
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Dependências do leitor read-only
         run: python -m pip install --disable-pip-version-check --quiet openpyxl google-auth requests
+
       - name: Validar leitor
         run: python -m py_compile scripts/read-fch-detailed-readonly.py
+
       - name: Ler FCH sem modificar origem
         run: python scripts/read-fch-detailed-readonly.py --output /tmp/fch-detail.json
+
       - name: Validar payload detalhado
         run: |
           test -s /tmp/fch-detail.json
@@ -58,28 +85,38 @@ jobs:
           assert all(x.get('source_entry_hash') and x.get('activity_date') and x.get('target_project') in ('OPR','MADRI') for x in p['entries'])
           print(p['summary'])
           PY
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+
       - name: Preparar autenticação Cloudflare
         run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
       - name: Garantir schema Stage
         run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
+
       - name: Atualizar fatos da Curva S no Stage
         run: node scripts/sync-fch-detailed-to-d1.mjs --env=stage --file=/tmp/fch-detail.json
+
       - name: Garantir schema Produção
         run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
+
       - name: Atualizar fatos da Curva S em Produção
         run: node scripts/sync-fch-detailed-to-d1.mjs --env=production --file=/tmp/fch-detail.json
+
       - name: Limpar arquivo temporário
         if: always()
         run: rm -f /tmp/fch-detail.json
+
       - name: Resumo
         if: always()
         run: |
-          echo '### FCH detalhado → Curva S' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Google Drive: somente leitura (`drive.readonly`)' >> "$GITHUB_STEP_SUMMARY"
+          echo '### FCH oficial → Curva S' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Fonte: Google Drive, estritamente somente leitura (`drive.readonly`)' >> "$GITHUB_STEP_SUMMARY"
+          echo "- Autenticação: ${FCH_AUTH_MODE:-não configurada}" >> "$GITHUB_STEP_SUMMARY"
           echo '- Detecção de colunas: por cabeçalho, não por letra fixa' >> "$GITHUB_STEP_SUMMARY"
           echo '- OPR_Madri: 100% OPR + 100% MADRI' >> "$GITHUB_STEP_SUMMARY"
           echo '- Capacidade física: deduplicada por `source_entry_hash`' >> "$GITHUB_STEP_SUMMARY"
           echo '- Atualização: Stage + Produção, somente tabelas derivadas do PMO' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Frequência: uma única rotina oficial por hora' >> "$GITHUB_STEP_SUMMARY"
