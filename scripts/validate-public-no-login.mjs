@@ -24,7 +24,7 @@ must(richReport,"renderInto(container,report)",'template mestre oferece modo inl
 must(richReport,"allamo-status-report-master-v1",'template mestre oficial identificado');
 must(richReport,"arm-inline",'layout mestre possui modo inline para portal público');
 must(richReport,"@media(max-width:560px)",'template mestre possui breakpoint mobile');
-must(richReport,"data-report-template",'Report renderizado identifica sua versão de template');
+must(richReport,"dataset.reportTemplate",'Report renderizado identifica sua versão de template no DOM');
 must(clientReports,"HISTÓRICO DE STATUS REPORTS",'histórico de edições publicado');
 must(clientReports,"data-history-report",'cada edição publicada vira aba selecionável');
 must(clientReports,"AllamoRichReport.renderInto",'histórico reutiliza o template mestre');
@@ -48,4 +48,4 @@ if(publicApiPos<0||authPos<0||publicApiPos>authPos)throw new Error('Endpoints p�
 
 const build=String(pkg.scripts['build:work']||'');
 must(build,'build-work-management.mjs','portal público entra no artefato final');
-console.log('OK: link público Empresa/Projeto funciona sem login, histórico por ciclos usa template mestre responsivo e shell interno permanece oculto.');
+console.log('OK: link público Empresa/Projeto funciona sem login, histórico por ciclos usa template mestre versionado e responsivo, shell interno permanece oculto.');
