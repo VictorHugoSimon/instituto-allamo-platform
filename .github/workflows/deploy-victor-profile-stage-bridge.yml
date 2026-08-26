@@ -3,6 +3,9 @@ name: Victor Profile STAGE Bridge
 on:
   push:
     branches: [ops/victor-profile-cloudflare-bridge-v2]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   deploy-profile-stage:
+    if: ${{ github.event_name != 'pull_request' || github.head_ref == 'ops/victor-profile-cloudflare-bridge-v2' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -32,6 +36,7 @@ jobs:
       - name: Checkout host de autenticação
         uses: actions/checkout@v4
         with:
+          ref: ops/victor-profile-cloudflare-bridge-v2
           path: bridge-host
 
       - name: Setup Node.js
