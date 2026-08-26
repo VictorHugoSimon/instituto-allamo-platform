@@ -17,9 +17,26 @@ const pkg=JSON.parse(read('package.json'));
 const index=read('public/index.html');
 const worker=read('public/_worker.js');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+
+function gzipBodyOffset(buf){
+  if(buf.length<18||buf[0]!==0x1f||buf[1]!==0x8b||buf[2]!==8)throw new Error('Fonte comprimida não possui header gzip válido.');
+  const flags=buf[3]; let p=10;
+  if(flags&4){const n=buf.readUInt16LE(p);p+=2+n}
+  const skipZero=()=>{while(p<buf.length&&buf[p]!==0)p++;p++};
+  if(flags&8)skipZero(); if(flags&16)skipZero(); if(flags&2)p+=2;
+  return p;
+}
+function decodeMaster(buf){
+  try{return zlib.gunzipSync(buf).toString('utf8')}
+  catch(gzipError){
+    const start=gzipBodyOffset(buf),end=buf.length-8;
+    try{return zlib.inflateRawSync(buf.subarray(start,end)).toString('utf8')}
+    catch(rawError){throw new Error('Fonte comprimida do template mestre corrompida: '+(rawError.message||rawError))}
+  }
+}
 const m=masterSource.match(/const GZIP_B64='([^']+)'/);
 if(!m)throw new Error('Fonte comprimida do template mestre não encontrada.');
-const masterHtml=zlib.gunzipSync(Buffer.from(m[1],'base64')).toString('utf8');
+const masterHtml=decodeMaster(Buffer.from(m[1],'base64'));
 new Function(client);new Function(ui);new Function(viewer);new Function(`return async function(){${guard}}`);new Function(`return async function(){${api}}`);new Function(`return async function(){${publicApi}}`);new Function(`return async function(){${clientGuard}}`);
 
 for(const [n,l] of [["data.client=companyName",'identidade pública autoritativa'],["data.tap.cliente=companyName",'TAP público autoritativo'],['context_locked:true','sinal de contexto bloqueado'],['resolved_by:resolvedBy','resolução ID/slug auditável']])must(guard,n,l);
@@ -42,8 +59,10 @@ for(const [n,l] of [['report_series_cycles x','join histórico público'],['x.cy
 for(const [n,l] of [['report_series_cycles x','join histórico autenticado'],['x.cycle_no','ciclo autenticado'],['x.presentation_date','data apresentação autenticada']])must(clientGuard,n,l);
 for(const f of ['src/public-report-context-guard.js','src/public-published-reports-api.js','src/report-client-api-guard.js','src/report-series-api.js','src/report-series-ui.js','src/rich-report-viewer.js','src/client-published-reports.js'])must(build,f,'injeção no build '+f);
 must(injectMaster,'src/status-report-master-source.js','injeção da fonte literal');
+must(injectMaster,'inflateRawSync','recuperação de checksum gzip legado no build');
+must(injectMaster,'gzipSync','recomposição de gzip válido no artefato');
 must(String(pkg.scripts['build:work']||''),'inject-status-report-master-source.mjs','fonte literal no pipeline');
 for(const marker of ['BEGIN ALLAMO PUBLIC REPORT CONTEXT GUARD','BEGIN ALLAMO REPORT SERIES'])must(worker,marker,'worker final '+marker);
 for(const marker of ['__allamoReportSeriesLoaded','AllamoRichReport','publicCompany)return'])must(index,marker,'index final '+marker);
 if(/\bDELETE\s+FROM\b|\bDROP\s+TABLE\b|\bTRUNCATE\b/i.test(migration))throw new Error('Migration recorrente contém SQL destrutivo.');
-console.log('OK: HTML literal mestre, quatro abas originais, histórico por ciclos, segregação pública e snapshots encadeados validados.');
+console.log('OK: HTML literal mestre recuperável/reparado, quatro abas originais, histórico por ciclos, segregação pública e snapshots encadeados validados.');
