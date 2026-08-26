@@ -4,6 +4,7 @@ const portal=read('src/public-client-portal.js');
 const portalApi=read('src/public-client-portal-api.js');
 const reportsApi=read('src/public-published-reports-api.js');
 const richReport=read('src/rich-report-viewer.js');
+const clientReports=read('src/client-published-reports.js');
 const loginGuard=read('src/login-interaction-guard.js');
 const worker=read('public/_worker.js');
 const pkg=JSON.parse(read('package.json'));
@@ -18,8 +19,15 @@ must(portal,"data-allamo-public-client-shell",'shell administrativo oculto no co
 must(portal,"data-pc-report-stage",'área do Report embutido dentro do projeto');
 must(portal,"AllamoRichReport.renderInto",'viewer rico reutilizado inline no portal público');
 must(portal,"state.reports[0]",'Report mais recente abre automaticamente ao entrar no projeto');
-must(richReport,"renderInto(container,report)",'viewer rico oferece modo inline reutilizável');
-must(richReport,"arrv-inline",'layout inline preserva tabs executivas do Report');
+
+must(richReport,"renderInto(container,report)",'template mestre oferece modo inline reutilizável');
+must(richReport,"allamo-status-report-master-v1",'template mestre oficial identificado');
+must(richReport,"arm-inline",'layout mestre possui modo inline para portal público');
+must(richReport,"@media(max-width:560px)",'template mestre possui breakpoint mobile');
+must(richReport,"data-report-template",'Report renderizado identifica sua versão de template');
+must(clientReports,"HISTÓRICO DE STATUS REPORTS",'histórico de edições publicado');
+must(clientReports,"data-history-report",'cada edição publicada vira aba selecionável');
+must(clientReports,"AllamoRichReport.renderInto",'histórico reutiliza o template mestre');
 
 must(portalApi,"path==='public-client-projects'",'endpoint público de empresa/projetos');
 must(portalApi,'context_locked:true','contexto público travado no tenant resolvido');
@@ -27,6 +35,8 @@ if(/currentUser\s*\(|authorization|Bearer\s/i.test(portalApi))throw new Error('A
 
 must(reportsApi,"path==='public-published-reports'",'lista pública de reports');
 must(reportsApi,"status='PUBLICADO'",'somente reports publicados');
+must(reportsApi,'report_series_cycles x','histórico público recebe metadados de ciclo');
+must(reportsApi,'x.cycle_no','número do ciclo público');
 if(/currentUser\s*\(|authorization|Bearer\s/i.test(reportsApi))throw new Error('API pública de reports não pode exigir sessão/token.');
 
 must(loginGuard,"new URLSearchParams(location.search).get('cliente')",'guard de login reconhece link público');
@@ -38,4 +48,4 @@ if(publicApiPos<0||authPos<0||publicApiPos>authPos)throw new Error('Endpoints p�
 
 const build=String(pkg.scripts['build:work']||'');
 must(build,'build-work-management.mjs','portal público entra no artefato final');
-console.log('OK: link público Empresa/Projeto funciona sem login, shell interno oculto e Report executivo embutido por projeto.');
+console.log('OK: link público Empresa/Projeto funciona sem login, histórico por ciclos usa template mestre responsivo e shell interno permanece oculto.');
