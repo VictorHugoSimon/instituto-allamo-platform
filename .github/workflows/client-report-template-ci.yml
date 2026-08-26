@@ -1,5 +1,6 @@
 name: Client Executive Report Template CI
 
+# Protege o template oficial do Status Report exibido no link do cliente.
 on:
   pull_request:
     branches: [develop, main]
