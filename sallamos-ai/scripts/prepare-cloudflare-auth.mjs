@@ -38,13 +38,15 @@ mask(token);
 mask(apiKey);
 mask(email);
 
+// Nesta branch operacional, a Global API Key existente é preferida porque um API Token
+// pode autenticar no whoami e ainda assim não possuir D1/Pages Edit. Os valores nunca são impressos.
 const candidates = [];
+if (apiKey && email) {
+  candidates.push({ mode: 'api_key_email', env: { CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_API_KEY: apiKey, CLOUDFLARE_EMAIL: email } });
+}
 if (token) {
   if (token.length < 20) throw new Error('CLOUDFLARE_API_TOKEN parece inválido: comprimento insuficiente');
   candidates.push({ mode: 'api_token', env: { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_API_KEY: '', CLOUDFLARE_EMAIL: '' } });
-}
-if (apiKey && email) {
-  candidates.push({ mode: 'api_key_email', env: { CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_API_KEY: apiKey, CLOUDFLARE_EMAIL: email } });
 }
 if (!candidates.length) {
   throw new Error('Credencial Cloudflare incompleta: configure CLOUDFLARE_API_TOKEN ou o par CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL.');
@@ -55,11 +57,17 @@ if (verifyOnline) {
   selected = null;
   for (const candidate of candidates) {
     const check = verifyWrangler(candidate.env);
-    if (check.ok) { selected = candidate; break; }
-    console.warn(`[cloudflare-auth] ${candidate.mode} não autenticou; tentando próximo modo disponível.`);
+    if (!check.ok) {
+      console.warn(`[cloudflare-auth] ${candidate.mode} não autenticou no Wrangler; tentando próximo modo.`);
+      continue;
+    }
+    const access = await verifyResourceAccess(candidate.env);
+    console.log(`[cloudflare-auth] ${candidate.mode}: workers=${access.workers}, d1=${access.d1}, pages=${access.pages}`);
+    if (access.ok) { selected = candidate; break; }
+    console.warn(`[cloudflare-auth] ${candidate.mode} autenticou, mas não tem acesso simultâneo a Workers, D1 e Pages; tentando próximo modo.`);
   }
   if (!selected) {
-    throw new Error('Nenhuma credencial Cloudflare configurada autenticou no Wrangler. Atualize os GitHub Secrets antes do deploy.');
+    throw new Error('Nenhuma credencial Cloudflare existente possui acesso simultâneo a Workers, D1 e Pages nesta conta.');
   }
 }
 
@@ -72,6 +80,7 @@ console.log(JSON.stringify({
   cloudflareAuthPreparation: 'ok',
   authMode: selected.mode,
   verifiedWithWrangler: verifyOnline,
+  resourceAccessVerified: verifyOnline,
   accountIdLength: accountId.length,
   tokenProvided: Boolean(rawToken.trim()),
   tokenLength: selected.mode === 'api_token' ? token.length : null,
@@ -90,6 +99,30 @@ function verifyWrangler(authEnv) {
   });
   return { ok: !result.error && result.status === 0 };
 }
+
+async function verifyResourceAccess(authEnv) {
+  const headers = authEnv.CLOUDFLARE_API_TOKEN
+    ? { Authorization: `Bearer ${authEnv.CLOUDFLARE_API_TOKEN}` }
+    : { 'X-Auth-Email': authEnv.CLOUDFLARE_EMAIL, 'X-Auth-Key': authEnv.CLOUDFLARE_API_KEY };
+  const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}`;
+  const endpoints = {
+    workers: `${base}/workers/scripts?per_page=1`,
+    d1: `${base}/d1/database?per_page=1`,
+    pages: `${base}/pages/projects?per_page=1`
+  };
+  const statuses = {};
+  for (const [name, url] of Object.entries(endpoints)) {
+    try {
+      const response = await fetch(url, { headers: { ...headers, 'Content-Type': 'application/json' } });
+      const data = await response.json().catch(() => ({}));
+      statuses[name] = response.ok && data.success !== false ? 'ok' : `http_${response.status}`;
+    } catch {
+      statuses[name] = 'network_error';
+    }
+  }
+  return { ...statuses, ok: statuses.workers === 'ok' && statuses.d1 === 'ok' && statuses.pages === 'ok' };
+}
+
 function normalizeToken(value) {
   let v = stripQuotes(String(value).trim());
   v = v.replace(/^Bearer\s+/i, '').trim();
