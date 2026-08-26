@@ -15,57 +15,23 @@ const publicApi=fs.readFileSync('src/public-published-reports-api.js','utf8');
 const build=fs.readFileSync('scripts/build-work-management.mjs','utf8');
 const index=fs.readFileSync('public/index.html','utf8');
 const responsiveWorkflow=fs.readFileSync('.github/workflows/responsive-usability-ci.yml','utf8');
-new Function(responsive);new Function(admin);new Function(reportUi);new Function(richReport);new Function(raci);new Function(watchdog);new Function(clientReports);new Function(releases);new Function(feedback);
-new Function('return async function(){'+clientApi+'}');
-new Function('return async function(){'+publicApi+'}');
+new Function(responsive);new Function(admin);new Function(reportUi);new Function(richReport);new Function(raci);new Function(watchdog);new Function(clientReports);new Function(releases);new Function(feedback);new Function('return async function(){'+clientApi+'}');new Function('return async function(){'+publicApi+'}');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
-
-function decodeMaster(){
-  const m=masterSource.match(/const GZIP_B64='([^']+)'/);if(!m)throw new Error('Fonte mestre comprimida ausente.');
-  const buf=Buffer.from(m[1],'base64');
-  try{return zlib.gunzipSync(buf).toString('utf8')}catch(_){
-    if(buf.length<18||buf[0]!==0x1f||buf[1]!==0x8b)throw new Error('Header gzip do template mestre inválido.');
-    const flags=buf[3];let p=10;
-    if(flags&4){const n=buf.readUInt16LE(p);p+=2+n}
-    const skip=()=>{while(p<buf.length&&buf[p]!==0)p++;p++};
-    if(flags&8)skip();if(flags&16)skip();if(flags&2)p+=2;
-    return zlib.inflateRawSync(buf.subarray(p,buf.length-8)).toString('utf8');
-  }
-}
+function decodeMaster(){const m=masterSource.match(/const GZIP_B64='([^']+)'/);if(!m)throw new Error('Fonte mestre comprimida ausente.');const buf=Buffer.from(m[1],'base64');try{return zlib.gunzipSync(buf).toString('utf8')}catch(_){if(buf.length<18||buf[0]!==0x1f||buf[1]!==0x8b)throw new Error('Header gzip do template mestre inválido.');const flags=buf[3];let p=10;if(flags&4){const n=buf.readUInt16LE(p);p+=2+n}const skip=()=>{while(p<buf.length&&buf[p]!==0)p++;p++};if(flags&8)skip();if(flags&16)skip();if(flags&2)p+=2;return zlib.inflateRawSync(buf.subarray(p,buf.length-8)).toString('utf8')}}
 const masterHtml=decodeMaster();
-
-for(const [n,l] of [
-  ['width=device-width','viewport responsivo'],['100dvh','altura móvel segura'],['allamo-report-editor','editor de report responsivo'],['allamo-responsive-modal-box','modal responsivo'],['overflow-x:auto','scroll horizontal controlado'],['@media(max-width:767px)','breakpoint mobile'],['@media(max-width:1023px)','breakpoint tablet'],['removeFloatingLaunchers','remoção defensiva dos launchers'],['allamo-raci-r','cor R'],['allamo-raci-a','cor A'],['allamo-raci-c','cor C'],['allamo-raci-i','cor I'],['#awm','Work Management responsivo'],['#arm','Central de Reports responsiva']
-])must(responsive,n,l);
-for(const [n,l] of [
-  ['allamo-status-report-master-v1','template mestre de Status Report'],['arm-inline','Report embutido sem quebrar o portal'],['width:100%','iframe ocupa largura disponível'],['min-width:0','container permite redução de largura'],['frame.style.height=Math.max','altura do iframe acompanha conteúdo'],['ResizeObserver','altura reage a mudanças do template'],["querySelectorAll('.tab-btn')",'troca de abas recalcula altura'],['dataset.reportTemplate','versão visual registrada no DOM']
-])must(richReport,n,l);
-for(const [n,l] of [
-  ['.tabbar','barra de abas do HTML mestre'],['.tab-btn','abas do HTML mestre'],['max-width:1180px','conteúdo mestre com largura máxima'],['@media(max-width:900px)','template responsivo tablet'],['@media(max-width:560px)','template responsivo mobile'],['@media print','template preparado para impressão/PDF'],['id="cronoTable"','tabela principal do cronograma presente']
-])must(masterHtml,n,l);
-for(const [n,l] of [
-  ['Central de Reports','central administrativa'],['acompanhar report','interceptação por projeto'],["txt==='acompanhar'",'interceptação por empresa'],['data-open-legacy-report','acesso ao report principal'],['Pesquise e abra qualquer Report','orientação da central'],['Abrindo a Central de Reports','feedback imediato'],['window.__allamoReportContext','contexto para painel publicado'],['projects.find','clique direto no projeto']
-])must(admin,n,l);
-must(reportUi,'data-a="new-report"','ação de criar novo report');
-must(reportUi,'+ Novo report','botão criar novo report');
-for(const [n,l] of [
-  ['Visualização RACI','preview visual'],['allamo-raci-chip','chips RACI'],['Responsável','legenda R'],['Accountable','legenda A'],["['R','A','C','I']",'papéis RACI'],['allamo-raci-table','matriz colorida']
-])must(raci,n,l);
+for(const [n,l] of [['width=device-width','viewport responsivo'],['100dvh','altura móvel segura'],['allamo-report-editor','editor de report responsivo'],['allamo-responsive-modal-box','modal responsivo'],['overflow-x:auto','scroll horizontal controlado'],['@media(max-width:767px)','breakpoint mobile'],['@media(max-width:1023px)','breakpoint tablet'],['removeFloatingLaunchers','remoção defensiva dos launchers'],['allamo-raci-r','cor R'],['allamo-raci-a','cor A'],['allamo-raci-c','cor C'],['allamo-raci-i','cor I'],['#awm','Work Management responsivo'],['#arm','Central de Reports responsiva']])must(responsive,n,l);
+for(const [n,l] of [['allamo-status-report-master-v1','template mestre de Status Report'],['arm-inline','Report embutido sem quebrar o portal'],['width:100%','iframe ocupa largura disponível'],['min-width:0','container permite redução de largura'],['frame.style.height=Math.max','altura do iframe acompanha conteúdo'],['ResizeObserver','altura reage a mudanças do template'],["querySelectorAll('.tab-btn')",'troca de abas recalcula altura'],['dataset.reportTemplate','versão visual registrada no DOM']])must(richReport,n,l);
+for(const [n,l] of [['.tabbar','barra de abas do HTML mestre'],['.tab-btn','abas do HTML mestre'],['max-width:1180px','conteúdo mestre com largura máxima'],['@media(max-width:900px)','template responsivo tablet'],['@media(max-width:560px)','template responsivo mobile'],['@media print','template preparado para impressão/PDF'],['const cronoMeses=','cronograma original disponível para renderização'],['id="curvaChart"','área de gráfico responsiva presente']])must(masterHtml,n,l);
+for(const [n,l] of [['Central de Reports','central administrativa'],['acompanhar report','interceptação por projeto'],["txt==='acompanhar'",'interceptação por empresa'],['data-open-legacy-report','acesso ao report principal'],['Pesquise e abra qualquer Report','orientação da central'],['Abrindo a Central de Reports','feedback imediato'],['window.__allamoReportContext','contexto para painel publicado'],['projects.find','clique direto no projeto']])must(admin,n,l);
+must(reportUi,'data-a="new-report"','ação de criar novo report');must(reportUi,'+ Novo report','botão criar novo report');
+for(const [n,l] of [['Visualização RACI','preview visual'],['allamo-raci-chip','chips RACI'],['Responsável','legenda R'],['Accountable','legenda A'],["['R','A','C','I']",'papéis RACI'],['allamo-raci-table','matriz colorida']])must(raci,n,l);
 for(const [n,l] of [['HISTÓRICO DE STATUS REPORTS','painel histórico do cliente'],['data-history-report','aba por edição/ciclo'],['AllamoRichReport.renderInto','renderização mestre inline'],['published-reports','endpoint autenticado'],['public-published-reports','endpoint público'],['Nenhum Report publicado ainda','estado vazio'],["get('cliente')",'contexto do link público']])must(clientReports,n,l);
 for(const [n,l] of [['HISTÓRICO COMPLETO','histórico de viradas'],['Viradas, versões e entregas','linha do tempo'],['Todas as empresas','filtro empresa'],['releases/','ações de histórico']])must(releases,n,l);
 for(const [n,l] of [['__allamoInteractionFeedbackLoaded','feedback carregado'],['Publicando Report','feedback publicação'],['Report publicado. Já está disponível no painel da empresa.','confirmação publicação'],['Registrando Virada / versão','feedback virada'],['Salvando Report','feedback salvamento']])must(feedback,n,l);
 for(const [n,l] of [["status='PUBLICADO'",'somente publicados autenticados'],["user.role==='usuario'",'proteção cliente'],['published-reports','API publicada'],['x.cycle_no','metadado de ciclo autenticado']])must(clientApi,n,l);
 for(const [n,l] of [['public-published-reports','API pública'],["status='PUBLICADO'",'somente publicados no link aberto'],['company_id=?','isolamento por empresa'],['x.cycle_no','metadado de ciclo público']])must(publicApi,n,l);
 for(const f of ['src/public-published-reports-api.js','src/report-client-api-guard.js','src/report-admin-navigation.js','src/client-published-reports.js','src/release-history-ui.js','src/interaction-feedback.js','src/raci-visual.js','src/responsive-usability.js','src/rich-report-viewer.js'])must(build,f,'injeção '+f);
-if(/launcher\('awm-launcher'|launcher\('arm-launcher'/.test(watchdog))throw new Error('Watchdog ainda recria launchers flutuantes.');
-if(build.includes("b.id='awm-launcher'")||build.includes("r.id='arm-launcher'"))throw new Error('Build ainda cria launchers flutuantes.');
-if(admin.includes('setInterval(tick,500)')||raci.includes('setInterval(tick,650)')||responsive.includes('setInterval(tick,700)'))throw new Error('Polling agressivo de UI voltou a ser introduzido.');
-must(watchdog,'setInterval(tick,2000)','watchdog com frequência reduzida');
-for(const marker of ['__allamoResponsiveUsabilityLoaded','__allamoReportAdminNavLoaded','__allamoRaciVisualLoaded','__allamoClientPublishedReportsLoaded','__allamoReleaseHistoryLoaded','__allamoInteractionFeedbackLoaded','allamo-status-report-master-v1'])must(index,marker,'artefato final '+marker);
-if(!index.includes('Central de Reports'))throw new Error('Artefato final sem central de Reports.');
-const buildPos=responsiveWorkflow.indexOf('run: npm run build:work');
-const reportAiPos=responsiveWorkflow.indexOf('run: npm run test:report-ai');
-const uxPos=responsiveWorkflow.indexOf('run: npm run test:ux');
-if(buildPos<0||reportAiPos<0||uxPos<0)throw new Error('Workflow responsivo incompleto: build, report AI e UX são obrigatórios.');
-if(!(buildPos<reportAiPos&&reportAiPos<uxPos))throw new Error('Workflow responsivo deve gerar o artefato final antes de validar Report AI e UX.');
-console.log('OK: template mestre responsivo no iframe, histórico por ciclos, publicação autenticada/pública, RACI, feedback e ordem do CI validados.');
+if(/launcher\('awm-launcher'|launcher\('arm-launcher'/.test(watchdog))throw new Error('Watchdog ainda recria launchers flutuantes.');if(build.includes("b.id='awm-launcher'")||build.includes("r.id='arm-launcher'"))throw new Error('Build ainda cria launchers flutuantes.');if(admin.includes('setInterval(tick,500)')||raci.includes('setInterval(tick,650)')||responsive.includes('setInterval(tick,700)'))throw new Error('Polling agressivo de UI voltou a ser introduzido.');
+must(watchdog,'setInterval(tick,2000)','watchdog com frequência reduzida');for(const marker of ['__allamoResponsiveUsabilityLoaded','__allamoReportAdminNavLoaded','__allamoRaciVisualLoaded','__allamoClientPublishedReportsLoaded','__allamoReleaseHistoryLoaded','__allamoInteractionFeedbackLoaded','allamo-status-report-master-v1'])must(index,marker,'artefato final '+marker);if(!index.includes('Central de Reports'))throw new Error('Artefato final sem central de Reports.');
+const buildPos=responsiveWorkflow.indexOf('run: npm run build:work');const reportAiPos=responsiveWorkflow.indexOf('run: npm run test:report-ai');const uxPos=responsiveWorkflow.indexOf('run: npm run test:ux');if(buildPos<0||reportAiPos<0||uxPos<0)throw new Error('Workflow responsivo incompleto: build, report AI e UX são obrigatórios.');if(!(buildPos<reportAiPos&&reportAiPos<uxPos))throw new Error('Workflow responsivo deve gerar o artefato final antes de validar Report AI e UX.');
+console.log('OK: template mestre responsivo no iframe, cronograma original, histórico por ciclos, publicação autenticada/pública, RACI, feedback e ordem do CI validados.');
