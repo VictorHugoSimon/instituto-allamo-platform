@@ -106,3 +106,5 @@ jobs:
           echo "- URL provisória: https://victor-hugo-teixeira-simon.pages.dev/" >> "$GITHUB_STEP_SUMMARY"
           echo "- Fonte: VictorHugoSimon/victor-simon-site@main" >> "$GITHUB_STEP_SUMMARY"
           echo "- Publicação: Cloudflare Pages" >> "$GITHUB_STEP_SUMMARY"
+
+# execução operacional isolada do portfólio
