@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const stage = fs.readFileSync('src/stage-runtime-bootstrap.js','utf8');
 const reportSchema = fs.readFileSync('src/report-schema-bootstrap.js','utf8');
+const globalReportSchema = fs.readFileSync('src/global-report-schema-bootstrap.js','utf8');
 const governanceSchema = fs.readFileSync('src/governance-schema-bootstrap.js','utf8');
 const governanceMigration = fs.readFileSync('migrations/2026-08-23-governance-roadmap.sql','utf8');
 const resetMigration = fs.readFileSync('migrations/2026-08-21-reset-stage.sql','utf8');
@@ -20,6 +21,7 @@ const stripSqlComments = content => content.replace(/^\s*--.*$/gm,'');
 for (const [name,content] of [
   ['bootstrap de Stage',stage],
   ['bootstrap de Reports',reportSchema],
+  ['bootstrap global de Reports',globalReportSchema],
   ['bootstrap de Governança',governanceSchema],
   ['migration Governança',governanceMigration],
   ['migration legada de reset',resetMigration],
@@ -43,6 +45,9 @@ if (!stage.includes("stageEnsureColumn('gmud', 'project'")) throw new Error('Sta
 if (!stage.includes("schema: { gmud_project: gmudProjectReady }")) throw new Error('Health-check de Stage não expõe a prontidão do schema GMUD.');
 if (!resetMigration.includes('RESET DESATIVADO')) throw new Error('Migration legada não está explicitamente neutralizada.');
 if (!reportSchema.includes('MODO PERSISTENTE')) throw new Error('Bootstrap de Reports não declara modo persistente.');
+if (!globalReportSchema.includes('Stage e Produção')) throw new Error('Bootstrap global precisa declarar cobertura de Stage e Produção.');
+if (!globalReportSchema.includes('CREATE TABLE IF NOT EXISTS report_records')) throw new Error('Bootstrap global não garante report_records.');
+if (!globalReportSchema.includes('CREATE TABLE IF NOT EXISTS report_roadmap_items')) throw new Error('Bootstrap global não garante report_roadmap_items.');
 if (!governanceSchema.includes('criação idempotente e não destrutiva')) throw new Error('Bootstrap de Governança precisa declarar criação não destrutiva.');
 if (!governanceMigration.includes('Migration aditiva e persistente')) throw new Error('Migration de Governança precisa permanecer explicitamente aditiva.');
 if (!reportAiMigration.includes('CREATE-ONLY')) throw new Error('Migration de Reports IA precisa permanecer explicitamente create-only.');
@@ -54,4 +59,4 @@ for(const table of ['governance_events','governance_event_agenda_items','governa
   if(!governanceSchema.includes(`CREATE TABLE IF NOT EXISTS ${table}`)||!governanceMigration.includes(`CREATE TABLE IF NOT EXISTS ${table}`))throw new Error(`Governança persistente incompleta: ${table}`);
 }
 
-console.log('OK: persistência cobre Stage, Reports, IA, campos dinâmicos, arquivos R2/D1, marcos, governança e evolução GMUD/projeto; restore legado neutralizado e nenhum SQL destrutivo permitido.');
+console.log('OK: persistência cobre Stage e Produção, Reports, IA, campos dinâmicos, arquivos R2/D1, marcos, governança e evolução GMUD/projeto; restore legado neutralizado e nenhum SQL destrutivo permitido.');
