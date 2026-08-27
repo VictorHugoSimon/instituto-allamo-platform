@@ -1,0 +1,40 @@
+name: Operational Hardening CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - '.github/workflows/operational-health.yml'
+      - '.github/workflows/sync-fch-curve-detailed.yml'
+      - '.github/workflows/fch-hours-sync.yml'
+      - '.github/workflows/sync-fch-hours.yml'
+      - 'scripts/operational-health-check.mjs'
+      - 'scripts/validate-operational-health.mjs'
+      - 'scripts/validate-fch-workflow-governance.mjs'
+      - 'package.json'
+  push:
+    branches: [develop, main]
+    paths:
+      - '.github/workflows/operational-health.yml'
+      - '.github/workflows/sync-fch-curve-detailed.yml'
+      - '.github/workflows/fch-hours-sync.yml'
+      - '.github/workflows/sync-fch-hours.yml'
+      - 'scripts/operational-health-check.mjs'
+      - 'scripts/validate-operational-health.mjs'
+      - 'scripts/validate-fch-workflow-governance.mjs'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  operational-hardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validar monitor operacional e governança FCH
+        run: npm run test:ops
