@@ -53,10 +53,10 @@
     try{const r=await api('report-records/'+encodeURIComponent(id));show(r)}catch(err){if(!quiet)toast(err.message,'error')}
   }
 
-  // O criador oficial já emite este evento ao concluir um POST com sucesso.
+  // Criação oficial e fechamento de ciclos recorrentes mostram imediatamente o link da nova edição.
   window.addEventListener('allamo:reports-changed',e=>{
     const d=e.detail||{};
-    if(d.reason==='official-report-created'&&d.id)setTimeout(()=>resolveAndShow(d.id),80);
+    if((d.reason==='official-report-created'||d.reason==='series-report-created')&&d.id)setTimeout(()=>resolveAndShow(d.id),80);
   });
 
   // Todo Report existente ganha ação de link, inclusive os criados por recorrência/IA.
@@ -71,7 +71,8 @@
       first.appendChild(b);
     });
   }
-  const mo=new MutationObserver(enhanceRows);document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>{mo.observe(document.body,{childList:true,subtree:true});enhanceRows()}):(()=>{mo.observe(document.body,{childList:true,subtree:true});enhanceRows()})();
+  const start=()=>{try{new MutationObserver(enhanceRows).observe(document.body,{childList:true,subtree:true})}catch(_){}enhanceRows();setInterval(enhanceRows,1200)};
+  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start):start();
 
   window.AllamoReportDirectLink={build:buildLink,open:resolveAndShow};
 })();
