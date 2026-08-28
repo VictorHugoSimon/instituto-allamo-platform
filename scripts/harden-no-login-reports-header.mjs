@@ -43,7 +43,23 @@ const createNew=`const allamoNoLoginCreateHost=()=>${officialHost};const api=asy
 if(html.includes(createOld)) html=html.replace(createOld,createNew);
 else if(!html.includes('allamoNoLoginCreateHost')) throw new Error('API de criação oficial do Report não encontrada para modo sem login.');
 
-// 5) Cabeçalho: o guard antigo dependia da existência do botão Sair.
+// 5) Gatilho determinístico do + Novo report.
+// Havia dois listeners concorrentes: um capturava o clique no document e outro no #arm.
+// O listener de captura podia bloquear a Central antes que ela abrisse o template oficial.
+// Agora o clique tem uma única autoridade: o handler da própria Central chama explicitamente
+// AllamoOfficialReportCreate.open(), com fallback para o formulário legado apenas se o runtime
+// oficial realmente não estiver disponível.
+const captureOld="document.addEventListener('click',e=>{const b=e.target.closest('#arm [data-a=\"new-report\"]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();open()},true);";
+const captureNew="/* allamo-report-create-delegated: clique tratado pela Central de Reports */";
+if(html.includes(captureOld)) html=html.replace(captureOld,captureNew);
+else if(!html.includes('allamo-report-create-delegated')) throw new Error('Listener concorrente de Novo Report não encontrado.');
+
+const genericCreateOld="if(t.dataset.a==='new-report'){reportForm();return}";
+const genericCreateNew="if(t.dataset.a==='new-report'){const official=window.AllamoOfficialReportCreate&&window.AllamoOfficialReportCreate.open;if(typeof official==='function'){try{await official.call(window.AllamoOfficialReportCreate)}catch(err){console.error('[reports] falha ao abrir template oficial',err);reportForm()}}else{reportForm()}return}";
+if(html.includes(genericCreateOld)) html=html.replace(genericCreateOld,genericCreateNew);
+else if(!html.includes('falha ao abrir template oficial')) throw new Error('Handler da Central para Novo Report não encontrado.');
+
+// 6) Cabeçalho: o guard antigo dependia da existência do botão Sair.
 // O novo guard remove perfil/cargo/avatar independentemente do botão Sair e sobrevive ao pós-unpack.
 const templateOpen='<script type="__bundler/template">';
 const templateClose='</script>';
@@ -68,11 +84,15 @@ if(html.includes(reportOld)) throw new Error('Central de Reports ainda exige ses
 if(html.includes(navOld)) throw new Error('Navegação dos Reports ainda exige sessão local.');
 if(aiApi.test(html)) throw new Error('Assistente IA ainda exige sessão local nos hosts oficiais.');
 if(html.includes(createOld)) throw new Error('Criação oficial de Report ainda exige sessão local.');
+if(html.includes(captureOld)) throw new Error('Listener concorrente do Novo Report ainda está no artefato.');
+if(html.includes(genericCreateOld)) throw new Error('Central ainda abre formulário legado diretamente no Novo Report.');
 if(!html.includes('allamoNoLoginReportHost')) throw new Error('Marker do Report sem login ausente.');
 if(!html.includes('allamoNoLoginAdminHost')) throw new Error('Marker da navegação sem login ausente.');
 if(!html.includes('allamoNoLoginAiHost')) throw new Error('Marker do Assistente IA sem login ausente.');
 if(!html.includes('allamoNoLoginCreateHost')) throw new Error('Marker da criação oficial sem login ausente.');
+if(!html.includes('allamo-report-create-delegated')) throw new Error('Marker de delegação do Novo Report ausente.');
+if(!html.includes('falha ao abrir template oficial')) throw new Error('Central não delega Novo Report ao template oficial.');
 if(!html.includes('allamo-no-login-profile-cleaner')) throw new Error('Cleaner de perfil do cabeçalho ausente.');
 
 fs.writeFileSync(file,html);
-console.log('OK: Reports, criação oficial e Assistente IA funcionam no modo sem login oficial; cabeçalho não exibe identidade de usuário.');
+console.log('OK: Reports, Novo Report no template oficial e Assistente IA funcionam no modo oficial; cabeçalho não exibe identidade de usuário.');
