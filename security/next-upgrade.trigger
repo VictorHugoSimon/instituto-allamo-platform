@@ -1,3 +1,3 @@
-Next.js 16.3.3
-Motivo: npm audit controlado da issue #149 identificou 5 vulnerabilidades altas concentradas na cadeia do Next.js.
-Regra: sem npm audit fix --force; commit somente se high=0 e critical=0 após o upgrade e build do workspace web aprovado.
+Next.js 16.3.3 — tentativa 2
+Motivo: o upgrade do Next reduziu 5 vulnerabilidades altas para 2; agora aplicar correção transitiva compatível via `npm audit fix --package-lock-only --ignore-scripts`, sem `--force`.
+Gate: commit somente se high=0, critical=0, nenhuma dependência direta inesperada mudar e build do workspace web passar.
