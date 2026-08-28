@@ -18,7 +18,7 @@ must(html,'A atualização de empresas/projetos excedeu 10 segundos','timeout de
 must(html,"timeoutMs=method==='POST'?20000:10000",'timeout diferenciado');
 must(html,"cache:'no-store'",'sem cache operacional');
 
-must(portal,"params.get('report')",'portal público lê report da URL');
+if(!/URLSearchParams\(location\.search\)\.get\('report'\)/.test(portal))throw new Error('Portal público não lê o Report solicitado da URL.');
 must(portal,'await loadReport(first.id)','portal abre edição solicitada');
 must(portal,'public-published-reports/','API pública tenant-safe do Report');
 
