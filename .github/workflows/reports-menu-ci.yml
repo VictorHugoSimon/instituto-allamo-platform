@@ -1,0 +1,23 @@
+name: Reports Menu CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+jobs:
+  reports-menu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build final portal artifact
+        run: npm run build:work
+      - name: Validate Reports menu click
+        run: node scripts/validate-reports-menu-click.mjs
+      - name: Validate bundle
+        run: npm run test:bundle
