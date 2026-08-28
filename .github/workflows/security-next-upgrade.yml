@@ -12,7 +12,7 @@ permissions:
 jobs:
   upgrade-next-minimal:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout da branch de segurança
         uses: actions/checkout@v4
@@ -29,25 +29,71 @@ jobs:
       - name: Atualizar somente Next e eslint-config-next
         run: npm install --workspace=apps/web --package-lock-only --ignore-scripts --save-exact next@16.3.3 eslint-config-next@16.3.3
 
-      - name: Instalar árvore resultante
+      - name: Instalar árvore após Next
         run: npm ci
 
-      - name: Validar que altas e críticas foram zeradas
+      - name: Registrar o que restou após Next
         shell: bash
         run: |
           set +e
           npm audit --json > npm-audit-after-next.json
           set -e
+          node scripts/security-audit-summary.mjs npm-audit-after-next.json
+
+      - name: Corrigir somente transitivos compatíveis sem force
+        run: npm audit fix --package-lock-only --ignore-scripts
+
+      - name: Instalar árvore final
+        run: npm ci
+
+      - name: Validar zero altas e críticas
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit-final.json
+          set -e
+          node scripts/security-audit-summary.mjs npm-audit-final.json
           node - <<'NODE'
           const fs=require('fs');
-          const a=JSON.parse(fs.readFileSync('npm-audit-after-next.json','utf8'));
+          const a=JSON.parse(fs.readFileSync('npm-audit-final.json','utf8'));
           const m=a.metadata?.vulnerabilities||{};
-          console.log(`Após upgrade mínimo: critical=${m.critical||0}, high=${m.high||0}, moderate=${m.moderate||0}, low=${m.low||0}`);
+          console.log(`Audit final: critical=${m.critical||0}, high=${m.high||0}, moderate=${m.moderate||0}, low=${m.low||0}`);
           if((m.critical||0)!==0 || (m.high||0)!==0){
-            console.error('Upgrade mínimo não zerou vulnerabilidades altas/críticas; nenhum commit será criado.');
+            console.error('Remediação sem force não zerou vulnerabilidades altas/críticas; nenhum commit será criado.');
             process.exit(1);
           }
           NODE
+
+      - name: Garantir que nenhuma outra dependência direta mudou
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const cp=require('child_process');
+          const before=JSON.parse(cp.execSync('git show HEAD:apps/web/package.json',{encoding:'utf8'}));
+          const after=JSON.parse(fs.readFileSync('apps/web/package.json','utf8'));
+          const allowed=new Set(['dependencies.next','devDependencies.eslint-config-next']);
+          const groups=['dependencies','devDependencies','peerDependencies','optionalDependencies'];
+          const changes=[];
+          for(const g of groups){
+            const keys=new Set([...Object.keys(before[g]||{}),...Object.keys(after[g]||{})]);
+            for(const k of keys){
+              const a=before[g]?.[k]??null,b=after[g]?.[k]??null;
+              if(a!==b) changes.push({key:`${g}.${k}`,before:a,after:b});
+            }
+          }
+          console.log('Mudanças diretas:',JSON.stringify(changes,null,2));
+          const unexpected=changes.filter(x=>!allowed.has(x.key));
+          if(unexpected.length){
+            console.error('Dependências diretas inesperadas foram alteradas:',unexpected);
+            process.exit(1);
+          }
+          if(after.dependencies?.next!=='16.3.3' || after.devDependencies?.['eslint-config-next']!=='16.3.3'){
+            console.error('Versões esperadas do Next/eslint-config-next não foram fixadas em 16.3.3.');
+            process.exit(1);
+          }
+          NODE
+          git diff --exit-code -- package.json
 
       - name: Validar build Next
         run: npm run build --workspace=apps/web
@@ -62,5 +108,5 @@ jobs:
             echo "Nenhuma alteração necessária."
             exit 0
           fi
-          git commit -m "security: atualiza Next para 16.3.3 sem force"
+          git commit -m "security: atualiza Next e transitivos sem force"
           git push origin HEAD:security/npm-audit-controlled
