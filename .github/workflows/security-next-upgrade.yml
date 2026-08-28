@@ -1,0 +1,66 @@
+name: Security Next Upgrade
+
+on:
+  push:
+    branches: [security/npm-audit-controlled]
+    paths:
+      - security/next-upgrade.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade-next-minimal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout da branch de segurança
+        uses: actions/checkout@v4
+        with:
+          ref: security/npm-audit-controlled
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Atualizar somente Next e eslint-config-next
+        run: npm install --workspace=apps/web --package-lock-only --ignore-scripts --save-exact next@16.3.3 eslint-config-next@16.3.3
+
+      - name: Instalar árvore resultante
+        run: npm ci
+
+      - name: Validar que altas e críticas foram zeradas
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit-after-next.json
+          set -e
+          node - <<'NODE'
+          const fs=require('fs');
+          const a=JSON.parse(fs.readFileSync('npm-audit-after-next.json','utf8'));
+          const m=a.metadata?.vulnerabilities||{};
+          console.log(`Após upgrade mínimo: critical=${m.critical||0}, high=${m.high||0}, moderate=${m.moderate||0}, low=${m.low||0}`);
+          if((m.critical||0)!==0 || (m.high||0)!==0){
+            console.error('Upgrade mínimo não zerou vulnerabilidades altas/críticas; nenhum commit será criado.');
+            process.exit(1);
+          }
+          NODE
+
+      - name: Validar build Next
+        run: npm run build --workspace=apps/web
+
+      - name: Commitar somente arquivos de dependência
+        shell: bash
+        run: |
+          git config user.name "allamo-security-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/web/package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração necessária."
+            exit 0
+          fi
+          git commit -m "security: atualiza Next para 16.3.3 sem force"
+          git push origin HEAD:security/npm-audit-controlled
