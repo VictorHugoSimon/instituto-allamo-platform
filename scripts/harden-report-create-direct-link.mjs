@@ -22,6 +22,13 @@ const resilientApi=`const api=async(p,o={})=>{const noLogin=allamoNoLoginCreateH
 
 if(!oldApi.includes('AbortController')) html=html.slice(0,apiStart)+resilientApi+html.slice(apiEnd+apiEndToken.length);
 
+// Fechamento de ciclo recorrente também informa qual Report foi criado,
+// para que o mesmo runtime mostre o link imediatamente.
+const seriesOld="window.dispatchEvent(new CustomEvent('allamo:reports-changed'));toast(`Report #${String(z.cycle_no).padStart(2,'0')} criado.`)";
+const seriesNew="window.dispatchEvent(new CustomEvent('allamo:reports-changed',{detail:{reason:'series-report-created',id:z.report_id}}));toast(`Report #${String(z.cycle_no).padStart(2,'0')} criado.`)";
+if(html.includes(seriesOld)) html=html.replace(seriesOld,seriesNew);
+else if(!html.includes("reason:'series-report-created'")) throw new Error('Evento de link do Report recorrente não encontrado.');
+
 // Runtime: gera link determinístico Empresa + Projeto + ID do Report e oferece
 // copiar/abrir em toda edição. Não cria coluna; o ID já é único e imutável.
 const begin='<!-- BEGIN ALLAMO REPORT DIRECT LINK -->';
@@ -41,6 +48,7 @@ if(!html.includes("searchParams.set('report',String(r.id))")) throw new Error('L
 if(!html.includes('A criação do Report excedeu 20 segundos')) throw new Error('Timeout do POST de Report não aplicado.');
 if(!html.includes('A atualização de empresas/projetos excedeu 10 segundos')) throw new Error('Timeout de carga do criador não aplicado.');
 if(!html.includes("timeoutMs=method==='POST'?20000:10000")) throw new Error('Contrato de timeout diferenciado GET/POST ausente.');
+if(!html.includes("reason:'series-report-created'")) throw new Error('Report recorrente não dispara geração de link.');
 
 fs.writeFileSync(file,html);
 console.log('OK: criação de Report possui timeout seguro e cada Report recebe link exclusivo Empresa/Projeto/Report.');
