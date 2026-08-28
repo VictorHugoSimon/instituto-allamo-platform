@@ -18,5 +18,6 @@ jobs:
       - run: npm ci
       - run: npm run build:work
       - run: npm run test:report-create
+      - run: npm run test:report-link
       - run: npm run test:session
       - run: npm run test:tenant
