@@ -40,7 +40,7 @@ if(html.includes(begin)){
 if(!html.includes("searchParams.set('report',String(r.id))")) throw new Error('Link exclusivo por Report não foi injetado.');
 if(!html.includes('A criação do Report excedeu 20 segundos')) throw new Error('Timeout do POST de Report não aplicado.');
 if(!html.includes('A atualização de empresas/projetos excedeu 10 segundos')) throw new Error('Timeout de carga do criador não aplicado.');
-if(!html.includes('POST nunca é repetido automaticamente')) throw new Error('Contrato de não repetição do POST ausente.');
+if(!html.includes("timeoutMs=method==='POST'?20000:10000")) throw new Error('Contrato de timeout diferenciado GET/POST ausente.');
 
 fs.writeFileSync(file,html);
 console.log('OK: criação de Report possui timeout seguro e cada Report recebe link exclusivo Empresa/Projeto/Report.');
