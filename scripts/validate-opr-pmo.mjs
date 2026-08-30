@@ -27,7 +27,7 @@ must(build,'BEGIN ALLAMO OPR PMO API');must(build,'BEGIN ALLAMO OPR PUBLIC REPOR
 // Report do cliente: exatamente quatro abas e sem detalhe interno de horas/FCH.
 const tabLabels=['1 · Executivo','2 · Atenções & Decisões','3 · Próximos Marcos','4 · Cadência & Governança'];
 for(const t of tabLabels)must(pub,t,'aba do report '+t);
-const tabCount=(pub.match(/<button class=\\"tab/g)||[]).length;
+const tabCount=(pub.match(/<button class="tab/g)||[]).length;
 if(tabCount!==4)throw new Error(`Report público deve ter exatamente 4 abas; encontrado: ${tabCount}`);
 mustNot(pub,/FCH|Horas individuais|banco de horas/i,'horas internas no report do cliente');
 
