@@ -1,0 +1,77 @@
+name: MADRI PMO - Stage Schema + CRUD Smoke
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: read
+
+concurrency:
+  group: madri-pmo-stage-schema
+  cancel-in-progress: false
+
+jobs:
+  madri-pmo-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout do mesmo commit do Stage
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar contrato MADRI antes de qualquer alteração
+        run: npm run test:madri-pmo
+
+      - name: Aguardar release Stage do mesmo commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 90); do
+            STATE=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/status" --jq '.statuses[] | select(.context=="allamo/stage-deploy") | .state' | head -n1 || true)
+            echo "allamo/stage-deploy = ${STATE:-aguardando}"
+            if [ "$STATE" = "success" ]; then exit 0; fi
+            if [ "$STATE" = "failure" ] || [ "$STATE" = "error" ]; then echo "Release Stage falhou; schema MADRI não será aplicado."; exit 1; fi
+            sleep 20
+          done
+          echo "Timeout aguardando o Stage do commit ${GITHUB_SHA}."
+          exit 1
+
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Dry-run do schema MADRI PMO
+        run: node scripts/ensure-madri-pmo-schema.mjs --env=stage
+
+      - name: Aplicar schema aditivo e seed de evidências no Stage
+        run: node scripts/ensure-madri-pmo-schema.mjs --env=stage --apply --confirm=APPLY-MADRI-PMO-STAGE
+
+      - name: Validar CRUD real e persistência do Plano MADRI
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+        run: node scripts/smoke-madri-pmo-stage.mjs
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### MADRI PMO · Stage" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Schema: aditivo + seed baseado em evidências" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Plano: work_items / pmo_scope=MADRI_NUCCI" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Report: derivado do Plano Mestre" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Testes: CRUD, status, histórico, lixeira, restore, customização, cadência e report" >> "$GITHUB_STEP_SUMMARY"
