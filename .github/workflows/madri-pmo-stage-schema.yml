@@ -30,6 +30,9 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Gerar bundle validável antes do gate MADRI
+        run: npm run build:work
+
       - name: Validar contrato MADRI antes de qualquer alteração
         run: npm run test:madri-pmo
 
@@ -71,6 +74,7 @@ jobs:
         run: |
           echo "### MADRI PMO · Stage" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Build: executado antes do validador de bundle" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: aditivo + seed baseado em evidências" >> "$GITHUB_STEP_SUMMARY"
           echo "- Plano: work_items / pmo_scope=MADRI_NUCCI" >> "$GITHUB_STEP_SUMMARY"
           echo "- Report: derivado do Plano Mestre" >> "$GITHUB_STEP_SUMMARY"
