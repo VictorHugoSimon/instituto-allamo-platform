@@ -136,14 +136,25 @@ const governanceTables=[
   'governance_event_decisions'
 ];
 const hoursTables=['horas_import','fch_entries','sync_state'];
+const oprTables=[
+  'opr_action_meta',
+  'opr_action_history',
+  'opr_intake',
+  'opr_cadence',
+  'opr_role_assignments',
+  'opr_customizations',
+  'opr_report_publications'
+];
 const missingGovernance=governanceTables.filter(t=>!tableExists(t));
 const missingHours=hoursTables.filter(t=>!tableExists(t));
+const missingOpr=oprTables.filter(t=>!tableExists(t));
 
 console.log(`Ambiente: ${envArg}`);
 console.log(`gmud existe: ${gmudExists?'sim':'não'}`);
 console.log(`gmud.project existe: ${gmudProjectExists?'sim':'não'}`);
 console.log(`Governança ausente: ${missingGovernance.length?missingGovernance.join(', '):'nenhuma'}`);
 console.log(`Horas FCH ausente: ${missingHours.length?missingHours.join(', '):'nenhuma'}`);
+console.log(`OPR PMO ausente: ${missingOpr.length?missingOpr.join(', '):'nenhuma'}`);
 
 if(!APPLY){
   console.log('[DRY-RUN] Nenhuma alteração aplicada.');
@@ -165,11 +176,18 @@ if(missingHours.length){
   runWrangler([WRANGLER,'d1','execute',DB,'--remote','--config',env.config,'--file','migrations/2026-08-25-fch-hours-automation.sql'],{capture:false});
 }
 
+if(missingOpr.length){
+  console.log('[APPLY] Aplicando migration idempotente do Plano PMO OPR...');
+  runWrangler([WRANGLER,'d1','execute',DB,'--remote','--config',env.config,'--file','migrations/2026-08-30-opr-pmo-action-plan.sql'],{capture:false});
+}
+
 const gmudProjectAfter=!gmudExists||columnExists('gmud','project');
 const missingAfter=governanceTables.filter(t=>!tableExists(t));
 const missingHoursAfter=hoursTables.filter(t=>!tableExists(t));
+const missingOprAfter=oprTables.filter(t=>!tableExists(t));
 if(!gmudProjectAfter) throw new Error('gmud.project continua ausente após aplicação.');
 if(missingAfter.length) throw new Error('Tabelas de Governança continuam ausentes: '+missingAfter.join(', '));
 if(missingHoursAfter.length) throw new Error('Tabelas da integração FCH continuam ausentes: '+missingHoursAfter.join(', '));
+if(missingOprAfter.length) throw new Error('Tabelas do Plano PMO OPR continuam ausentes: '+missingOprAfter.join(', '));
 
 console.log('[OK] Schema aditivo validado sem operações destrutivas.');
