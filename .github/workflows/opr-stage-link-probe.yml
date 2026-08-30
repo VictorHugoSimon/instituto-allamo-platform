@@ -12,25 +12,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Resolve OPR project and publish report
+      - name: Initialize OPR baseline and validate links
         run: |
-          node <<'NODE'
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
           const base='https://allamo-pmo-stage.pages.dev';
           async function call(path,opt={}){
             const r=await fetch(base+path,{...opt,headers:{'content-type':'application/json','cache-control':'no-cache',...(opt.headers||{})},cache:'no-store'});
             const text=await r.text();
             let data; try{data=JSON.parse(text)}catch{data=text}
             if(!r.ok) throw new Error(`${path} -> HTTP ${r.status}: ${text.slice(0,500)}`);
-            return data;
+            return {data,response:r,text};
           }
-          const projects=await call('/api/opr-projects');
+          const projects=(await call('/api/opr-projects')).data;
           if(!Array.isArray(projects)||!projects.length) throw new Error('Nenhum projeto OPR encontrado.');
           const p=projects[0];
-          const published=await call('/api/opr-report-publish',{method:'POST',body:JSON.stringify({project_id:Number(p.id)})});
-          const plan=`${base}/?module=opr-plan&project=${encodeURIComponent(p.id)}`;
-          const lines=[`PROJECT_ID=${p.id}`,`PROJECT_NAME=${p.name}`,`PLAN_LINK=${plan}`,`REPORT_LINK=${published.public_url}`];
+          const boot=(await call('/api/opr-bootstrap',{method:'POST',body:JSON.stringify({project_id:Number(p.id)})})).data;
+          const actions=(await call('/api/opr-actions?project='+encodeURIComponent(p.id))).data;
+          if(!Array.isArray(actions)||!actions.length) throw new Error('Plano OPR permaneceu vazio após bootstrap.');
+          const published=(await call('/api/opr-report-publish',{method:'POST',body:JSON.stringify({project_id:Number(p.id)})})).data;
+          const reportCheck=await fetch(published.public_url,{headers:{'cache-control':'no-cache'},cache:'no-store'});
+          const reportHtml=await reportCheck.text();
+          if(!reportCheck.ok||!reportHtml.includes('Status Report · OPR')) throw new Error('Report público não validou. HTTP '+reportCheck.status);
+          const plan=base;
+          const lines=[
+            `PROJECT_ID=${p.id}`,
+            `PROJECT_NAME=${p.name}`,
+            `BOOTSTRAP_CREATED=${boot.created??'n/a'}`,
+            `BOOTSTRAP_SKIPPED=${boot.skipped??'n/a'}`,
+            `ACTION_COUNT=${actions.length}`,
+            `PLAN_LINK=${plan}`,
+            `PLAN_ENTRY=OPR · Plano PMO`,
+            `REPORT_LINK=${published.public_url}`,
+            `REPORT_HTTP=${reportCheck.status}`
+          ];
           console.log(lines.join('\n'));
-          require('node:fs').writeFileSync('opr-links.txt',lines.join('\n')+'\n');
+          fs.writeFileSync('opr-links.txt',lines.join('\n')+'\n');
           NODE
       - uses: actions/upload-artifact@v4
         with:
