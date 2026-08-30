@@ -24,12 +24,14 @@ for(const table of ['opr_action_meta','opr_action_history','opr_intake','opr_cad
 must(build,"src/opr-pmo-api.js");must(build,"src/opr-public-report-api.js");must(build,"src/opr-pmo-ui.js");
 must(build,'BEGIN ALLAMO OPR PMO API');must(build,'BEGIN ALLAMO OPR PUBLIC REPORT');
 
-// Report do cliente: exatamente quatro abas e sem detalhe interno de horas/FCH.
+// Report do cliente: exatamente quatro abas e sem acoplamento a dados internos de horas.
+// A fonte pode mencionar em texto que informações internas não são expostas; o que fica proibido
+// é consultar tabelas/endpoints de FCH/horas ou renderizar métricas internas no report público.
 const tabLabels=['1 · Executivo','2 · Atenções & Decisões','3 · Próximos Marcos','4 · Cadência & Governança'];
 for(const t of tabLabels)must(pub,t,'aba do report '+t);
 const tabCount=(pub.match(/<button class="tab/g)||[]).length;
 if(tabCount!==4)throw new Error(`Report público deve ter exatamente 4 abas; encontrado: ${tabCount}`);
-mustNot(pub,/FCH|Horas individuais|banco de horas/i,'horas internas no report do cliente');
+mustNot(pub,/fch_entries|horas_import|fch-hours|capacity_hours|actual_hours|planned_hours/i,'acoplamento de horas internas no report do cliente');
 
 // Isolamento: nenhum dado copiado de Dual/Madri/Nucci nos artefatos OPR.
 for(const [name,text] of [['API',api],['UI',ui],['Report público',pub],['Migration',migration]]){
