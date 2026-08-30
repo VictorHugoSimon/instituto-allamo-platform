@@ -1,0 +1,58 @@
+name: OPR PMO Tool CI
+
+on:
+  push:
+    branches: [feature/opr-action-plan-report-20260830]
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'src/opr-*.js'
+      - 'migrations/2026-08-30-opr-pmo-action-plan.sql'
+      - 'scripts/build-work-management.mjs'
+      - 'scripts/ensure-additive-schema.mjs'
+      - 'scripts/validate-opr-pmo.mjs'
+      - '.github/workflows/opr-pmo-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-opr-pmo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+      - name: Validar sintaxe do módulo OPR
+        run: |
+          node --check src/opr-pmo-ui.js
+          node --check scripts/validate-opr-pmo.mjs
+          node scripts/validate-opr-pmo.mjs
+      - name: Validar migration OPR em SQLite
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib
+          sql=pathlib.Path('migrations/2026-08-30-opr-pmo-action-plan.sql').read_text()
+          con=sqlite3.connect(':memory:')
+          con.executescript(sql)
+          expected={'opr_action_meta','opr_action_history','opr_intake','opr_cadence','opr_role_assignments','opr_customizations','opr_report_publications'}
+          got={r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+          missing=expected-got
+          assert not missing, missing
+          print('migration OPR ok:', ', '.join(sorted(expected)))
+          PY
+      - name: Gerar bundle real da plataforma
+        run: npm run build:work
+      - name: Confirmar injeção e isolamento no bundle
+        run: |
+          grep -q 'BEGIN ALLAMO OPR PMO API' public/_worker.js
+          grep -q 'BEGIN ALLAMO OPR PUBLIC REPORT' public/_worker.js
+          grep -q 'OPR · Plano de Ação & Report' public/index.html
+          grep -q 'opr-report-publications\|opr_report_publications' public/_worker.js
+          node scripts/validate-opr-pmo.mjs
+          ! grep -E 'Status Report · Dual Clima|MADRI · Implantação NUCCI|NUCCI ERP' src/opr-pmo-api.js src/opr-pmo-ui.js src/opr-public-report-api.js
