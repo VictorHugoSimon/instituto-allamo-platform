@@ -1,0 +1,33 @@
+name: OPR Plan Page Probe
+
+on:
+  push:
+    branches: [feat/opr-plano-acao-dual-style]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate standalone OPR action plan
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path='public/opr-plano-de-acao/index.html';
+          const html=fs.readFileSync(path,'utf8');
+          for(const expected of ['OPR · Plano de Ação PMO','Visão Geral','Plano de Ação','Kanban','Pendências','Cadência','Responsáveis','Customizações','Entrada de Demandas','Lixeira','/api/']){
+            if(!html.includes(expected)) throw new Error('Conteúdo obrigatório ausente: '+expected);
+          }
+          if(/Dual Clima|MADRI|Madrid/i.test(html)) throw new Error('Contaminação de outro tenant detectada na página OPR.');
+          const matches=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+          if(matches.length!==1) throw new Error('Esperado exatamente um script inline; encontrados '+matches.length);
+          new Function(matches[0][1]);
+          console.log('OK: página OPR standalone validada, sem contaminação e com JavaScript sintaticamente válido.');
+          NODE
