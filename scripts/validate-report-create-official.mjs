@@ -23,6 +23,15 @@ must(router,'e.stopImmediatePropagation()','handler legado não concorre com o c
 must(router,'window.AllamoOfficialReportCreate','roteador chama o criador oficial');
 must(router,"document.querySelector('#arc-company')",'empresa selecionada é reaplicada no criador');
 must(router,"document.querySelector('#arc-project')",'projeto selecionado é reaplicado no criador');
+must(router,"CREATE_TITLE='Criar Status Report · Template oficial do cliente'",'modal oficial é identificado deterministicamente');
+must(router,"data-allamo-report-create-modal",'modal recebe marcador exclusivo de estabilidade');
+must(router,'forceVisible','roteador força visibilidade do template contra CSS legado');
+must(router,"set('display','flex')",'display do modal é protegido por inline important');
+must(router,"set('visibility','visible')",'visibilidade do modal é protegida');
+must(router,"set('opacity','1')",'opacidade do modal é protegida');
+must(router,'timeout(creator.open(),12000)','abertura possui timeout explícito');
+must(router,"O template oficial não foi montado na tela.",'falha de montagem é detectada e informada');
+must(router,"feedback('Template de Report aberto.')",'sucesso só é informado após montagem real');
 must(tabs,'allamoActiveReportTab','aba ativa persiste entre rerenders');
 must(tabs,"classList.toggle('on'",'painel ativo é restaurado sem clique artificial');
 must(login,"u.pathname==='/api/login'",'retry limitado ao login');
@@ -34,4 +43,4 @@ if(pRouter<0||pCreate<0||pRouter>pCreate)throw new Error('Roteador do botão dev
 if(pCreate<0||pAi<0||pAi>pCreate)throw new Error('Ponte IA deve carregar antes do criador oficial.');
 const pRaci=build.indexOf('${clientReportTemplateRaciEnhancement}'),pTabs=build.indexOf('${clientReportTabStability}');
 if(pRaci<0||pTabs<0||pRaci>pTabs)throw new Error('Estabilidade de abas deve envolver o renderer já enriquecido pela RACI.');
-console.log('OK: botão Novo report abre deterministicamente o criador oficial, preserva empresa/projeto, usa Copiloto sob aprovação, publicação explícita, preview cliente e abas persistentes.');
+console.log('OK: Novo report só conclui abertura após montar e exibir o template oficial; contexto, IA, publicação explícita, preview e abas permanecem preservados.');
