@@ -1,0 +1,74 @@
+name: MADRI PMO - Current Stage CRUD Verification
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - '.github/workflows/madri-current-stage-crud-verification.yml'
+      - '.github/workflows/madri-pmo-stage-schema.yml'
+      - 'scripts/smoke-madri-pmo-stage.mjs'
+      - 'scripts/prepare-stage-smoke-session.mjs'
+      - 'scripts/expire-stage-smoke-session.mjs'
+      - 'src/madri-pmo-api.js'
+      - 'scripts/build-madri-pmo.mjs'
+      - 'scripts/validate-madri-pmo-static.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-current-stage-crud-verification
+  cancel-in-progress: false
+
+jobs:
+  verify-current-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar build e contrato MADRI localmente
+        run: |
+          npm run build:work
+          npm run test:madri-pmo
+
+      - name: Preparar autenticação Cloudflare somente para o D1 de Stage
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Criar sessão técnica efêmera autenticada no Stage
+        run: node scripts/prepare-stage-smoke-session.mjs
+
+      - name: Smoke CRUD completo no Stage já publicado
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+        run: node scripts/smoke-madri-pmo-stage.mjs
+
+      - name: Expirar sessão técnica do smoke
+        if: always()
+        run: node scripts/expire-stage-smoke-session.mjs
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### MADRI PMO · Current Stage CRUD Verification" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ambiente testado: https://allamo-pmo-stage.pages.dev" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Sem deploy e sem acesso ao D1 oficial de Produção" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Sessão: técnica, efêmera, mascarada e exclusiva do Stage" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Segurança: DELETE anônimo permanece bloqueado" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Valida: create, update, status, histórico, lixeira, restore, customização, cadência e report público" >> "$GITHUB_STEP_SUMMARY"

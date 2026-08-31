@@ -64,10 +64,17 @@ jobs:
       - name: Aplicar schema aditivo e seed de evidências no Stage
         run: node scripts/ensure-madri-pmo-schema.mjs --env=stage --apply --confirm=APPLY-MADRI-PMO-STAGE
 
+      - name: Criar sessão técnica efêmera autenticada no Stage
+        run: node scripts/prepare-stage-smoke-session.mjs
+
       - name: Validar CRUD real e persistência do Plano MADRI
         env:
           ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
         run: node scripts/smoke-madri-pmo-stage.mjs
+
+      - name: Expirar sessão técnica do smoke MADRI
+        if: always()
+        run: node scripts/expire-stage-smoke-session.mjs
 
       - name: Resumo
         if: always()
@@ -78,4 +85,6 @@ jobs:
           echo "- Schema: aditivo + seed baseado em evidências" >> "$GITHUB_STEP_SUMMARY"
           echo "- Plano: work_items / pmo_scope=MADRI_NUCCI" >> "$GITHUB_STEP_SUMMARY"
           echo "- Report: derivado do Plano Mestre" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Sessão do smoke: técnica, efêmera, mascarada e exclusiva do Stage" >> "$GITHUB_STEP_SUMMARY"
+          echo "- DELETE anônimo: continua bloqueado" >> "$GITHUB_STEP_SUMMARY"
           echo "- Testes: CRUD, status, histórico, lixeira, restore, customização, cadência e report" >> "$GITHUB_STEP_SUMMARY"
