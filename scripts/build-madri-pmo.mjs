@@ -2,7 +2,18 @@ import fs from 'node:fs';
 
 const worker='public/_worker.js';
 const publicApi=fs.readFileSync('src/madri-pmo-public-api.js','utf8');
-const privateApi=fs.readFileSync('src/madri-pmo-api.js','utf8');
+let privateApi=fs.readFileSync('src/madri-pmo-api.js','utf8');
+
+// Correção defensiva do contrato de criação de ações MADRI.
+// work_items possui 25 colunas neste INSERT: 24 parâmetros + version=1.
+// Mantemos o source API isolado e garantimos que o bundle publicado não use
+// a forma antiga com 25 placeholders + literal 1 (26 valores / 25 colunas).
+const badInsert='VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)';
+const goodInsert='VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)';
+if(!privateApi.includes(badInsert) && !privateApi.includes(goodInsert)){
+  throw new Error('Contrato INSERT MADRI não encontrado para validação.');
+}
+privateApi=privateApi.replace(badInsert,goodInsert);
 
 const sync=(text,start,end,content,needle,indent='')=>{
   const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
@@ -33,4 +44,4 @@ w=sync(
   '    '
 );
 fs.writeFileSync(worker,w);
-console.log('OK: APIs MADRI PMO pública e autenticada injetadas de forma idempotente.');
+console.log('OK: APIs MADRI PMO pública e autenticada injetadas de forma idempotente; INSERT de ações validado.');
