@@ -7,6 +7,8 @@ const DB='DB';
 const WRANGLER='wrangler@4.124.0';
 
 const abort=(m)=>{console.error('[ABORTADO] '+m);process.exit(2)};
+if(!process.env.GITHUB_ENV) abort('GITHUB_ENV não está disponível; este helper só pode criar sessão em workflow GitHub Actions controlado.');
+if(String(process.env.GITHUB_ACTIONS||'').toLowerCase()!=='true') abort('Execução recusada fora do GitHub Actions.');
 if(!fs.existsSync(CONFIG)) abort('Config exclusiva de Stage não encontrada: '+CONFIG);
 const cfg=fs.readFileSync(CONFIG,'utf8');
 if(!/name\s*=\s*"allamo-pmo-stage"/.test(cfg)) abort('Config informada não pertence ao projeto allamo-pmo-stage.');
@@ -52,10 +54,8 @@ try{
   // A sessão dura no máximo 30 minutos e será expirada explicitamente no final do workflow.
   exec(`INSERT INTO sessions (token,user_id,expires_at) VALUES ('${esc(token)}','${esc(user.id)}',datetime('now','+30 minutes'));`);
 
-  const envFile=process.env.GITHUB_ENV;
-  if(!envFile) abort('GITHUB_ENV não está disponível; este helper só deve criar sessão em workflow controlado.');
   process.stdout.write(`::add-mask::${token}\n`);
-  fs.appendFileSync(envFile,`\nALLAMO_SMOKE_TOKEN=${token}\n`);
+  fs.appendFileSync(process.env.GITHUB_ENV,`\nALLAMO_SMOKE_TOKEN=${token}\n`);
   console.log('[OK] Sessão técnica efêmera criada exclusivamente no Stage; token mascarado e TTL de 30 minutos.');
 }catch(e){
   console.error('[ABORTADO] Não foi possível preparar a sessão técnica de Stage:',e.message||String(e));
