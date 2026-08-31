@@ -1,0 +1,52 @@
+name: OPR Meeting Sync CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/apply-opr-meeting-actions.mjs'
+      - 'data/opr/meeting-actions/**'
+      - '.github/workflows/deploy-stage.yml'
+      - '.github/workflows/opr-meeting-sync-ci.yml'
+  push:
+    branches-ignore: [develop, main]
+    paths:
+      - 'scripts/apply-opr-meeting-actions.mjs'
+      - 'data/opr/meeting-actions/**'
+      - '.github/workflows/opr-meeting-sync-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-opr-meeting-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validar sintaxe do sincronizador
+        run: node --check scripts/apply-opr-meeting-actions.mjs
+      - name: Validar manifestos OPR
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const dir='data/opr/meeting-actions';
+          const files=fs.readdirSync(dir).filter(x=>x.endsWith('.json'));
+          if(!files.length) throw new Error('Nenhum manifesto OPR encontrado');
+          const sources=new Set();
+          for(const file of files){
+            const m=JSON.parse(fs.readFileSync(`${dir}/${file}`,'utf8'));
+            if(!m.meeting_date||!m.project_id||!Array.isArray(m.actions)||!m.actions.length) throw new Error(`${file}: estrutura incompleta`);
+            for(const a of m.actions){
+              for(const f of ['source','front','action','status','impact','next_step','evidence']) if(!String(a[f]??'').trim()) throw new Error(`${file}: ação sem ${f}`);
+              if(!['Planejado','Em andamento','Atrasado','Concluído'].includes(a.status)) throw new Error(`${file}: status inválido em ${a.source}`);
+              if(sources.has(a.source)) throw new Error(`source duplicado: ${a.source}`);
+              sources.add(a.source);
+            }
+            if(m.cadence){
+              if(!m.cadence.source||!m.cadence.agenda||!['Realizada','Planejada','A confirmar','Cancelada','Não realizada'].includes(m.cadence.status)) throw new Error(`${file}: cadência inválida`);
+            }
+          }
+          console.log(`[OK] ${files.length} manifesto(s), ${sources.size} ação(ões) únicas.`);
+          NODE

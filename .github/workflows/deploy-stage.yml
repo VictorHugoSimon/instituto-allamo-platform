@@ -106,6 +106,10 @@ jobs:
         run: npm run smoke:opr-pop
         env:
           ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+      - name: Sincronizar reuniões OPR no Plano de Ação
+        run: node scripts/apply-opr-meeting-actions.mjs
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
       - name: Registrar sucesso do deploy no commit
         if: success()
         env:
@@ -131,3 +135,4 @@ jobs:
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
           echo "- Autenticação: API Token com fallback para Global API Key + e-mail quando disponível" >> "$GITHUB_STEP_SUMMARY"
           echo "- Smokes: governança multitenant + Dual Clima/Madrid/OPR + POP OPR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Reuniões OPR: sincronização idempotente para Plano de Ação + Cadência" >> "$GITHUB_STEP_SUMMARY"
