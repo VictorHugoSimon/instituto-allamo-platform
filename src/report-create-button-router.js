@@ -2,6 +2,7 @@
   if(window.__allamoReportCreateButtonRouterLoaded)return;
   window.__allamoReportCreateButtonRouterLoaded=true;
 
+  const CREATE_TITLE='Criar Status Report · Template oficial do cliente';
   const context=()=>{
     const c=window.__allamoReportContext||{};
     return {
@@ -13,14 +14,87 @@
     if(window.AllamoActionFeedback){window.AllamoActionFeedback(msg);return;}
     let x=document.getElementById('allamo-action-feedback');
     if(!x){x=document.createElement('div');x.id='allamo-action-feedback';x.style.cssText='position:fixed;right:18px;bottom:18px;z-index:2147483646;background:#302f39;color:#fff;border-radius:10px;padding:10px 14px;font:700 12px/1.35 Inter,Arial,sans-serif;box-shadow:0 8px 28px #0004';document.body.appendChild(x)}
-    x.textContent=msg;x.style.opacity='1';clearTimeout(x._t);x._t=setTimeout(()=>{x.style.opacity='0'},1800);
+    x.textContent=msg;x.style.opacity='1';clearTimeout(x._t);x._t=setTimeout(()=>{x.style.opacity='0'},2600);
   };
+
+  const ensureGuardStyle=()=>{
+    if(document.getElementById('allamo-report-create-modal-guard'))return;
+    const s=document.createElement('style');
+    s.id='allamo-report-create-modal-guard';
+    s.textContent=`
+      body>[data-allamo-report-create-modal="1"]{
+        position:fixed!important;inset:0!important;z-index:2147483000!important;
+        display:flex!important;visibility:visible!important;opacity:1!important;
+        pointer-events:auto!important;align-items:center!important;justify-content:center!important;
+        background:rgba(0,0,0,.60)!important;padding:12px!important;overflow:hidden!important;
+        transform:none!important;clip:auto!important;filter:none!important;
+      }
+      body>[data-allamo-report-create-modal="1"]>.arc-box{
+        display:flex!important;visibility:visible!important;opacity:1!important;
+        width:min(1180px,98vw)!important;height:min(96vh,980px)!important;
+        max-width:1180px!important;max-height:96vh!important;overflow:hidden!important;
+        position:relative!important;z-index:1!important;transform:none!important;
+      }
+      @media(max-width:800px){
+        body>[data-allamo-report-create-modal="1"]{padding:0!important;align-items:stretch!important}
+        body>[data-allamo-report-create-modal="1"]>.arc-box{width:100vw!important;height:100dvh!important;max-width:100vw!important;max-height:100dvh!important;border-radius:0!important}
+      }
+    `;
+    (document.head||document.documentElement).appendChild(s);
+  };
+
+  const isCreateModal=el=>{
+    if(!el||el.nodeType!==1)return false;
+    if(el.getAttribute?.('data-allamo-report-create-modal')==='1')return true;
+    const box=el.querySelector?.('.arc-box');
+    if(!box)return false;
+    const text=String(box.textContent||'');
+    return text.includes(CREATE_TITLE);
+  };
+  const findCreateModal=()=>{
+    const marked=document.querySelector('body>[data-allamo-report-create-modal="1"]');
+    if(marked)return marked;
+    const nodes=[...(document.body?.children||[])].reverse();
+    return nodes.find(isCreateModal)||null;
+  };
+  const forceVisible=modal=>{
+    if(!modal)return null;
+    ensureGuardStyle();
+    modal.setAttribute('data-allamo-report-create-modal','1');
+    const set=(k,v)=>modal.style.setProperty(k,v,'important');
+    set('position','fixed');set('inset','0');set('z-index','2147483000');set('display','flex');
+    set('visibility','visible');set('opacity','1');set('pointer-events','auto');set('align-items','center');
+    set('justify-content','center');set('background','rgba(0,0,0,.60)');set('transform','none');set('clip','auto');
+    const box=modal.querySelector('.arc-box');
+    if(box){
+      const b=(k,v)=>box.style.setProperty(k,v,'important');
+      b('display','flex');b('visibility','visible');b('opacity','1');b('position','relative');b('z-index','1');b('transform','none');
+    }
+    return modal;
+  };
+
+  ensureGuardStyle();
+  const observer=new MutationObserver(mutations=>{
+    for(const mutation of mutations){
+      for(const node of mutation.addedNodes||[]){
+        if(isCreateModal(node)){forceVisible(node);return}
+        const nested=node?.querySelectorAll?.('.arc-box')||[];
+        for(const box of nested){
+          const root=box.parentElement;
+          if(isCreateModal(root)){forceVisible(root);return}
+        }
+      }
+    }
+  });
+  if(document.body)observer.observe(document.body,{childList:true});
+  else document.addEventListener('DOMContentLoaded',()=>observer.observe(document.body,{childList:true}),{once:true});
+
   const prefill=(companyId,projectId)=>{
     let attempt=0;
     const apply=()=>{
       const company=document.querySelector('#arc-company');
       const project=document.querySelector('#arc-project');
-      if(!company){if(attempt++<30)setTimeout(apply,100);return;}
+      if(!company){if(attempt++<40)setTimeout(apply,100);return;}
       if(companyId){
         company.value=String(companyId);
         company.dispatchEvent(new Event('change',{bubbles:true}));
@@ -32,6 +106,10 @@
     };
     apply();
   };
+  const timeout=(promise,ms)=>Promise.race([
+    Promise.resolve(promise),
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error('O template de criação não respondeu em '+Math.round(ms/1000)+' segundos.')),ms))
+  ]);
   const open=async()=>{
     const ctx=context();
     const creator=window.AllamoOfficialReportCreate;
@@ -40,13 +118,20 @@
       feedback('Não foi possível carregar o criador de Report. Atualize a página.');
       return;
     }
+    const stale=findCreateModal();
+    if(stale)stale.remove();
     feedback('Abrindo criação de Report…');
     try{
-      await creator.open();
+      await timeout(creator.open(),12000);
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const modal=forceVisible(findCreateModal());
+      if(!modal)throw new Error('O template oficial não foi montado na tela.');
       prefill(ctx.company,ctx.project);
+      feedback('Template de Report aberto.');
     }catch(err){
       console.error('[report-create] falha ao abrir',err);
-      feedback('Erro ao abrir a criação de Report. Tente novamente.');
+      const msg=String(err?.message||err||'Falha desconhecida');
+      feedback('Não foi possível abrir o Report: '+msg);
     }
   };
 
@@ -59,5 +144,5 @@
     open();
   },true);
 
-  window.AllamoCreateReportButton={open};
+  window.AllamoCreateReportButton={open,findCreateModal,forceVisible};
 })();
