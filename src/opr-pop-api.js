@@ -1,0 +1,90 @@
+// OPR POP — procedimento operacional padrão editável, isolado por projeto OPR.
+// Requer que o bloco OPR Governance Master tenha sido injetado antes deste bloco.
+const oprPopWrite=oprMasterWrite;
+const oprPopStatuses=['Ativo','Em revisão','Pendente','Inativo'];
+const oprPopSeed=[
+  ['Governança e fonte única','Usar o Plano Mestre como fonte única das obrigações operacionais da OPR. Informações relevantes não devem permanecer apenas em reunião, mensagem, e-mail ou documento isolado.','PMO','Contínuo','Plano Mestre e registros no banco','Toda obrigação executável está rastreada no Plano Mestre','Ativo','Revisar desvios de rastreabilidade na rotina PMO'],
+  ['Entrada de Demandas','Registrar toda nova demanda na Entrada de Demandas, classificando origem, frente, responsável, prazo e evidência antes da aprovação para o Plano Mestre.','PMO','Sempre que surgir nova demanda','Registro de Entrada de Demandas','Demanda classificada e, quando aplicável, convertida em PA','Ativo','Manter triagem atualizada'],
+  ['Tratamento de Reuniões','Após cada reunião, analisar decisões, novas ações, pendências, riscos, bloqueios, dependências e mudanças de prazo ou responsabilidade. Criar novo PA somente quando necessário e sem duplicidade.','PMO','Após cada reunião','Ata, transcrição ou resumo da reunião','Novas obrigações registradas ou PA existente atualizado com contexto','Ativo','Informar quais PAs foram criados ou atualizados'],
+  ['Plano Mestre','Criar ou atualizar ações no Plano Mestre com ID sequencial, frente, ação, responsável, início, prazo, status, dependência, impacto, caminho crítico, próximo passo e evidência.','PMO','Quando houver compromisso executável','Registro PA no Plano Mestre','Ação rastreável com dados suficientes para acompanhamento','Ativo','Revisar campos pendentes'],
+  ['Status e conclusão','Utilizar apenas os status oficiais do Plano de Ação: Planejado, Em andamento, Atrasado e Concluído. Prazo vencido com ação não concluída deve ser tratado como Atrasado.','PMO','Em toda atualização de ação','Histórico do PA','Status coerente com prazo, execução e evidência','Ativo','Corrigir inconsistências de status'],
+  ['Responsabilidades','Definir responsável sempre que houver evidência válida. Quando não houver responsável confirmado, registrar PENDENTE DE VALIDAÇÃO.','PMO','Na criação ou revisão de ações','Plano Mestre e matriz de responsáveis','Nenhuma responsabilidade nominal é atribuída sem base','Ativo','Cobrar validação dos responsáveis pendentes'],
+  ['Pendências','Gerar e acompanhar pendências para ações sem responsável, sem prazo quando necessário, atrasadas, dependências não resolvidas, aprovações pendentes, evidências ausentes e decisões pendentes.','PMO','Revisão contínua e semanal','Visão de Pendências','Pendências críticas possuem dono e próximo passo','Ativo','Escalar pendências críticas sem evolução'],
+  ['Customizações e Desenvolvimentos','Registrar toda necessidade de customização ou desenvolvimento com fluxo de análise, revisão, aprovação, desenvolvimento, teste, validação e aceite, vinculada ao PA quando aplicável.','PMO','Quando surgir necessidade técnica ou funcional','Registro de Customização/Desenvolvimento','Customização rastreável com situação, responsáveis, evidência e próximo passo','Ativo','Manter vínculo com PA correspondente'],
+  ['Evidências','Registrar evidências válidas como ata, transcrição, documento, aprovação formal, e-mail, arquivo técnico, proposta, matriz, RFI/RFP, homologação ou aceite.','PMO','Ao criar, atualizar ou concluir ação','Campo Fonte/Evidência e arquivos vinculados','Conclusões e decisões relevantes possuem evidência suficiente','Ativo','Substituir suposições por A confirmar quando necessário'],
+  ['Histórico e auditoria','Manter histórico das alterações relevantes e utilizar auditoria de completude para confrontar Plano de Ação com reuniões, cronograma, documentos, backlog, cliente, fornecedor, customizações, mensagens e documentação PMO.','PMO','A cada alteração relevante e revisão de completude','Histórico e Auditoria de Completude','Mudanças e lacunas permanecem rastreáveis','Ativo','Executar auditoria periódica'],
+  ['Cadência','Registrar cada cerimônia com data/período, agenda, objetivo, participantes, status, resultado, próximo passo, PA relacionado e evidência.','PMO','Em toda cerimônia planejada ou realizada','Cadência Completa','Reunião encerra com decisão, ação, responsável, prazo e evidência quando aplicável','Ativo','Revisar aderência quando houver base suficiente'],
+  ['Gestão de Riscos','Registrar riscos relevantes com probabilidade, impacto, responsável, mitigação e ação relacionada. Riscos com resposta executável devem gerar ou atualizar PA.','PMO','Quando risco for identificado ou alterado','Matriz/registro de riscos e PA relacionado','Riscos críticos possuem resposta rastreável','Ativo','Revisar riscos no rito semanal'],
+  ['Escalonamento','Escalar bloqueio de caminho crítico, atraso relevante sem recuperação, ausência de responsável, decisão executiva pendente, dependência de fornecedor, divergência de escopo ou impacto significativo em prazo.','PMO','Quando critério de escalonamento ocorrer','Registro de decisão, reunião ou comunicação formal','Escalonamento possui contexto, impacto, responsável e próximo passo','Ativo','Acompanhar decisão até resolução'],
+  ['Status Report Executivo','Gerar o Status Report exclusivamente a partir da mesma base do Plano Mestre, apresentando visão executiva, atenções e decisões, próximos marcos e cadência/governança.','PMO','Na periodicidade definida da comunicação executiva','Status Report publicado','Report reflete a situação real do Plano Mestre sem base paralela','Ativo','Validar consistência antes da publicação'],
+  ['Ritual pré-reunião','Revisar ações abertas, atrasos, pendências, riscos, dependências e decisões necessárias antes da reunião.','PMO','Antes de cada reunião de governança','Checklist/revisão do Plano Mestre','Reunião inicia com visão atualizada das prioridades','Ativo','Preparar pontos de decisão'],
+  ['Ritual pós-reunião','Atualizar o Plano Mestre, registrar novos PAs quando necessários, anexar evidências e comunicar o contexto das ações criadas ou atualizadas.','PMO','Imediatamente após cada reunião','Ata/transcrição + atualizações no Plano','Nenhum compromisso da reunião fica sem rastreabilidade','Ativo','Informar novos PAs e contexto'],
+  ['Revisão semanal','Revisar caminho crítico, atrasos, pendências, riscos, responsáveis, próximos marcos e consistência entre Plano Mestre e evidências.','PMO','Semanal','Plano Mestre, Pendências e Auditoria','Principais desvios possuem ação ou escalonamento definido','Ativo','Preparar leitura executiva da semana'],
+  ['Definição de Concluído','Considerar uma ação concluída somente quando a entrega foi realizada, a evidência foi registrada e o resultado foi aceito quando houver aceite aplicável.','PMO','Ao encerrar uma ação','Evidência e histórico do PA','Ação encerrada sem pendência de evidência ou aceite aplicável','Ativo','Reabrir ação se o critério não estiver atendido']
+];
+
+const oprPopEnsureConfig=async ctx=>{
+  await DB.prepare(`INSERT OR IGNORE INTO opr_pop_config(project_id,company_id,updated_by) VALUES(?,?,?)`).bind(ctx.project_id,ctx.company_id,user.name||'').run();
+  return DB.prepare(`SELECT * FROM opr_pop_config WHERE project_id=?`).bind(ctx.project_id).first();
+};
+const oprPopTakeNumber=async ctx=>{
+  await DB.prepare(`INSERT OR IGNORE INTO opr_pop_sequence(project_id,company_id,next_value,updated_at) VALUES(?,?,1,datetime('now'))`).bind(ctx.project_id,ctx.company_id).run();
+  const r=await DB.prepare(`UPDATE opr_pop_sequence SET next_value=next_value+1,updated_at=datetime('now') WHERE project_id=? RETURNING next_value-1 AS n`).bind(ctx.project_id).first();
+  const n=Number(r?.n||0);if(!n)throw new Error('Falha ao reservar ID sequencial do POP');
+  return 'POP-'+String(n).padStart(3,'0');
+};
+const oprPopResolve=async(ref,includeArchived=false)=>{
+  const raw=String(ref||'').trim();if(!raw)return null;
+  return DB.prepare(`SELECT * FROM opr_pop_procedures WHERE (id=? OR UPPER(display_id)=UPPER(?)) ${includeArchived?'':'AND archived_at IS NULL'}`).bind(raw,raw).first();
+};
+const oprPopHistory=async(row,event,version)=>{
+  if(!row)return;const snap=JSON.stringify(row);
+  await DB.prepare(`INSERT INTO opr_pop_history(company_id,project_id,procedure_id,action_type,version,actor,snapshot_json) VALUES(?,?,?,?,?,?,?)`).bind(row.company_id,row.project_id,row.id,event,version||row.version||1,user.name||'',snap).run();
+};
+const oprPopBootstrap=async ctx=>{
+  await oprPopEnsureConfig(ctx);
+  const c=await DB.prepare(`SELECT COUNT(*) total FROM opr_pop_procedures WHERE project_id=?`).bind(ctx.project_id).first();
+  if(Number(c?.total||0)>0)return {created:0,skipped:Number(c.total||0)};
+  let created=0;
+  for(let i=0;i<oprPopSeed.length;i++){
+    const [section,procedure_text,owner,trigger_frequency,evidence,done_criteria,status,next_step]=oprPopSeed[i];
+    const id=oprMasterId('OPR-POP-'),display=await oprPopTakeNumber(ctx);
+    await DB.prepare(`INSERT INTO opr_pop_procedures(id,display_id,company_id,project_id,section,procedure_text,owner,trigger_frequency,evidence,done_criteria,status,next_step,source,rank,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id,display,ctx.company_id,ctx.project_id,section,procedure_text,owner,trigger_frequency,evidence,done_criteria,status,next_step,'POP-OPR-ERP-v1.0',i+1,user.name||'',user.name||'').run();
+    const row=await oprPopResolve(id);await oprPopHistory(row,'INSERT',1);created++;
+  }
+  await DB.prepare(`UPDATE opr_pop_config SET initialized_at=datetime('now'),updated_at=datetime('now'),updated_by=? WHERE project_id=?`).bind(user.name||'',ctx.project_id).run();
+  return {created,skipped:0};
+};
+
+if(path==='opr-pop'&&request.method==='GET'){
+  const ctx=await oprMasterProjectContext(url.searchParams.get('project'));if(ctx.error)return json({error:ctx.error},400);
+  const config=await oprPopEnsureConfig(ctx),trash=url.searchParams.get('trash')==='1';
+  const procedures=(await DB.prepare(`SELECT * FROM opr_pop_procedures WHERE project_id=? AND ${trash?'archived_at IS NOT NULL':'archived_at IS NULL'} ORDER BY rank,CAST(SUBSTR(display_id,5) AS INTEGER),created_at`).bind(ctx.project_id).all()).results||[];
+  return json({config,procedures,project:{id:ctx.project_id,name:ctx.project_name,company_id:ctx.company_id,company_name:ctx.company_name}});
+}
+if(path==='opr-pop-bootstrap'&&request.method==='POST'){
+  if(!oprPopWrite)return json({error:'Sem permissão'},403);const b=await request.json().catch(()=>({})),ctx=await oprMasterProjectContext(b.project_id);if(ctx.error)return json({error:ctx.error},400);
+  try{return json({ok:true,...await oprPopBootstrap(ctx)})}catch(e){return json({error:e.message||'Falha ao inicializar POP'},400)}
+}
+if(path==='opr-pop-config'&&request.method==='PATCH'){
+  if(!oprPopWrite)return json({error:'Sem permissão'},403);const b=await request.json().catch(()=>({})),ctx=await oprMasterProjectContext(b.project_id);if(ctx.error)return json({error:ctx.error},400);await oprPopEnsureConfig(ctx);
+  const allowed=['version','document_status','governance_owner','approver','objective'],sets=[],args=[];for(const f of allowed)if(Object.prototype.hasOwnProperty.call(b,f)){sets.push(f+'=?');args.push(String(b[f]??''))}
+  if(!sets.length)return json({ok:true});sets.push('version_number=version_number+1',"updated_at=datetime('now')",'updated_by=?');args.push(user.name||'',ctx.project_id);await DB.prepare('UPDATE opr_pop_config SET '+sets.join(',')+' WHERE project_id=?').bind(...args).run();return json({ok:true,config:await oprPopEnsureConfig(ctx)});
+}
+if(path==='opr-pop'&&request.method==='POST'){
+  if(!oprPopWrite)return json({error:'Sem permissão'},403);const b=await request.json().catch(()=>({})),ctx=await oprMasterProjectContext(b.project_id);if(ctx.error)return json({error:ctx.error},400);const text=String(b.procedure_text||'').trim();if(!text)return json({error:'Procedimento é obrigatório'},400);let st=String(b.status||'Ativo');if(!oprPopStatuses.includes(st))st='Ativo';const display=await oprPopTakeNumber(ctx),id=oprMasterId('OPR-POP-');
+  await DB.prepare(`INSERT INTO opr_pop_procedures(id,display_id,company_id,project_id,section,procedure_text,owner,trigger_frequency,evidence,done_criteria,status,next_step,source,rank,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id,display,ctx.company_id,ctx.project_id,b.section||'Governança',text,b.owner||'PENDENTE DE VALIDAÇÃO',b.trigger_frequency||'A confirmar',b.evidence||'Sem evidência suficiente',b.done_criteria||'A confirmar',st,b.next_step||'',b.source||'POP-OPR-ERP-v1.0',Number(b.rank||Date.now()),user.name||'',user.name||'').run();const row=await oprPopResolve(id);await oprPopHistory(row,'INSERT',1);return json({ok:true,id:display},201);
+}
+if(path.match(/^opr-pop\/[^/]+$/)&&(request.method==='PATCH'||request.method==='PUT')){
+  if(!oprPopWrite)return json({error:'Sem permissão'},403);const ref=decodeURIComponent(path.split('/')[1]),old=await oprPopResolve(ref);if(!old)return json({error:'Procedimento não encontrado'},404);const ctx=await oprMasterProjectContext(old.project_id);if(ctx.error)return json({error:ctx.error},403);const b=await request.json().catch(()=>({}));if(b.status&&!oprPopStatuses.includes(b.status))return json({error:'Status inválido'},400);
+  const fields=['section','procedure_text','owner','trigger_frequency','evidence','done_criteria','status','next_step','source','rank'],sets=[],args=[];for(const f of fields)if(Object.prototype.hasOwnProperty.call(b,f)){sets.push(f+'=?');args.push(f==='rank'?Number(b[f]||0):b[f])}if(!sets.length)return json({ok:true,id:old.display_id});const next=Number(old.version||1)+1;sets.push('version=?',"updated_at=datetime('now')",'updated_by=?');args.push(next,user.name||'',old.id);await DB.prepare('UPDATE opr_pop_procedures SET '+sets.join(',')+' WHERE id=?').bind(...args).run();const row=await oprPopResolve(old.id);await oprPopHistory(row,'UPDATE',next);return json({ok:true,id:row.display_id,version:next});
+}
+if(path.match(/^opr-pop\/[^/]+$/)&&request.method==='DELETE'){
+  if(!oprPopWrite)return json({error:'Sem permissão'},403);const ref=decodeURIComponent(path.split('/')[1]),old=await oprPopResolve(ref);if(!old)return json({error:'Procedimento não encontrado'},404);const ctx=await oprMasterProjectContext(old.project_id);if(ctx.error)return json({error:ctx.error},403);const next=Number(old.version||1)+1;await DB.prepare(`UPDATE opr_pop_procedures SET archived_at=datetime('now'),version=?,updated_at=datetime('now'),updated_by=? WHERE id=?`).bind(next,user.name||'',old.id).run();const row=await oprPopResolve(old.id,true);await oprPopHistory(row,'SOFT_DELETE',next);return json({ok:true,id:row.display_id});
+}
+if(path.match(/^opr-pop\/[^/]+\/restore$/)&&request.method==='POST'){
+  if(!oprPopWrite)return json({error:'Sem permissão'},403);const ref=decodeURIComponent(path.split('/')[1]),old=await oprPopResolve(ref,true);if(!old)return json({error:'Procedimento não encontrado'},404);const ctx=await oprMasterProjectContext(old.project_id);if(ctx.error)return json({error:ctx.error},403);const next=Number(old.version||1)+1;await DB.prepare(`UPDATE opr_pop_procedures SET archived_at=NULL,version=?,updated_at=datetime('now'),updated_by=? WHERE id=?`).bind(next,user.name||'',old.id).run();const row=await oprPopResolve(old.id);await oprPopHistory(row,'RESTORE',next);return json({ok:true,id:row.display_id});
+}
+if(path.match(/^opr-pop\/[^/]+\/history$/)&&request.method==='GET'){
+  const ref=decodeURIComponent(path.split('/')[1]),old=await oprPopResolve(ref,true);if(!old)return json({error:'Procedimento não encontrado'},404);const ctx=await oprMasterProjectContext(old.project_id);if(ctx.error)return json({error:ctx.error},403);return json((await DB.prepare(`SELECT id,action_type,version,actor,snapshot_json,created_at FROM opr_pop_history WHERE procedure_id=? ORDER BY id DESC`).bind(old.id).all()).results||[]);
+}
