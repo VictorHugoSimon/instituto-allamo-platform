@@ -58,6 +58,7 @@ const governanceTables=['governance_events','governance_event_agenda_items','gov
 const hoursTables=['horas_import','fch_entries','sync_state'];
 const oprBaseTables=['opr_action_meta','opr_action_history','opr_intake','opr_cadence','opr_role_assignments','opr_customizations','opr_report_publications'];
 const oprExtensionTables=['opr_action_sequence','opr_completeness_audit'];
+const oprPopTables=['opr_pop_config','opr_pop_sequence','opr_pop_procedures','opr_pop_history'];
 const oprExtensionColumns=[
   ['opr_action_meta','display_id',"TEXT NOT NULL DEFAULT ''"],
   ['opr_role_assignments','development_owner',"TEXT NOT NULL DEFAULT 'PENDENTE DE VALIDAÇÃO'"],
@@ -69,6 +70,7 @@ const missingGovernance=governanceTables.filter(t=>!tableExists(t));
 const missingHours=hoursTables.filter(t=>!tableExists(t));
 const missingOpr=oprBaseTables.filter(t=>!tableExists(t));
 const missingOprExtensionTables=oprExtensionTables.filter(t=>!tableExists(t));
+const missingOprPop=oprPopTables.filter(t=>!tableExists(t));
 const missingOprColumns=oprExtensionColumns.filter(([t,c])=>!columnExists(t,c));
 
 console.log(`Ambiente: ${envArg}`);
@@ -79,28 +81,23 @@ console.log(`Horas FCH ausente: ${missingHours.length?missingHours.join(', '):'n
 console.log(`OPR PMO base ausente: ${missingOpr.length?missingOpr.join(', '):'nenhuma'}`);
 console.log(`OPR governança mestre — tabelas ausentes: ${missingOprExtensionTables.length?missingOprExtensionTables.join(', '):'nenhuma'}`);
 console.log(`OPR governança mestre — colunas ausentes: ${missingOprColumns.length?missingOprColumns.map(x=>x[0]+'.'+x[1]).join(', '):'nenhuma'}`);
+console.log(`OPR POP — tabelas ausentes: ${missingOprPop.length?missingOprPop.join(', '):'nenhuma'}`);
 if(!APPLY){console.log('[DRY-RUN] Nenhuma alteração aplicada.');process.exit(0)}
 
 if(gmudExists&&!gmudProjectExists){console.log('[APPLY] Adicionando coluna aditiva gmud.project...');execute("ALTER TABLE gmud ADD COLUMN project TEXT NOT NULL DEFAULT '';")}
 if(missingGovernance.length){console.log('[APPLY] Aplicando migration idempotente de Governança...');runWrangler([WRANGLER,'d1','execute',DB,'--remote','--config',env.config,'--file','migrations/2026-08-23-governance-roadmap.sql'],{capture:false})}
 if(missingHours.length){console.log('[APPLY] Aplicando migration idempotente da integração FCH/Curva S...');runWrangler([WRANGLER,'d1','execute',DB,'--remote','--config',env.config,'--file','migrations/2026-08-25-fch-hours-automation.sql'],{capture:false})}
 if(missingOpr.length){console.log('[APPLY] Aplicando migration idempotente do Plano PMO OPR...');runWrangler([WRANGLER,'d1','execute',DB,'--remote','--config',env.config,'--file','migrations/2026-08-30-opr-pmo-action-plan.sql'],{capture:false})}
+if(missingOprPop.length){console.log('[APPLY] Aplicando migration idempotente do POP OPR...');runWrangler([WRANGLER,'d1','execute',DB,'--remote','--config',env.config,'--file','migrations/2026-08-31-opr-pop.sql'],{capture:false})}
 
-// Instalação aditiva para bases OPR já existentes antes da governança mestre.
 for(const [table,column,definition] of oprExtensionColumns){
   if(!columnExists(table,column)){
     console.log(`[APPLY] Adicionando ${table}.${column}...`);
     execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
   }
 }
-if(!tableExists('opr_action_sequence')){
-  console.log('[APPLY] Criando sequência imutável de IDs PA-xxx...');
-  execute("CREATE TABLE IF NOT EXISTS opr_action_sequence (project_id INTEGER PRIMARY KEY,company_id TEXT NOT NULL,next_value INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
-}
-if(!tableExists('opr_completeness_audit')){
-  console.log('[APPLY] Criando registro de auditoria de completude OPR...');
-  execute("CREATE TABLE IF NOT EXISTS opr_completeness_audit (id TEXT PRIMARY KEY,company_id TEXT NOT NULL,project_id INTEGER NOT NULL,audit_date TEXT NOT NULL DEFAULT (date('now')),source_type TEXT NOT NULL,source_ref TEXT NOT NULL DEFAULT '',item_summary TEXT NOT NULL,classification TEXT NOT NULL,related_action_id TEXT,notes TEXT NOT NULL DEFAULT '',created_by TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT (datetime('now')));");
-}
+if(!tableExists('opr_action_sequence')){console.log('[APPLY] Criando sequência imutável de IDs PA-xxx...');execute("CREATE TABLE IF NOT EXISTS opr_action_sequence (project_id INTEGER PRIMARY KEY,company_id TEXT NOT NULL,next_value INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL DEFAULT (datetime('now')));")}
+if(!tableExists('opr_completeness_audit')){console.log('[APPLY] Criando registro de auditoria de completude OPR...');execute("CREATE TABLE IF NOT EXISTS opr_completeness_audit (id TEXT PRIMARY KEY,company_id TEXT NOT NULL,project_id INTEGER NOT NULL,audit_date TEXT NOT NULL DEFAULT (date('now')),source_type TEXT NOT NULL,source_ref TEXT NOT NULL DEFAULT '',item_summary TEXT NOT NULL,classification TEXT NOT NULL,related_action_id TEXT,notes TEXT NOT NULL DEFAULT '',created_by TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT (datetime('now')));")}
 if(!indexExists('idx_opr_action_display_id'))execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_opr_action_display_id ON opr_action_meta(project_id, display_id) WHERE display_id <> '';");
 if(!indexExists('idx_opr_audit_project'))execute("CREATE INDEX IF NOT EXISTS idx_opr_audit_project ON opr_completeness_audit(company_id, project_id, audit_date DESC);");
 
@@ -109,12 +106,14 @@ const missingAfter=governanceTables.filter(t=>!tableExists(t));
 const missingHoursAfter=hoursTables.filter(t=>!tableExists(t));
 const missingOprAfter=oprBaseTables.filter(t=>!tableExists(t));
 const missingExtensionAfter=oprExtensionTables.filter(t=>!tableExists(t));
+const missingPopAfter=oprPopTables.filter(t=>!tableExists(t));
 const missingColumnsAfter=oprExtensionColumns.filter(([t,c])=>!columnExists(t,c));
 if(!gmudProjectAfter)throw new Error('gmud.project continua ausente após aplicação.');
 if(missingAfter.length)throw new Error('Tabelas de Governança continuam ausentes: '+missingAfter.join(', '));
 if(missingHoursAfter.length)throw new Error('Tabelas da integração FCH continuam ausentes: '+missingHoursAfter.join(', '));
 if(missingOprAfter.length)throw new Error('Tabelas do Plano PMO OPR continuam ausentes: '+missingOprAfter.join(', '));
 if(missingExtensionAfter.length)throw new Error('Tabelas da governança mestre OPR continuam ausentes: '+missingExtensionAfter.join(', '));
+if(missingPopAfter.length)throw new Error('Tabelas do POP OPR continuam ausentes: '+missingPopAfter.join(', '));
 if(missingColumnsAfter.length)throw new Error('Colunas da governança mestre OPR continuam ausentes: '+missingColumnsAfter.map(x=>x[0]+'.'+x[1]).join(', '));
 if(!indexExists('idx_opr_action_display_id'))throw new Error('Índice único de PA-xxx não foi criado.');
-console.log('[OK] Schema aditivo validado sem operações destrutivas, incluindo governança mestre OPR.');
+console.log('[OK] Schema aditivo validado sem operações destrutivas, incluindo governança mestre e POP OPR.');
