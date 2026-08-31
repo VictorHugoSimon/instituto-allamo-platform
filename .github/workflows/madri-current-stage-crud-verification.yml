@@ -1,0 +1,54 @@
+name: MADRI PMO - Current Stage CRUD Verification
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - '.github/workflows/madri-current-stage-crud-verification.yml'
+      - 'scripts/smoke-madri-pmo-stage.mjs'
+      - 'src/madri-pmo-api.js'
+      - 'scripts/build-madri-pmo.mjs'
+      - 'scripts/validate-madri-pmo-static.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-current-stage-crud-verification
+  cancel-in-progress: false
+
+jobs:
+  verify-current-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar build e contrato MADRI localmente
+        run: |
+          npm run build:work
+          npm run test:madri-pmo
+
+      - name: Smoke CRUD no Stage já publicado
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+        run: node scripts/smoke-madri-pmo-stage.mjs
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### MADRI PMO · Current Stage CRUD Verification" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ambiente testado: https://allamo-pmo-stage.pages.dev" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Sem deploy e sem acesso à Produção" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Valida: create, update, status, histórico, lixeira, restore, customização, cadência e report público" >> "$GITHUB_STEP_SUMMARY"
