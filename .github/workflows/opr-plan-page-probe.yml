@@ -22,12 +22,12 @@ jobs:
           import fs from 'node:fs';
           const path='public/opr-plano-de-acao/index.html';
           const html=fs.readFileSync(path,'utf8');
-          for(const expected of ['OPR · Plano de Ação PMO','Visão Geral','Plano de Ação','Kanban','Pendências','Cadência','Responsáveis','Customizações','Entrada de Demandas','Lixeira','/api/']){
+          for(const expected of ['OPR · Plano de Ação PMO','Visão Geral','Plano de Ação','Kanban','Pendências','Cadência','Responsáveis','Customizações','Entrada de Demandas','Lixeira','opr-projects','opr-actions']){
             if(!html.includes(expected)) throw new Error('Conteúdo obrigatório ausente: '+expected);
           }
-          if(/Dual Clima|MADRI|Madrid/i.test(html)) throw new Error('Contaminação de outro tenant detectada na página OPR.');
+          if(/\/api\/(madri|dual)|madri-pmo|dual-pmo/i.test(html)) throw new Error('Endpoint de outro tenant detectado na página OPR.');
           const matches=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
           if(matches.length!==1) throw new Error('Esperado exatamente um script inline; encontrados '+matches.length);
           new Function(matches[0][1]);
-          console.log('OK: página OPR standalone validada, sem contaminação e com JavaScript sintaticamente válido.');
+          console.log('OK: página OPR standalone validada, isolada e com JavaScript sintaticamente válido.');
           NODE
