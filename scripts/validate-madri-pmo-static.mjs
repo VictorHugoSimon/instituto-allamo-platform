@@ -9,6 +9,7 @@ const report=read('public/madri-status-report.html');
 const migration=read('migrations/2026-08-30-madri-pmo-master-plan.sql');
 const builder=read('scripts/build-madri-pmo.mjs');
 const schema=read('scripts/ensure-madri-pmo-schema.mjs');
+const worker=read('public/_worker.js');
 
 // Isolamento deliberado: nenhum conteúdo de projeto alheio nos artefatos MADRI.
 for(const [name,text] of Object.entries({api,pub,plan,report,migration,builder,schema})){
@@ -48,4 +49,16 @@ for(const c of ['pmo_scope','front','dependency_text','impact_text','critical_pa
 // Build precisa injetar API pública antes do login e API privada no bloco autenticado.
 must(builder.includes('MADRI PMO PUBLIC API')&&builder.includes('MADRI PMO PRIVATE API'),'Build MADRI não injeta os dois endpoints');
 
-console.log('[OK] MADRI PMO: contrato funcional, quatro abas, Vision Roadmap e isolamento validados.');
+// Regressão real encontrada no Stage: 25 colunas de work_items não podem receber 26 valores.
+const badArity=/VALUES\(\s*(?:\?\s*,\s*){25}1\s*\)/g;
+const goodInsert='VALUES('+Array(24).fill('?').join(',')+',1)';
+must(!badArity.test(worker),'Worker final contém INSERT MADRI com 26 valores para 25 colunas');
+const normalizedInserts=worker.split(goodInsert).length-1;
+must(normalizedInserts>=2,`Worker deve conter os dois INSERTs MADRI normalizados; encontrado ${normalizedInserts}`);
+const privateBlocks=(worker.match(/BEGIN MADRI PMO PRIVATE API/g)||[]).length;
+const publicBlocks=(worker.match(/BEGIN MADRI PMO PUBLIC API/g)||[]).length;
+must(privateBlocks===1,`Worker deve conter exatamente 1 bloco privado MADRI; encontrado ${privateBlocks}`);
+must(publicBlocks===1,`Worker deve conter exatamente 1 bloco público MADRI; encontrado ${publicBlocks}`);
+must(builder.includes('badArityPattern')&&builder.includes('normalizeInsertArity'),'Build não possui hardening explícito de aridade dos INSERTs MADRI');
+
+console.log(`[OK] MADRI PMO: contrato, isolamento, quatro abas, Vision Roadmap e ${normalizedInserts} INSERTs work_items 25×25 validados.`);
