@@ -1,0 +1,33 @@
+name: OPR Live Route Probe
+
+on:
+  push:
+    branches: [feat/opr-plano-acao-dual-style]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate deployed OPR plan route and live data
+        run: |
+          node --input-type=module <<'NODE'
+          const base='https://allamo-pmo-stage.pages.dev';
+          const page=await fetch(base+'/opr-plano-de-acao/',{cache:'no-store',headers:{'cache-control':'no-cache'}});
+          const html=await page.text();
+          if(!page.ok) throw new Error('Página HTTP '+page.status);
+          for(const x of ['OPR · Plano de Ação PMO','Visão Geral','Kanban','Entrada de Demandas']) if(!html.includes(x)) throw new Error('Conteúdo live ausente: '+x);
+          const pr=await fetch(base+'/api/opr-projects',{cache:'no-store',headers:{'cache-control':'no-cache'}});
+          const projects=await pr.json();
+          if(!pr.ok||!Array.isArray(projects)||!projects.length) throw new Error('Projetos OPR não carregaram');
+          const p=projects[0];
+          const ar=await fetch(base+'/api/opr-actions?project='+encodeURIComponent(p.id),{cache:'no-store',headers:{'cache-control':'no-cache'}});
+          const actions=await ar.json();
+          if(!ar.ok||!Array.isArray(actions)||actions.length<1) throw new Error('Ações OPR não carregaram');
+          const crossed=actions.filter(a=>String(a.company_id||'')&&String(a.company_id)!==String(p.company_id));
+          if(crossed.length) throw new Error('Cruzamento de tenant detectado');
+          console.log(JSON.stringify({ok:true,page_http:page.status,url:base+'/opr-plano-de-acao/',project_id:p.id,project_name:p.name,company_id:p.company_id,action_count:actions.length},null,2));
+          NODE
