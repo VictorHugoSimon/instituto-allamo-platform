@@ -80,6 +80,14 @@ if(path.match(/^sprint-documents\/[^/]+$/)&&(request.method==='PATCH'||request.m
   return json({ok:true,id,version});
 }
 
+if(path.match(/^sprint-documents\/[^/]+\/archive$/)&&request.method==='POST'){
+  if(!sgWrite)return json({error:'Sem permissão para arquivar documento'},403);
+  const id=decodeURIComponent(path.split('/')[1]),doc=await sgDoc(id);if(!doc)return json({error:'Documento não encontrado'},404);if(!sgScope(doc.company_id))return json({error:'Fora do escopo'},403);
+  await DB.prepare("UPDATE sprint_documents SET archived_at=datetime('now'),updated_at=datetime('now'),updated_by=? WHERE id=?").bind(user.name,id).run();
+  await logEvent(env,user,'sprint-document:arquivar',id,doc.title);
+  return json({ok:true,id,archived:true});
+}
+
 if(path.match(/^sprint-documents\/[^/]+$/)&&request.method==='DELETE'){
   if(!sgWrite)return json({error:'Sem permissão para arquivar documento'},403);
   const id=decodeURIComponent(path.split('/')[1]),doc=await sgDoc(id);if(!doc)return json({error:'Documento não encontrado'},404);if(!sgScope(doc.company_id))return json({error:'Fora do escopo'},403);
