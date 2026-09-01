@@ -113,12 +113,13 @@ async function createTicket(db,ctx,input){
 async function updateTicketStatus(db,ctx,ticketId,input){
   const tenant=tenantOf(ctx),id=required(ticketId,'ticket_id_required'),status=one(input.status,TICKET_STATUS,'invalid_ticket_status');
   const existing=await getTicket(db,ctx,id),now=new Date().toISOString();
-  const resolved=(status==='resolved'||status==='closed')?now:existing.resolved_at??null;
+  const resolved=(status==='resolved'||status==='closed') ? now : (existing.resolved_at ?? null);
+  const assignedTo=clean(input.assignedTo,180) || existing.assigned_to || null;
   await db.prepare(`UPDATE service_hub_tickets SET status=?,assigned_to=COALESCE(?,assigned_to),resolved_at=?,updated_at=? WHERE id=? AND tenant_id=?`).bind(status,clean(input.assignedTo,180)||null,resolved,now,id,tenant).run();
   const note=redactServiceText(input.note,4000);
   await addEvent(db,ctx,id,'ticket.status_changed',ctx.actorType??'user',{from:existing.status,to:status,note:note.text,redacted:note.redacted});
   await audit(db,ctx,'ticket',id,'status_change',{from:existing.status,to:status});
-  return {id,status,assignedTo:clean(input.assignedTo,180)||existing.assigned_to??null,updatedAt:now,resolvedAt:resolved};
+  return {id,status,assignedTo,updatedAt:now,resolvedAt:resolved};
 }
 
 async function listTicketEvents(db,ctx,ticketId){
