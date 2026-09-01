@@ -121,15 +121,15 @@
     else if(/report-ai/.test(p)){label='Gerando Status Report com IA…';success='Análise da IA concluída.'}
     else if(/doc-upload|tenant-files|milestone.*(?:file|asset|evidence)|upload/.test(p)){label='Enviando arquivo…';success='Arquivo enviado.'}
     else if(/public-update/.test(p)){label='Enviando atualização…';success='Atualização enviada.'}
-    else if(/report/.test(p)&&/publish|publicar/.test(p)){label='Publicando Report…';success='Report publicado.'}
-    else if(/report/.test(p)&&write){label='Salvando Status Report…';success='Report salvo.'}
+    else if(/report/.test(p)&&/publish|publicar/.test(p)){label='Publicando Report…';success='Report publicado. Já está disponível no painel da empresa.'}
+    else if(/report/.test(p)&&write){label='Salvando Report…';success='Report salvo.'}
     else if(/linear-sync/.test(p)){label='Sincronizando Linear…';success='Sincronização do Linear concluída.'}
     else if(/horas-sync/.test(p)){label='Sincronizando horas…';success='Sincronização de horas concluída.'}
     else if(/company-create|companies/.test(p)&&write){label='Salvando empresa…';success='Empresa salva.'}
     else if(/projects/.test(p)&&write){label=m==='DELETE'?'Excluindo projeto…':'Salvando projeto…';success=m==='DELETE'?'Projeto excluído.':'Projeto salvo.'}
     else if(/users/.test(p)&&write){label=m==='DELETE'?'Excluindo usuário…':'Salvando usuário…';success=m==='DELETE'?'Usuário excluído.':'Usuário salvo.'}
     else if(/gmud/.test(p)&&write){label='Salvando GMUD…';success='GMUD salva.'}
-    else if(/releases/.test(p)&&write){label='Registrando virada / versão…';success='Virada / versão registrada.'}
+    else if(/releases/.test(p)&&write){label='Registrando Virada / versão…';success='Virada / versão registrada.'}
     else if(/work/.test(p)&&write){label='Salvando demanda / tarefa…';success='Demanda / tarefa salva.'}
     else if(/plan/.test(p)&&write){label='Salvando etapa…';success='Etapa salva.'}
     else if(m==='DELETE'){label='Excluindo registro…';success='Registro excluído.'}
