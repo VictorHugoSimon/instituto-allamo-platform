@@ -29,6 +29,15 @@ must(router,'forceVisible','roteador força visibilidade do template contra CSS 
 must(router,"set('display','flex')",'display do modal é protegido por inline important');
 must(router,"set('visibility','visible')",'visibilidade do modal é protegida');
 must(router,"set('opacity','1')",'opacidade do modal é protegida');
+must(router,'flex-direction:column!important','container principal mantém fluxo vertical');
+must(router,">.arc-box>.arc-body",'corpo do modal recebe escopo estrutural exclusivo');
+must(router,'flex:1 1 auto!important;min-height:0!important','corpo ocupa espaço restante sem romper o modal');
+must(router,'overflow-y:auto!important;overflow-x:hidden!important','scroll fica restrito ao corpo do formulário');
+must(router,'grid-template-columns:minmax(0,1.4fr)','metadados usam grid resiliente');
+must(router,'grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important','campos internos mantêm duas colunas válidas no desktop');
+must(router,'@media(max-width:960px)','layout intermediário é responsivo');
+must(router,'@media(max-width:800px)','layout mobile é responsivo');
+must(router,"b('flex-direction','column')",'hardening inline preserva direção vertical mesmo sob CSS concorrente');
 must(router,'timeout(creator.open(),12000)','abertura possui timeout explícito');
 must(router,"O template oficial não foi montado na tela.",'falha de montagem é detectada e informada');
 must(router,"feedback('Template de Report aberto.')",'sucesso só é informado após montagem real');
@@ -43,4 +52,4 @@ if(pRouter<0||pCreate<0||pRouter>pCreate)throw new Error('Roteador do botão dev
 if(pCreate<0||pAi<0||pAi>pCreate)throw new Error('Ponte IA deve carregar antes do criador oficial.');
 const pRaci=build.indexOf('${clientReportTemplateRaciEnhancement}'),pTabs=build.indexOf('${clientReportTabStability}');
 if(pRaci<0||pTabs<0||pRaci>pTabs)throw new Error('Estabilidade de abas deve envolver o renderer já enriquecido pela RACI.');
-console.log('OK: Novo report só conclui abertura após montar e exibir o template oficial; contexto, IA, publicação explícita, preview e abas permanecem preservados.');
+console.log('OK: Novo report monta visível e mantém layout íntegro: coluna principal, corpo rolável, grids responsivos, contexto, IA, publicação, preview e abas preservados.');
