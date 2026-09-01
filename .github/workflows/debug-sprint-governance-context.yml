@@ -1,0 +1,19 @@
+name: Debug Sprint Governance Context
+
+on:
+  push:
+    branches: ['debug/sprint-governance-context']
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Inspect live Stage context persistence
+        run: node scripts/debug-sprint-context.mjs
