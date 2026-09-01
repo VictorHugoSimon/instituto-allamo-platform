@@ -31,6 +31,8 @@ jobs:
           node --check service-hub/src/redact.mjs
           node --check service-hub/src/repository.mjs
           node --check service-hub/src/api.mjs
+          node --check service-hub/src/classifier.mjs
+          node --check service-hub/src/intake.mjs
       - name: Unit tests
         working-directory: service-hub
         run: npm test
@@ -50,7 +52,6 @@ jobs:
           tables={r[0] for r in db.execute("select name from sqlite_master where type='table'")}
           missing=required-tables
           assert not missing, f'missing tables: {missing}'
-          # Idempotência de mensagens é uma proteção crítica para webhooks/retries.
           db.execute("insert into service_hub_messages(id,tenant_id,project_id,channel_id,provider_message_id,direction,text_redacted,occurred_at) values(?,?,?,?,?,?,?,?)",('m1','t1','p1','c1','ext-1','inbound','teste','2026-09-01T00:00:00Z'))
           try:
             db.execute("insert into service_hub_messages(id,tenant_id,project_id,channel_id,provider_message_id,direction,text_redacted,occurred_at) values(?,?,?,?,?,?,?,?)",('m2','t1','p1','c1','ext-1','inbound','teste 2','2026-09-01T00:01:00Z'))
