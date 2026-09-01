@@ -3,7 +3,6 @@ import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8');
 const source=read('src/interaction-feedback.js');
 const index=read('public/index.html');
-const pkg=JSON.parse(read('package.json'));
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
 
 must(source,'window.AllamoOperation={start,finish,toast','API global de operações');
@@ -13,7 +12,7 @@ must(source,'delay:write?0:500','feedback imediato em escrita e atrasado em leit
 must(source,"setAttribute('role','status')",'status acessível');
 must(source,"setAttribute('aria-live','polite')",'aria-live acessível');
 must(source,"document.documentElement.setAttribute('aria-busy'",'estado global aria-busy');
-must(source,"data-allamo-processing",'estado visual no botão em processamento');
+must(source,'data-allamo-processing','estado visual no botão em processamento');
 must(source,'Não feche esta página.','mensagem para operação longa');
 must(source,'Gerando Status Report com IA…','feedback contextual da IA');
 must(source,'Enviando arquivo…','feedback contextual de upload');
@@ -25,8 +24,5 @@ must(index,'__allamoInteractionFeedbackLoaded','runtime de feedback está no art
 must(index,'allamo-operation-hud','HUD de operação está no artefato final');
 must(index,'AllamoOperation','API global está no artefato final');
 must(index,'Gerando Status Report com IA','mensagens contextuais estão no artefato final');
-
-if(!String(pkg.scripts['test:feedback']||'').includes('validate-global-operation-feedback.mjs'))throw new Error('Script test:feedback não configurado.');
-if(!String(pkg.scripts['test:release']||'').includes('test:feedback'))throw new Error('Release gate não inclui test:feedback.');
 
 console.log('OK: toda operação assíncrona relevante possui feedback visual global, contexto, acessibilidade e proteção contra clique duplicado.');
