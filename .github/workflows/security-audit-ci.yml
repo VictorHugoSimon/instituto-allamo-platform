@@ -1,0 +1,73 @@
+name: Security Audit CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit-controlled:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências travadas
+        run: npm ci
+
+      - name: Executar npm audit somente leitura
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit.json
+          code=$?
+          echo "NPM_AUDIT_EXIT_CODE=$code" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Gerar resumo revisável
+        run: node scripts/security-audit-summary.mjs npm-audit.json
+
+      - name: Publicar resumo no job summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f npm-audit-summary.md ]; then
+            cat npm-audit-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Audit exit code original: ${NPM_AUDIT_EXIT_CODE:-desconhecido}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar evidência do audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-controlled
+          path: |
+            npm-audit.json
+            npm-audit-summary.md
+          retention-days: 14
+
+      - name: Gate crítico
+        if: always()
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const a=JSON.parse(fs.readFileSync('npm-audit.json','utf8'));
+          const m=a.metadata?.vulnerabilities||{};
+          if((m.critical||0)>0){
+            console.error(`Bloqueado: ${m.critical} vulnerabilidade(s) crítica(s).`);
+            process.exit(1);
+          }
+          console.log(`Audit registrado: high=${m.high||0}, moderate=${m.moderate||0}, low=${m.low||0}, critical=${m.critical||0}.`);
+          NODE

@@ -32,30 +32,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=pending -f context=allamo/stage-deploy -f description='Release de Stage em andamento'
-
       - name: Checkout da release candidata
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
-
       - name: Instalar dependências travadas
         run: npm ci
-
       - name: Gerar um único artefato de release
         run: npm run build:work
-
       - name: Gate consolidado da plataforma
         run: npm run test:release
-
       - name: Registrar gates aprovados
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-gates -f description='Build e gate consolidado aprovados'
-
       - name: Preparar e validar autenticação Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -63,21 +56,16 @@ jobs:
           CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
-
       - name: Preflight Cloudflare final
         run: npx wrangler@4.124.0 whoami
-
       - name: Fixar develop como branch de produção do projeto STAGE
         run: node scripts/ensure-stage-pages-production-branch.mjs
-
       - name: Registrar autenticação Cloudflare aprovada
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-cloudflare-auth -f description='Wrangler autenticado e production_branch do Stage validado'
-
       - name: Backup obrigatório do D1 Stage
         run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-${GITHUB_SHA}.sql"
-
       - name: Guardar backup do Stage
         uses: actions/upload-artifact@v4
         with:
@@ -85,57 +73,53 @@ jobs:
           path: backup-stage-${{ github.sha }}.sql
           if-no-files-found: error
           retention-days: 14
-
       - name: Dry-run do schema e dos tenants essenciais
         run: |
           node scripts/ensure-additive-schema.mjs --env=stage
           node scripts/repair-core-tenants-portable.mjs --env=stage
-
       - name: Aplicar somente schema aditivo no Stage
         run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
-
       - name: Reparar tenants essenciais de forma idempotente no Stage
         run: |
           node scripts/repair-core-tenants-portable.mjs --env=stage --apply --confirm=REPAIR-STAGE
           node scripts/repair-core-tenants-portable.mjs --env=stage
-
       - name: Materializar configuração exclusiva de Stage
         run: |
           cp wrangler.stage.toml wrangler.toml
           grep -F 'name = "allamo-pmo-stage"' wrangler.toml
-
       - name: Registrar configuração Stage validada
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração, backup, schema e tenants de Stage validados'
-
       - name: Publicar exatamente o artefato validado no STAGE canônico
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch develop --commit-hash "$GITHUB_SHA" --commit-dirty=true
-
       - name: Confirmar que a URL canônica recebeu este commit
         run: node scripts/verify-stage-canonical-release.mjs --base=https://allamo-pmo-stage.pages.dev --sha=$GITHUB_SHA
-
       - name: Smoke de governança pós-deploy
         run: npm run smoke:governance
         env:
           ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
           ALLAMO_SMOKE_COMPANIES: ${{ vars.ALLAMO_SMOKE_COMPANIES }}
-
       - name: Smoke dos tenants essenciais pós-deploy
         run: node scripts/smoke-core-tenants.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage
-
+      - name: Smoke CRUD real POP OPR
+        run: npm run smoke:opr-pop
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+      - name: Sincronizar reuniões OPR no Plano de Ação
+        run: node scripts/apply-opr-meeting-actions.mjs
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
       - name: Registrar sucesso do deploy no commit
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-deploy -f description='Stage canônico publicado no commit correto e smokes concluídos'
-
       - name: Registrar falha do deploy no commit
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=allamo/stage-deploy -f description='Release de Stage falhou; URL canônica pode não ter recebido o commit'
-
       - name: Resumo da release
         if: always()
         run: |
@@ -150,4 +134,5 @@ jobs:
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
           echo "- Autenticação: API Token com fallback para Global API Key + e-mail quando disponível" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Smokes: governança multitenant + Dual Clima/Madrid/OPR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smokes: governança multitenant + Dual Clima/Madrid/OPR + POP OPR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Reuniões OPR: sincronização idempotente para Plano de Ação + Cadência" >> "$GITHUB_STEP_SUMMARY"
