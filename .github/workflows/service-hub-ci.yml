@@ -5,13 +5,23 @@ on:
     branches: [develop, main]
     paths:
       - 'service-hub/**'
+      - 'src/service-hub-worker-api.js'
+      - 'scripts/harden-service-hub.mjs'
+      - 'scripts/validate-service-hub-worker.mjs'
+      - 'scripts/ensure-additive-schema.mjs'
       - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
+      - 'package.json'
       - '.github/workflows/service-hub-ci.yml'
   push:
     branches: [develop, main]
     paths:
       - 'service-hub/**'
+      - 'src/service-hub-worker-api.js'
+      - 'scripts/harden-service-hub.mjs'
+      - 'scripts/validate-service-hub-worker.mjs'
+      - 'scripts/ensure-additive-schema.mjs'
       - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
+      - 'package.json'
       - '.github/workflows/service-hub-ci.yml'
 
 permissions:
@@ -33,6 +43,10 @@ jobs:
           node --check service-hub/src/api.mjs
           node --check service-hub/src/classifier.mjs
           node --check service-hub/src/intake.mjs
+          node --check src/service-hub-worker-api.js
+          node --check scripts/harden-service-hub.mjs
+          node --check scripts/validate-service-hub-worker.mjs
+          node --check scripts/ensure-additive-schema.mjs
       - name: Unit tests
         working-directory: service-hub
         run: npm test
@@ -60,3 +74,7 @@ jobs:
             pass
           print('SERVICE_HUB_SCHEMA_OK')
           PY
+      - name: Inject Service Hub into Worker
+        run: node scripts/harden-service-hub.mjs
+      - name: Validate Worker integration
+        run: node scripts/validate-service-hub-worker.mjs
