@@ -66,11 +66,12 @@ async function createSlaPolicy(db,ctx,input){
   const tenant=tenantOf(ctx),priority=one(input.priority,['low','normal','medium','high','critical'],'invalid_priority');
   const first=positiveInt(input.firstResponseMinutes,'invalid_first_response_minutes'),resolution=positiveInt(input.resolutionMinutes,'invalid_resolution_minutes');
   const projectId=clean(input.projectId,120)||null,systemId=clean(input.systemId,160)||null;
+  if(input.businessHoursOnly)throw httpError(400,'business_hours_sla_not_supported_in_mvp');
   if(systemId)await assertTenantEntity(db,'service_hub_systems',systemId,tenant,'system_not_found');
-  const id='sla:'+crypto.randomUUID(),now=new Date().toISOString(),business=input.businessHoursOnly?1:0;
+  const id='sla:'+crypto.randomUUID(),now=new Date().toISOString(),business=0;
   await db.prepare(`INSERT INTO service_hub_sla_policies(id,tenant_id,project_id,system_id,priority,first_response_minutes,resolution_minutes,business_hours_only,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?)`).bind(id,tenant,projectId,systemId,priority,first,resolution,business,now,now).run();
-  await audit(db,ctx,'sla_policy',id,'create',{projectId,systemId,priority,first,resolution,businessHoursOnly:Boolean(business)});
-  return {id,tenantId:tenant,projectId,systemId,priority,firstResponseMinutes:first,resolutionMinutes:resolution,businessHoursOnly:Boolean(business),active:true};
+  await audit(db,ctx,'sla_policy',id,'create',{projectId,systemId,priority,first,resolution,businessHoursOnly:false});
+  return {id,tenantId:tenant,projectId,systemId,priority,firstResponseMinutes:first,resolutionMinutes:resolution,businessHoursOnly:false,active:true};
 }
 
 async function listTickets(db,ctx,filters){
@@ -101,6 +102,7 @@ async function createTicket(db,ctx,input){
   const priority=one(input.priority??'normal',PRIORITIES,'invalid_priority'),title=required(input.title,'ticket_title_required');
   const sanitized=redactServiceText(input.description,12000), id='tkt:'+crypto.randomUUID(), ticketKey=buildTicketKey(),now=new Date().toISOString();
   const sla=await resolveSla(db,tenant,projectId,systemId,priority);
+  if(sla&&Number(sla.business_hours_only)===1)throw httpError(409,'business_hours_sla_not_supported_in_mvp');
   const firstDue=sla?addMinutes(now,Number(sla.first_response_minutes)):null,resolutionDue=sla?addMinutes(now,Number(sla.resolution_minutes)):null;
   await db.prepare(`INSERT INTO service_hub_tickets(id,ticket_key,tenant_id,project_id,system_id,channel_id,external_ticket_id,source,message_type,priority,status,title,description_redacted,assigned_to,sla_policy_id,first_response_due_at,resolution_due_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id,ticketKey,tenant,projectId,systemId,channelId,clean(input.externalTicketId,180)||null,source,messageType,priority,'new',title,sanitized.text,clean(input.assignedTo,180)||null,sla?.id??null,firstDue,resolutionDue,now,now).run();
   await addEvent(db,ctx,id,'ticket.created','system',{source,messageType,priority,redacted:sanitized.redacted});
