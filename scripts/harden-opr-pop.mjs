@@ -1,20 +1,6 @@
 import fs from 'node:fs';
-const workerFile='public/_worker.js';
-const apiFile='src/opr-pop-api.js';
-const start='    // BEGIN ALLAMO OPR POP API';
-const end='    // END ALLAMO OPR POP API';
-const needle='    // BEGIN ALLAMO OPR PMO API';
-function sync(text,start,end,content,needle,indent=''){
-  const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
-  if(text.includes(start)){
-    const a=text.indexOf(start),b=text.indexOf(end,a);if(b<0)throw new Error('Marcador final ausente: '+end);
-    return text.slice(0,a)+block+text.slice(b+end.length);
-  }
-  if(!text.includes(needle))throw new Error('Ponto de injeção OPR não encontrado.');
-  return text.replace(needle,block+'\n'+needle);
-}
-let worker=fs.readFileSync(workerFile,'utf8');const api=fs.readFileSync(apiFile,'utf8');worker=sync(worker,start,end,api,needle,'    ');
-if((worker.match(/BEGIN ALLAMO OPR POP API/g)||[]).length!==1)throw new Error('Bloco POP OPR duplicado.');
-if(worker.indexOf(start)>worker.indexOf(needle))throw new Error('API POP precisa executar antes da API OPR legada.');
-fs.writeFileSync(workerFile,worker);
-console.log('OK: API persistente do POP OPR injetada no Worker.');
+const workerFile='public/_worker.js';const apiFile='src/opr-pop-api.js';const start='    // BEGIN ALLAMO OPR POP API';const end='    // END ALLAMO OPR POP API';const needle='    // BEGIN ALLAMO OPR PMO API';
+function sync(text,start,end,content,needle,indent=''){const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;if(text.includes(start)){const a=text.indexOf(start),b=text.indexOf(end,a);if(b<0)throw new Error('Marcador final ausente: '+end);return text.slice(0,a)+block+text.slice(b+end.length)}if(!text.includes(needle))throw new Error('Ponto de injeção OPR não encontrado.');return text.replace(needle,block+'\n'+needle)}
+let worker=fs.readFileSync(workerFile,'utf8');const api=fs.readFileSync(apiFile,'utf8');worker=sync(worker,start,end,api,needle,'    ');if((worker.match(/BEGIN ALLAMO OPR POP API/g)||[]).length!==1)throw new Error('Bloco POP OPR duplicado.');if(worker.indexOf(start)>worker.indexOf(needle))throw new Error('API POP precisa executar antes da API OPR legada.');fs.writeFileSync(workerFile,worker);
+const page='public/opr-pop/index.html';if(fs.existsSync(page)){let html=fs.readFileSync(page,'utf8');if(!html.includes('data-opr-platform-links="1"')){const old='<a class="btn" href="/opr-plano-de-acao/">Plano de Ação</a>';if(!html.includes(old))throw new Error('Atalho do Plano não localizado no POP');const links='<span data-opr-platform-links="1"></span><a class="btn" href="/opr/">Portal</a><a class="btn" href="/opr-plano-de-acao/">Plano</a><a class="btn" href="/opr-mapa-implantacao/">Mapa</a><a class="btn" href="/opr-requisitos/">Requisitos</a><a class="btn" href="/opr-plano-testes/">Testes</a><a class="btn" href="/opr-status-report/">Report</a>';html=html.replace(old,links);fs.writeFileSync(page,html)}}
+console.log('OK: API persistente do POP OPR injetada no Worker e navegação da plataforma conectada.');
