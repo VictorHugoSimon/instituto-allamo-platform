@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+const must=(text,needle,label)=>{if(!text.includes(needle))throw new Error('Sprint Governance inválido: '+label+' ('+needle+')')};
+const migration=fs.readFileSync('migrations/2026-09-01-sprint-governance-documents.sql','utf8');
+const api=fs.readFileSync('src/sprint-governance-api.js','utf8');
+const harden=fs.readFileSync('scripts/harden-sprint-governance.mjs','utf8');
+const panel=fs.readFileSync('public/governanca-sprint/index.html','utf8');
+const worker=fs.readFileSync('public/_worker.js','utf8');
+for(const t of ['sprint_documents','sprint_document_versions'])must(migration,t,'tabela D1 '+t);
+for(const x of ["path==='sprint-documents'",'sprint-documents\\/[^/]+','sprint_document_versions','sgScope','const sgKey=','project_id:sgKey(row.project_id)',"['project','p.id']",'sgKey(b.project_id)','sgKey(src.project_id)'])must(api,x,'API '+x);
+must(harden,'BEGIN ALLAMO SPRINT GOVERNANCE','injeção versionada');
+for(const x of ['Governança de Sprint','Definition of Ready','Definition of Done','TEMPLATES=','sprint-documents','Histórico de versões'])must(panel,x,'painel '+x);
+must(worker,'BEGIN ALLAMO SPRINT GOVERNANCE','Worker final contém API DoR/DoD');
+console.log('OK: Governança de Sprint validada — painel, D1, API, versionamento, canonicalização de project_id e Worker.');

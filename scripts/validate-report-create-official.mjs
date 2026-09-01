@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8');
 const create=read('src/report-create-official-ui.js');
+const router=read('src/report-create-button-router.js');
 const tabs=read('src/client-report-tab-stability.js');
 const login=read('src/login-503-retry.js');
 const build=read('scripts/build-work-management.mjs');
 const must=(s,n,l)=>{if(!s.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
-new Function(create);new Function(tabs);new Function(login);
+new Function(create);new Function(router);new Function(tabs);new Function(login);
 [
  'Criar Status Report · Template oficial do cliente','01 · Executive Overview','02 · Escopo & Plano de Ação',
  '03 · Caminho Crítico & Riscos','04 · Cadência & Governança','05 · Matriz RACI','06 · Indicadores & Próximos Passos',
@@ -16,14 +17,39 @@ must(create,"api('report-records',{method:'POST'",'criação usa report nativo m
 must(create,"status:publish?'PUBLICADO':'RASCUNHO'",'publicação é decisão explícita');
 must(create,'AllamoClientReportAiTemplateBridge.enrich','IA preenche o template oficial');
 must(create,'AllamoClientExecutiveReport.renderInto','prévia usa exatamente o renderer do cliente');
+must(router,"window.addEventListener('click'",'roteador captura clique global');
+must(router,"#arm [data-a=\"new-report\"]",'botão Novo report é roteado explicitamente');
+must(router,'e.stopImmediatePropagation()','handler legado não concorre com o criador oficial');
+must(router,'window.AllamoOfficialReportCreate','roteador chama o criador oficial');
+must(router,"document.querySelector('#arc-company')",'empresa selecionada é reaplicada no criador');
+must(router,"document.querySelector('#arc-project')",'projeto selecionado é reaplicado no criador');
+must(router,"CREATE_TITLE='Criar Status Report · Template oficial do cliente'",'modal oficial é identificado deterministicamente');
+must(router,"data-allamo-report-create-modal",'modal recebe marcador exclusivo de estabilidade');
+must(router,'forceVisible','roteador força visibilidade do template contra CSS legado');
+must(router,"set('display','flex')",'display do modal é protegido por inline important');
+must(router,"set('visibility','visible')",'visibilidade do modal é protegida');
+must(router,"set('opacity','1')",'opacidade do modal é protegida');
+must(router,'flex-direction:column!important','container principal mantém fluxo vertical');
+must(router,">.arc-box>.arc-body",'corpo do modal recebe escopo estrutural exclusivo');
+must(router,'flex:1 1 auto!important;min-height:0!important','corpo ocupa espaço restante sem romper o modal');
+must(router,'overflow-y:auto!important;overflow-x:hidden!important','scroll fica restrito ao corpo do formulário');
+must(router,'grid-template-columns:minmax(0,1.4fr)','metadados usam grid resiliente');
+must(router,'grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important','campos internos mantêm duas colunas válidas no desktop');
+must(router,'@media(max-width:960px)','layout intermediário é responsivo');
+must(router,'@media(max-width:800px)','layout mobile é responsivo');
+must(router,"b('flex-direction','column')",'hardening inline preserva direção vertical mesmo sob CSS concorrente');
+must(router,'timeout(creator.open(),12000)','abertura possui timeout explícito');
+must(router,"O template oficial não foi montado na tela.",'falha de montagem é detectada e informada');
+must(router,"feedback('Template de Report aberto.')",'sucesso só é informado após montagem real');
 must(tabs,'allamoActiveReportTab','aba ativa persiste entre rerenders');
 must(tabs,"classList.toggle('on'",'painel ativo é restaurado sem clique artificial');
 must(login,"u.pathname==='/api/login'",'retry limitado ao login');
 must(login,'response.status!==503','retry somente para 503 temporário');
 must(login,'attempt<3','máximo de três tentativas');
-['src/report-create-official-ui.js','src/client-report-tab-stability.js','src/login-503-retry.js'].forEach(x=>must(build,x,'arquivo injetado no build'));
-const pCreate=build.indexOf('${reportCreateOfficialUi}'),pAi=build.indexOf('${clientReportAiTemplateBridge}');
+['src/report-create-button-router.js','src/report-create-official-ui.js','src/client-report-tab-stability.js','src/login-503-retry.js'].forEach(x=>must(build,x,'arquivo injetado no build'));
+const pRouter=build.indexOf('${reportCreateButtonRouter}'),pCreate=build.indexOf('${reportCreateOfficialUi}'),pAi=build.indexOf('${clientReportAiTemplateBridge}');
+if(pRouter<0||pCreate<0||pRouter>pCreate)throw new Error('Roteador do botão deve carregar antes do criador oficial.');
 if(pCreate<0||pAi<0||pAi>pCreate)throw new Error('Ponte IA deve carregar antes do criador oficial.');
 const pRaci=build.indexOf('${clientReportTemplateRaciEnhancement}'),pTabs=build.indexOf('${clientReportTabStability}');
 if(pRaci<0||pTabs<0||pRaci>pTabs)throw new Error('Estabilidade de abas deve envolver o renderer já enriquecido pela RACI.');
-console.log('OK: criação de Report usa template oficial, Copiloto PMO sob aprovação, publicação explícita, preview cliente e abas persistentes.');
+console.log('OK: Novo report monta visível e mantém layout íntegro: coluna principal, corpo rolável, grids responsivos, contexto, IA, publicação, preview e abas preservados.');

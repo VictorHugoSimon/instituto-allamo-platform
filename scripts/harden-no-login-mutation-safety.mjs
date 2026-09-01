@@ -16,7 +16,8 @@ if(!worker.includes(handleMarker) || occurrences!==1){
 }
 
 const guard=`${authNeedle}
-    if (user.__portal_no_login === true && request.method === 'DELETE') {
+    const __softSprintArchive = request.method === 'DELETE' && /^\\/api\\/sprint-documents\\/[^/]+$/.test(url.pathname);
+    if (user.__portal_no_login === true && request.method === 'DELETE' && !__softSprintArchive) {
       return json({
         error:'Ação destrutiva exige sessão autenticada',
         code:'authenticated_session_required'
@@ -25,4 +26,4 @@ const guard=`${authNeedle}
 
 worker=worker.replace(authNeedle,guard);
 fs.writeFileSync(file,worker);
-console.log('OK: DELETE bloqueado para identidade PMO sintética; operações destrutivas exigem sessão autenticada.');
+console.log('OK: DELETE destrutivo bloqueado para identidade PMO sintética; soft archive DoR/DoD permanece permitido.');
