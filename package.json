@@ -23,7 +23,7 @@
     "test:fch": "node scripts/validate-fch-hours.mjs",
     "test:fch-workflows": "node scripts/validate-fch-workflow-governance.mjs",
     "test:ops": "node scripts/validate-operational-health.mjs && node scripts/validate-fch-workflow-governance.mjs",
-    "smoke:governance": "node scripts/smoke-governance-stage.mjs",
+    "smoke:governance": "node scripts/smoke-governance-stage.mjs && node scripts/smoke-sprint-governance-stage.mjs",
     "smoke:opr-pop": "node scripts/smoke-opr-pop-stage.mjs",
     "test:artifact-recovery": "node scripts/validate-stale-artifact-recovery.mjs",
     "test:freshness": "node scripts/validate-boot-guard.mjs && node scripts/validate-data-freshness.mjs && node scripts/validate-portfolio-resilience.mjs && node scripts/validate-stale-artifact-recovery.mjs",
