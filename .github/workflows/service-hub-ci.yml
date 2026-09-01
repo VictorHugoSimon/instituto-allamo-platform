@@ -25,7 +25,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Routing unit tests
+      - name: JavaScript syntax
+        run: |
+          node --check service-hub/src/routing.mjs
+          node --check service-hub/src/redact.mjs
+          node --check service-hub/src/repository.mjs
+          node --check service-hub/src/api.mjs
+      - name: Unit tests
         working-directory: service-hub
         run: npm test
       - name: Validate D1 schema
