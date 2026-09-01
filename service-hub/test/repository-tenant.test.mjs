@@ -40,3 +40,11 @@ test('criação de sistema persiste tenant do contexto, nunca do payload',async(
   assert.equal(insert.args[1],'tenant-a');
   assert.equal(result.tenantId,'tenant-a');
 });
+
+test('SLA em horário comercial fica bloqueado até existir calendário oficial',async()=>{
+  const db=new FakeDb(),repo=createServiceHubRepository(db);
+  await assert.rejects(
+    ()=>repo.createSlaPolicy(ctx,{priority:'high',firstResponseMinutes:30,resolutionMinutes:240,businessHoursOnly:true}),
+    /business_hours_sla_not_supported_in_mvp/
+  );
+});
