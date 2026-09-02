@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+const runner=fs.readFileSync('scripts/smoke-opr-governance-platform-stage-runner.mjs','utf8');
+const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+const must=(needle,label)=>{if(!runner.includes(needle))throw new Error(`Ausente: ${label}`)};
+must("missingPath='/opr-rota-inexistente-smoke-404'",'rota sintética dedicada');
+must("missingHtml!==rootHtml",'comparação exata com shell canônico');
+must("routeMode='pages-spa-shell'",'modo explícito de fallback SPA');
+must("url.pathname===missingPath",'normalização limitada à rota sintética');
+must("liveHtml!==rootHtml",'revalidação antes de normalizar o status');
+must("globalThis.fetch=nativeFetch",'restauração do fetch global');
+if(!String(pkg.scripts?.['smoke:opr-platform']||'').includes('smoke-opr-governance-platform-stage-runner.mjs'))throw new Error('smoke:opr-platform ainda não usa o runner do contrato de rota.');
+console.log('OK: smoke OPR aceita 404 ou fallback SPA canônico sem mascarar rota fantasma e preserva o CRUD real.');
