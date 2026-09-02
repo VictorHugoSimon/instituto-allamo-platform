@@ -1,0 +1,49 @@
+name: Work Management Schema Guard CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'scripts/ensure-work-management-schema.mjs'
+      - 'migrations/2026-08-21-work-management.sql'
+      - '.github/workflows/deploy-production.yml'
+      - '.github/workflows/work-schema-guard-ci.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'scripts/ensure-work-management-schema.mjs'
+      - 'migrations/2026-08-21-work-management.sql'
+      - '.github/workflows/deploy-production.yml'
+      - '.github/workflows/work-schema-guard-ci.yml'
+
+jobs:
+  schema-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validar sintaxe do guard de schema
+        run: node --check scripts/ensure-work-management-schema.mjs
+      - name: Validar migration base de Work Management
+        run: |
+          grep -F 'CREATE TABLE IF NOT EXISTS work_items' migrations/2026-08-21-work-management.sql
+          grep -F 'CREATE TABLE IF NOT EXISTS work_sprints' migrations/2026-08-21-work-management.sql
+          grep -F 'CREATE TABLE IF NOT EXISTS work_comments' migrations/2026-08-21-work-management.sql
+          grep -F 'CREATE TABLE IF NOT EXISTS work_checklist' migrations/2026-08-21-work-management.sql
+          grep -F 'CREATE TABLE IF NOT EXISTS work_links' migrations/2026-08-21-work-management.sql
+          grep -F 'CREATE TABLE IF NOT EXISTS work_events' migrations/2026-08-21-work-management.sql
+      - name: Validar ordem segura da release produtiva
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const y=fs.readFileSync('.github/workflows/deploy-production.yml','utf8');
+          const backup=y.indexOf('Backup obrigatório do D1 produtivo');
+          const core=y.indexOf('Garantir schema base de Work Management em Produção');
+          const additive=y.indexOf('Aplicar somente schema aditivo em Produção');
+          const deploy=y.indexOf('Publicar exatamente o artefato validado em PRODUÇÃO');
+          if(!(backup>=0&&core>backup&&additive>core&&deploy>additive)) throw new Error('Ordem segura backup → Work Management → schema aditivo → deploy não está garantida.');
+          if(!y.includes('--confirm=APPLY-WORK-SCHEMA-PRODUCTION')) throw new Error('Confirmação explícita do schema Work Management ausente.');
+          console.log('OK: release garante work_items antes das estruturas OPR e do deploy.');
+          NODE
