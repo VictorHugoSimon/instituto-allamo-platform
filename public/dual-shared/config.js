@@ -1,0 +1,1 @@
+window.DUAL_DB={url:'https://koiniqcwachfdbmlvruj.supabase.co',key:'sb_publishable_GbRf_c1SXcQ0gPLSF5b6cw_leZdJEJn',projectId:'40986020-d51b-4815-b6b7-f5f461994d6b',scope:'DUAL'};
