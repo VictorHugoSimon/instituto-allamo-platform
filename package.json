@@ -46,7 +46,7 @@
     "test:matrices": "node scripts/validate-visual-matrices.mjs && node scripts/validate-bundle-json.mjs",
     "test:stage-no-login": "node scripts/validate-stage-no-login.mjs && node scripts/validate-no-login-reports-header.mjs && node scripts/validate-bundle-json.mjs",
     "test:opr-pop": "node scripts/validate-opr-pop.mjs && node scripts/validate-bundle-json.mjs",
-    "test:opr-platform": "node scripts/validate-opr-governance-platform.mjs && node scripts/validate-bundle-json.mjs",
+    "test:opr-platform": "node scripts/validate-opr-governance-platform.mjs",
     "test:madri-pmo": "node scripts/validate-madri-pmo-static.mjs && node scripts/validate-bundle-json.mjs",
     "test:release": "npm run test:bundle && npm run test:session && npm run test:freshness && npm run test:tenant && npm run test:public && npm run test:pwa && npm run test:live && npm run test:baseline && npm run test:report-scope && npm run test:report-edit && npm run test:report-create && npm run test:report-link && npm run test:platform && npm run test:governance && npm run test:report-ai && npm run test:series && npm run test:ux && npm run test:env-isolation && npm run test:matrices && npm run test:stage-no-login && npm run test:runtime-readiness && npm run test:stage-api-resilience && npm run test:d1-cli-safety && npm run test:auth-override && npm run test:mutation-safety && npm run test:schema && npm run test:fch-hours && npm run test:fch && npm run test:ops && npm run test:opr-platform && npm run test:opr-pop && npm run test:madri-pmo",
     "lint": "npm run lint --workspace=apps/web",
