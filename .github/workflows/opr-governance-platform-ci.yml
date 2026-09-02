@@ -31,6 +31,26 @@ jobs:
       - run: npm ci
       - name: Validar contrato estático OPR v2
         run: npm run test:opr-platform
+      - name: Validar migration do POP versionado em SQLite
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import sqlite3, pathlib
+          db=sqlite3.connect(':memory:')
+          db.executescript(pathlib.Path('migrations/2026-08-31-opr-pop.sql').read_text())
+          db.execute("INSERT INTO opr_pop_config(project_id,company_id,version,document_status,governance_owner,approver,objective,initialized_at,updated_by) VALUES(1,'opr','1.0','Ativo','PMO','A confirmar','Smoke',datetime('now'),'CI')")
+          db.execute("INSERT INTO opr_pop_procedures(id,display_id,company_id,project_id,section,procedure_text,owner,status,created_by,updated_by) VALUES('P1','POP-001','opr',1,'CI','Procedimento CI','PMO','Ativo','CI','CI')")
+          db.executescript(pathlib.Path('migrations/2026-09-01-opr-pop-versioning.sql').read_text())
+          row=db.execute("SELECT version_label,event_type FROM opr_pop_versions WHERE project_id=1 ORDER BY version_seq").fetchall()
+          assert row and row[0][0]=='v1.0' and row[0][1]=='BASELINE_MIGRATION', row
+          db.execute("UPDATE opr_pop_procedures SET status='Em revisão',version=version+1,updated_by='CI',updated_at=datetime('now') WHERE id='P1'")
+          assert db.execute("SELECT COUNT(*) FROM opr_pop_versions WHERE project_id=1 AND event_type='STATUS_CHANGE'").fetchone()[0]==1
+          db.execute("UPDATE opr_pop_procedures SET archived_at=datetime('now'),version=version+1,updated_by='CI' WHERE id='P1'")
+          db.execute("UPDATE opr_pop_procedures SET archived_at=NULL,version=version+1,updated_by='CI' WHERE id='P1'")
+          kinds={x[0] for x in db.execute("SELECT event_type FROM opr_pop_versions WHERE project_id=1")}
+          assert {'BASELINE_MIGRATION','STATUS_CHANGE','SOFT_DELETE','RESTORE'} <= kinds, kinds
+          print('OK: migration POP versionado + triggers validada')
+          PY
       - name: Construir artefato real
         run: npm run build:work
       - name: Revalidar após hardeners
@@ -39,4 +59,10 @@ jobs:
         run: |
           test "$(grep -c 'BEGIN ALLAMO OPR ACTION V2' public/_worker.js)" -eq 1
           test "$(grep -c 'BEGIN ALLAMO OPR GOVERNANCE PLATFORM' public/_worker.js)" -eq 1
+          test "$(grep -c 'BEGIN ALLAMO OPR PERMANENT REPORT API' public/_worker.js)" -eq 1
+          test "$(grep -c 'BEGIN ALLAMO OPR POP VERSIONING API' public/_worker.js)" -eq 1
           grep -F 'data-opr-plan-v2="1"' public/opr-plano-de-acao/index.html
+          grep -F '1 · Executivo' public/opr-status-report/index.html
+          grep -F '2 · Atenções & Decisões' public/opr-status-report/index.html
+          grep -F '3 · Próximos Marcos' public/opr-status-report/index.html
+          grep -F '4 · Cadência & Governança' public/opr-status-report/index.html
