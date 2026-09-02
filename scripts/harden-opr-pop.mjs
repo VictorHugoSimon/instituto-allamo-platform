@@ -42,7 +42,17 @@ if(fs.existsSync(page)){
   if(!html.includes('id="versionsModal"')){
     const modal='<div class="modal" id="versionsModal"><div class="modalbox wide"><h3>Versões documentais do POP</h3><div id="currentPopVersion" class="smallnote"></div><div class="card tablewrap"><table><thead><tr><th>Versão</th><th>Evento</th><th>Motivo</th><th>Responsável</th><th>Data</th><th></th></tr></thead><tbody id="versionRows"></tbody></table></div><div class="modal-actions"><button class="btn" onclick="closeModal(\'versionsModal\')">Fechar</button></div></div></div><div class="modal" id="versionSnapshotModal"><div class="modalbox wide"><h3 id="versionSnapshotTitle">Snapshot do POP</h3><pre id="versionSnapshotBody" style="white-space:pre-wrap;word-break:break-word;background:#faf9f7;border-radius:10px;padding:12px;font-size:9px;max-height:65vh;overflow:auto"></pre><div class="modal-actions"><button class="btn" onclick="closeModal(\'versionSnapshotModal\')">Fechar</button></div></div></div>';
     html=html.replace('<script>',modal+'<script>');
-    const funcs=`\nasync function openPopVersions(){try{const d=await api('opr-pop-versions?project='+encodeURIComponent(state.project)),rows=d.versions||[];state.currentVersion=d.current||null;renderMeta();el('currentPopVersion').textContent=d.current?'Versão atual: '+d.current.version_label+' · '+(d.current.document_status||'A confirmar'):'Sem versão documental registrada.';el('versionRows').innerHTML=rows.map(v=>\`<tr><td><b>\${esc(v.version_label)}</b></td><td>\${esc(v.event_type)}</td><td>\${esc(v.reason||'Não informado')}</td><td>\${esc(v.actor||'PENDENTE DE VALIDAÇÃO')}</td><td>\${esc(v.created_at||'')}</td><td><button class="btn" onclick="openPopVersionSnapshot('\\${v.id}')">Abrir</button></td></tr>\`).join('')||'<tr><td colspan="6" class="empty">Sem versões registradas.</td></tr>';openModal('versionsModal')}catch(e){showError(e)}}\nasync function openPopVersionSnapshot(id){try{const v=await api('opr-pop-versions/'+encodeURIComponent(id));el('versionSnapshotTitle').textContent='Snapshot · '+(v.version_label||id);el('versionSnapshotBody').textContent=pretty(v.content_json);openModal('versionSnapshotModal')}catch(e){showError(e)}}\n`;
+    const funcs=[
+      '',
+      "async function openPopVersions(){try{",
+      "const d=await api('opr-pop-versions?project='+encodeURIComponent(state.project)),rows=d.versions||[];",
+      "state.currentVersion=d.current||null;renderMeta();",
+      "el('currentPopVersion').textContent=d.current?'Versão atual: '+d.current.version_label+' · '+(d.current.document_status||'A confirmar'):'Sem versão documental registrada.';",
+      "el('versionRows').innerHTML=rows.map(v=>'<tr><td><b>'+esc(v.version_label)+'</b></td><td>'+esc(v.event_type)+'</td><td>'+esc(v.reason||'Não informado')+'</td><td>'+esc(v.actor||'PENDENTE DE VALIDAÇÃO')+'</td><td>'+esc(v.created_at||'')+'</td><td><button class=\"btn\" data-version-id=\"'+esc(v.id)+'\" onclick=\"openPopVersionSnapshot(this.dataset.versionId)\">Abrir</button></td></tr>').join('')||'<tr><td colspan=\"6\" class=\"empty\">Sem versões registradas.</td></tr>';",
+      "openModal('versionsModal')}catch(e){showError(e)}}",
+      "async function openPopVersionSnapshot(id){try{const v=await api('opr-pop-versions/'+encodeURIComponent(id));el('versionSnapshotTitle').textContent='Snapshot · '+(v.version_label||id);el('versionSnapshotBody').textContent=pretty(v.content_json);openModal('versionSnapshotModal')}catch(e){showError(e)}}",
+      ''
+    ].join('\n');
     const at=html.lastIndexOf('</script>');if(at<0)throw new Error('Script do POP não localizado');html=html.slice(0,at)+funcs+html.slice(at);
   }
   fs.writeFileSync(page,html);
