@@ -53,8 +53,10 @@ jobs:
           PY
       - name: Construir artefato real
         run: npm run build:work
-      - name: Revalidar após hardeners
+      - name: Revalidar contrato OPR após hardeners
         run: npm run test:opr-platform
+      - name: Validar bundle gerado
+        run: npm run test:bundle
       - name: Confirmar injeção única e ordem das APIs
         run: |
           test "$(grep -c 'BEGIN ALLAMO OPR ACTION V2' public/_worker.js)" -eq 1
