@@ -83,10 +83,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Dry-run do schema e dos tenants essenciais em Produção
+      - name: Dry-run do schema base, aditivo e tenants essenciais em Produção
         run: |
+          node scripts/ensure-work-management-schema.mjs --env=production
           node scripts/ensure-additive-schema.mjs --env=production
           node scripts/repair-core-tenants-portable.mjs --env=production
+
+      - name: Garantir schema base de Work Management em Produção
+        run: node scripts/ensure-work-management-schema.mjs --env=production --apply --confirm=APPLY-WORK-SCHEMA-PRODUCTION
 
       - name: Aplicar somente schema aditivo em Produção
         run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
@@ -134,7 +138,8 @@ jobs:
           echo "- Deploy automático por push/merge em main: ATIVO" >> "$GITHUB_STEP_SUMMARY"
           echo "- Workflow manual: disponível como fallback" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório e retido por 30 dias" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Schema base Work Management: dry-run + aplicação idempotente antes do schema OPR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Schema aditivo: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
           echo "- Autenticação: API Token com fallback para Global API Key + e-mail quando disponível" >> "$GITHUB_STEP_SUMMARY"
           echo "- Smokes: Dual Clima/Madrid/OPR + governança multitenant" >> "$GITHUB_STEP_SUMMARY"
