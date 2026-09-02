@@ -11,7 +11,7 @@
     ['/opr/','Portal'],['/opr-requisitos/','Requisitos'],['/opr-plano-testes/','Testes'],['/opr-riscos/','Riscos'],['/opr-integracoes/','Integrações'],['/opr-documentos/','Documentos']
   ];
   const routes=[...officialRoutes,...supportRoutes];
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   async function api(path,opt={}){
     const headers={'content-type':'application/json',...(opt.headers||{})};
     const r=await fetch(path,{...opt,headers,cache:'no-store'});const text=await r.text();let data;try{data=JSON.parse(text)}catch{data=text}
