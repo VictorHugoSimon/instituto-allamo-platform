@@ -25,10 +25,34 @@ CREATE TABLE IF NOT EXISTS opr_pop_versions (
 CREATE INDEX IF NOT EXISTS idx_opr_pop_versions_project
   ON opr_pop_versions(company_id, project_id, version_seq DESC);
 
--- Snapshot inicial somente após o bootstrap finalizar.
+-- Backfill idempotente: POPs já existentes recebem snapshot da versão atual.
+INSERT INTO opr_pop_versions(
+  company_id,project_id,version_seq,major_version,minor_version,version_label,
+  document_status,governance_owner,event_type,procedure_id,reason,actor,content_json
+)
+SELECT
+  c.company_id,c.project_id,1,
+  CASE WHEN instr(COALESCE(c.version,'1.0'),'.')>0 THEN CAST(substr(c.version,1,instr(c.version,'.')-1) AS INTEGER) ELSE 1 END,
+  CASE WHEN instr(COALESCE(c.version,'1.0'),'.')>0 THEN CAST(substr(c.version,instr(c.version,'.')+1) AS INTEGER) ELSE 0 END,
+  'v'||COALESCE(NULLIF(c.version,''),'1.0'),c.document_status,c.governance_owner,'BASELINE_MIGRATION',NULL,
+  'Snapshot da versão corrente ao habilitar versionamento imutável',c.updated_by,
+  json_object(
+    'config',json_object('version',c.version,'status',c.document_status,'owner',c.governance_owner,'approver',c.approver,'objective',c.objective),
+    'procedures',json(COALESCE((SELECT json_group_array(json_object(
+      'id',p.display_id,'section',p.section,'procedure',p.procedure_text,'owner',p.owner,
+      'trigger',p.trigger_frequency,'evidence',p.evidence,'done',p.done_criteria,
+      'status',p.status,'next_step',p.next_step,'source',p.source,'version',p.version
+    )) FROM opr_pop_procedures p WHERE p.project_id=c.project_id AND p.archived_at IS NULL),'[]'))
+  )
+FROM opr_pop_config c
+WHERE c.initialized_at IS NOT NULL
+  AND NOT EXISTS(SELECT 1 FROM opr_pop_versions v WHERE v.project_id=c.project_id);
+
+-- Snapshot inicial para POP criado após esta migration.
 CREATE TRIGGER IF NOT EXISTS trg_opr_pop_version_init
 AFTER UPDATE OF initialized_at ON opr_pop_config
 WHEN OLD.initialized_at IS NULL AND NEW.initialized_at IS NOT NULL
+  AND NOT EXISTS(SELECT 1 FROM opr_pop_versions WHERE project_id=NEW.project_id)
 BEGIN
   INSERT INTO opr_pop_versions(
     company_id,project_id,version_seq,major_version,minor_version,version_label,
