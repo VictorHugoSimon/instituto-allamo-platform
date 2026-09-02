@@ -1,0 +1,5 @@
+import fs from 'node:fs';
+const workerFile='public/_worker.js',apiFile='src/opr-action-v2-api.js';
+const start='    // BEGIN ALLAMO OPR ACTION V2',end='    // END ALLAMO OPR ACTION V2',needle='    // BEGIN ALLAMO OPR GOVERNANCE PLATFORM';
+function sync(text){const content=fs.readFileSync(apiFile,'utf8'),block=start+'\n'+content.split('\n').map(x=>'    '+x).join('\n')+'\n'+end;if(text.includes(start)){const a=text.indexOf(start),b=text.indexOf(end,a);if(b<0)throw new Error('Marcador final ausente');return text.slice(0,a)+block+text.slice(b+end.length)}if(!text.includes(needle))throw new Error('Ponto de injeção Governance Platform ausente');return text.replace(needle,block+'\n'+needle)}
+let worker=sync(fs.readFileSync(workerFile,'utf8'));if((worker.match(/BEGIN ALLAMO OPR ACTION V2/g)||[]).length!==1)throw new Error('Plano OPR v2 duplicado');if(worker.indexOf(start)>worker.indexOf(needle))throw new Error('Plano OPR v2 deve executar antes das demais APIs OPR');fs.writeFileSync(workerFile,worker);console.log('OK: Plano Mestre OPR v2 injetado antes das rotas legadas.');

@@ -1,0 +1,62 @@
+name: Valkiria Service Hub CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'service-hub/**'
+      - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
+      - '.github/workflows/service-hub-ci.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'service-hub/**'
+      - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
+      - '.github/workflows/service-hub-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JavaScript syntax
+        run: |
+          node --check service-hub/src/routing.mjs
+          node --check service-hub/src/redact.mjs
+          node --check service-hub/src/repository.mjs
+          node --check service-hub/src/api.mjs
+          node --check service-hub/src/classifier.mjs
+          node --check service-hub/src/intake.mjs
+      - name: Unit tests
+        working-directory: service-hub
+        run: npm test
+      - name: Validate D1 schema
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib
+          p=pathlib.Path('migrations/2026-09-01-valkiria-service-hub-foundation.sql')
+          sql=p.read_text(encoding='utf-8')
+          db=sqlite3.connect(':memory:')
+          db.executescript(sql)
+          required={
+            'service_hub_systems','service_hub_channels','service_hub_sla_policies',
+            'service_hub_routing_rules','service_hub_tickets','service_hub_ticket_events',
+            'service_hub_messages','service_hub_audit_log'
+          }
+          tables={r[0] for r in db.execute("select name from sqlite_master where type='table'")}
+          missing=required-tables
+          assert not missing, f'missing tables: {missing}'
+          db.execute("insert into service_hub_messages(id,tenant_id,project_id,channel_id,provider_message_id,direction,text_redacted,occurred_at) values(?,?,?,?,?,?,?,?)",('m1','t1','p1','c1','ext-1','inbound','teste','2026-09-01T00:00:00Z'))
+          try:
+            db.execute("insert into service_hub_messages(id,tenant_id,project_id,channel_id,provider_message_id,direction,text_redacted,occurred_at) values(?,?,?,?,?,?,?,?)",('m2','t1','p1','c1','ext-1','inbound','teste 2','2026-09-01T00:01:00Z'))
+            raise AssertionError('duplicate provider message was accepted')
+          except sqlite3.IntegrityError:
+            pass
+          print('SERVICE_HUB_SCHEMA_OK')
+          PY
