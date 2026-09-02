@@ -16,23 +16,14 @@ const schema=read('scripts/ensure-additive-schema.mjs');for(const x of ['2026-09
 
 const pkg=JSON.parse(read('package.json'));for(const x of ['harden-opr-governance-platform.mjs','harden-opr-action-v2.mjs','harden-opr-plan-v2-ui.mjs','harden-opr-pop.mjs'])has(pkg.scripts['build:work'],x);has(pkg.scripts['test:release'],'test:opr-platform');if(!pkg.scripts['smoke:opr-platform'])fail('smoke:opr-platform ausente');
 
-const official=[
-  ['public/opr-plano-de-acao/index.html','/opr-plano-de-acao/'],
-  ['public/opr-status-report/index.html','/opr-status-report/'],
-  ['public/opr-pop/index.html','/opr-pop/'],
-  ['public/opr-mapa-implantacao/index.html','/opr-mapa-implantacao/']
-];for(const [f] of official)if(!fs.existsSync(f))fail(`Link oficial sem página: ${f}`);
+const official=[['public/opr-plano-de-acao/index.html','/opr-plano-de-acao/'],['public/opr-status-report/index.html','/opr-status-report/'],['public/opr-pop/index.html','/opr-pop/'],['public/opr-mapa-implantacao/index.html','/opr-mapa-implantacao/']];for(const [f] of official)if(!fs.existsSync(f))fail(`Link oficial sem página: ${f}`);
 const pages=['public/opr/index.html','public/opr-mapa-implantacao/index.html','public/opr-requisitos/index.html','public/opr-plano-testes/index.html','public/opr-status-report/index.html','public/opr-riscos/index.html','public/opr-integracoes/index.html','public/opr-documentos/index.html'];for(const f of pages){if(!fs.existsSync(f))fail(`Página ausente: ${f}`);const t=read(f);has(t,'/opr/assets/platform.css');has(t,'/opr/assets/platform.js');if(/localStorage|sessionStorage/.test(t))fail(`${f} usa storage de navegador como dado`)}for(const f of ['public/opr/assets/platform.js','public/opr/assets/entity-page.js'])if(/localStorage|sessionStorage/.test(read(f)))fail(`${f} usa storage de navegador`);
-
 const shared=read('public/opr/assets/platform.js');for(const u of ['/opr-plano-de-acao/','/opr-status-report/','/opr-pop/','/opr-mapa-implantacao/'])has(shared,u,`URL oficial permanente ausente da navegação: ${u}`);has(shared,'Links oficiais permanentes');if(/opr-(?:status|plano|pop|mapa)[^'"\s]*\d{2}[-_/]\d{2}/i.test(shared))fail('Navegação contém URL oficial datada/versionada');
-
 const tests=read('public/opr-plano-testes/index.html');for(const x of ['SIT','UAT','E2E','P1','Aprovado','Defeitos','Go/No-Go'])has(tests,x);
 const map=read('public/opr-mapa-implantacao/index.html');for(const x of ['Stage-Gate','Swimlane','REQUISITO','STD / CFG / DEV / INT','ACEITE'])has(map,x);
-const report=read('public/opr-status-report/index.html');has(report,'api/opr-platform/status-report');for(const x of ['1 · Executivo','2 · Atenções & Decisões','3 · Próximos Marcos','4 · Cadência & Governança','Total de ações','Planejado','Em andamento','Atrasado','Concluído'])has(report,x,`Status Report oficial incompleto: ${x}`);if((report.match(/class="report-tab/g)||[]).length!==4)fail('Status Report deve possuir exatamente quatro abas executivas');if(/localStorage|sessionStorage/.test(report))fail('Status Report usa storage do navegador como fonte');
+const report=read('public/opr-status-report/index.html');has(report,'api/opr-platform/status-report');for(const x of ['1 · Executivo','2 · Atenções & Decisões','3 · Próximos Marcos','4 · Cadência & Governança','Total de ações','Planejado','Em andamento','Atrasado','Concluído'])has(report,x,`Status Report oficial incompleto: ${x}`);if((report.match(/class="report-tab(?: on)?"/g)||[]).length!==4)fail('Status Report deve possuir exatamente quatro abas executivas');if(/localStorage|sessionStorage/.test(report))fail('Status Report usa storage do navegador como fonte');
 const integrations=read('public/opr-integracoes/index.html');for(const x of ['Sucesso','Reprocessamento','Duplicidade','Timeout','Retorno inválido','Contingência'])has(integrations,x);
-
 const hardPlan=read('scripts/harden-opr-plan-v2-ui.mjs');for(const x of ['PA sequencial','Kanban','Histórico','Lixeira','fAcceptance','fEvidence'])has(hardPlan,x);
 const hardGov=read('scripts/harden-opr-governance-platform.mjs'),hardAction=read('scripts/harden-opr-action-v2.mjs'),hardPop=read('scripts/harden-opr-pop.mjs');has(hardGov,'BEGIN ALLAMO OPR PERMANENT REPORT API');has(hardGov,'BEGIN ALLAMO OPR GOVERNANCE PLATFORM');has(hardGov,'BEGIN ALLAMO OPR PMO API');has(hardAction,'BEGIN ALLAMO OPR ACTION V2');for(const x of ['BEGIN ALLAMO OPR POP VERSIONING API','opr-pop-versions','Versões','data-opr-pop-current-version','/opr-plano-de-acao/','/opr-status-report/','/opr-mapa-implantacao/'])has(hardPop,x);
-
 const banned=['Dual Clima','MADRI · Implantação','MADRI × NUCCI'];for(const f of pages.concat(['public/opr/assets/platform.js'])){const t=read(f);for(const b of banned)if(t.includes(b))fail(`${f} contém referência operacional de outro projeto: ${b}`)}
 console.log('[OK] OPR: quatro URLs permanentes, Plano fonte da verdade, Status Report em 4 abas, POP versionado, Mapa Mestre, APIs, histórico, segurança e isolamento estático validados.');
