@@ -33,8 +33,7 @@ BEGIN
   INSERT INTO opr_pop_versions(
     company_id,project_id,version_seq,major_version,minor_version,version_label,
     document_status,governance_owner,event_type,procedure_id,reason,actor,content_json
-  )
-  VALUES(
+  ) VALUES(
     NEW.company_id,NEW.project_id,1,1,0,'v1.0',
     NEW.document_status,NEW.governance_owner,'INITIAL_VERSION',NULL,'Inicialização do POP OPR',NEW.updated_by,
     json_object(
@@ -56,10 +55,9 @@ BEGIN
   INSERT INTO opr_pop_versions(
     company_id,project_id,version_seq,major_version,minor_version,version_label,
     document_status,governance_owner,event_type,procedure_id,reason,actor,content_json
-  )
-  SELECT
+  ) VALUES(
     NEW.company_id,NEW.project_id,
-    COALESCE(MAX(v.version_seq),0)+1,
+    (SELECT COALESCE(MAX(version_seq),0)+1 FROM opr_pop_versions WHERE project_id=NEW.project_id),
     COALESCE((SELECT major_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),1),
     COALESCE((SELECT minor_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),-1)+1,
     'v'||COALESCE((SELECT major_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),1)||'.'||(COALESCE((SELECT minor_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),-1)+1),
@@ -74,9 +72,7 @@ BEGIN
         'status',p.status,'next_step',p.next_step,'source',p.source,'version',p.version
       )) FROM opr_pop_procedures p WHERE p.project_id=NEW.project_id AND p.archived_at IS NULL),'[]'))
     )
-  FROM opr_pop_versions v
-  WHERE v.project_id=NEW.project_id OR NOT EXISTS(SELECT 1 FROM opr_pop_versions WHERE project_id=NEW.project_id)
-  LIMIT 1;
+  );
 END;
 
 -- Edição, mudança de status, lixeira e restauração geram nova versão documental.
@@ -87,10 +83,9 @@ BEGIN
   INSERT INTO opr_pop_versions(
     company_id,project_id,version_seq,major_version,minor_version,version_label,
     document_status,governance_owner,event_type,procedure_id,reason,actor,content_json
-  )
-  SELECT
+  ) VALUES(
     NEW.company_id,NEW.project_id,
-    COALESCE(MAX(v.version_seq),0)+1,
+    (SELECT COALESCE(MAX(version_seq),0)+1 FROM opr_pop_versions WHERE project_id=NEW.project_id),
     COALESCE((SELECT major_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),1),
     COALESCE((SELECT minor_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),-1)+1,
     'v'||COALESCE((SELECT major_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),1)||'.'||(COALESCE((SELECT minor_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),-1)+1),
@@ -118,9 +113,7 @@ BEGIN
         'status',p.status,'next_step',p.next_step,'source',p.source,'version',p.version
       )) FROM opr_pop_procedures p WHERE p.project_id=NEW.project_id AND p.archived_at IS NULL),'[]'))
     )
-  FROM opr_pop_versions v
-  WHERE v.project_id=NEW.project_id OR NOT EXISTS(SELECT 1 FROM opr_pop_versions WHERE project_id=NEW.project_id)
-  LIMIT 1;
+  );
 END;
 
 -- Alterações relevantes de cabeçalho/configuração também são versionadas.
@@ -131,10 +124,9 @@ BEGIN
   INSERT INTO opr_pop_versions(
     company_id,project_id,version_seq,major_version,minor_version,version_label,
     document_status,governance_owner,event_type,procedure_id,reason,actor,content_json
-  )
-  SELECT
+  ) VALUES(
     NEW.company_id,NEW.project_id,
-    COALESCE(MAX(v.version_seq),0)+1,
+    (SELECT COALESCE(MAX(version_seq),0)+1 FROM opr_pop_versions WHERE project_id=NEW.project_id),
     CASE WHEN COALESCE(NEW.version,'')<>COALESCE(OLD.version,'') AND instr(NEW.version,'.')>0 THEN CAST(substr(NEW.version,1,instr(NEW.version,'.')-1) AS INTEGER)
          ELSE COALESCE((SELECT major_version FROM opr_pop_versions WHERE project_id=NEW.project_id ORDER BY version_seq DESC LIMIT 1),1) END,
     CASE WHEN COALESCE(NEW.version,'')<>COALESCE(OLD.version,'') AND instr(NEW.version,'.')>0 THEN CAST(substr(NEW.version,instr(NEW.version,'.')+1) AS INTEGER)
@@ -150,7 +142,5 @@ BEGIN
         'status',p.status,'next_step',p.next_step,'source',p.source,'version',p.version
       )) FROM opr_pop_procedures p WHERE p.project_id=NEW.project_id AND p.archived_at IS NULL),'[]'))
     )
-  FROM opr_pop_versions v
-  WHERE v.project_id=NEW.project_id OR NOT EXISTS(SELECT 1 FROM opr_pop_versions WHERE project_id=NEW.project_id)
-  LIMIT 1;
+  );
 END;
