@@ -5,6 +5,9 @@ const index='public/index.html';
 const api=fs.readFileSync('src/commercial-sales-intelligence-api.js','utf8');
 const routeGuard=fs.readFileSync('src/commercial-sales-intelligence-route-guard.js','utf8');
 const ui=fs.readFileSync('src/commercial-sales-intelligence-ui.js','utf8');
+const accessPublicApi=fs.readFileSync('src/access-invitation-public-api.js','utf8');
+const accessApi=fs.readFileSync('src/access-invitation-api.js','utf8');
+const accessUi=fs.readFileSync('src/access-invitation-ui.js','utf8');
 
 function sync(text,start,end,content,needle,indent=''){
   const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
@@ -18,6 +21,22 @@ function sync(text,start,end,content,needle,indent=''){
 }
 
 let w=fs.readFileSync(worker,'utf8');
+w=sync(
+  w,
+  '    // BEGIN ALLAMO ACCESS INVITATION PUBLIC API',
+  '    // END ALLAMO ACCESS INVITATION PUBLIC API',
+  accessPublicApi,
+  "    if (path === 'login' && request.method === 'POST') {",
+  '    '
+);
+w=sync(
+  w,
+  '    // BEGIN ALLAMO ACCESS INVITATION API',
+  '    // END ALLAMO ACCESS INVITATION API',
+  accessApi,
+  '    // EMPRESAS: criar (rota dedicada)',
+  '    '
+);
 const apiContent=routeGuard+'\n\n'+api;
 w=sync(
   w,
@@ -29,19 +48,33 @@ w=sync(
 );
 fs.writeFileSync(worker,w);
 
-let h=fs.readFileSync(index,'utf8');
-const start='<!-- BEGIN ALLAMO SALES INTELLIGENCE UI -->';
-const end='<!-- END ALLAMO SALES INTELLIGENCE UI -->';
-const block=start+'\n<script data-allamo-sales-intelligence="1">\n'+ui+'\n</script>\n'+end;
-if(h.includes(start)){
-  const a=h.indexOf(start),b=h.indexOf(end,a);
-  if(b<0)throw new Error('Marcador final da UI Sales Intelligence ausente.');
-  h=h.slice(0,a)+block+h.slice(b+end.length);
-}else{
-  const body=h.toLowerCase().lastIndexOf('</body>');
+function syncHtml(text,start,end,scriptAttr,content){
+  const block=start+'\n<script '+scriptAttr+'>\n'+content+'\n</script>\n'+end;
+  if(text.includes(start)){
+    const a=text.indexOf(start),b=text.indexOf(end,a);
+    if(b<0)throw new Error('Marcador final ausente: '+end);
+    return text.slice(0,a)+block+text.slice(b+end.length);
+  }
+  const body=text.toLowerCase().lastIndexOf('</body>');
   if(body<0)throw new Error('Fechamento </body> não encontrado.');
-  h=h.slice(0,body)+block+'\n'+h.slice(body);
+  return text.slice(0,body)+block+'\n'+text.slice(body);
 }
+
+let h=fs.readFileSync(index,'utf8');
+h=syncHtml(
+  h,
+  '<!-- BEGIN ALLAMO SALES INTELLIGENCE UI -->',
+  '<!-- END ALLAMO SALES INTELLIGENCE UI -->',
+  'data-allamo-sales-intelligence="1"',
+  ui
+);
+h=syncHtml(
+  h,
+  '<!-- BEGIN ALLAMO ACCESS INVITATION UI -->',
+  '<!-- END ALLAMO ACCESS INVITATION UI -->',
+  'data-allamo-access-invitation="1"',
+  accessUi
+);
 fs.writeFileSync(index,h);
 
 const combined=fs.readFileSync(worker,'utf8')+'\n'+fs.readFileSync(index,'utf8');
@@ -51,8 +84,14 @@ for(const marker of [
   'Conta não pertence à empresa',
   'Conta incompatível na rota',
   'data-allamo-sales-intelligence',
-  'Semeali · Sales Intelligence'
+  'Semeali · Sales Intelligence',
+  'BEGIN ALLAMO ACCESS INVITATION PUBLIC API',
+  "path==='access-invite-accept'",
+  'BEGIN ALLAMO ACCESS INVITATION API',
+  "path==='access-invitations'",
+  'data-allamo-access-invitation',
+  'Compartilhar acesso'
 ]){
-  if(!combined.includes(marker))throw new Error('Sales Intelligence incompleto no artefato: '+marker);
+  if(!combined.includes(marker))throw new Error('Sales Intelligence/Acessos incompleto no artefato: '+marker);
 }
-console.log('OK: Sales Intelligence D1 multiempresa sincronizado no Worker e portal canônicos.');
+console.log('OK: Sales Intelligence D1 e convite seguro de acesso sincronizados no Worker e portal canônicos.');
