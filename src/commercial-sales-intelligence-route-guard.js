@@ -1,7 +1,7 @@
 // Guard especializado: valida todas as contas antes de persistir a rota.
 // Este bloco é injetado antes da API comercial principal e intercepta somente POST /commercial-routes.
 if(path==='commercial-routes'&&request.method==='POST'){
-  const csrField=['admin','pmo','gestor','techlead','comercial','vendedor','representante'].includes(user.role);
+  const csrField=['admin','pmo','gestor','techlead','comercial','vendedor','representante','usuario'].includes(user.role);
   const csrScope=id=>!scope||String(id)===String(scope);
   const csrSafe=(v,n=4000)=>String(v??'').slice(0,n);
   const csrId=p=>p+'-'+Date.now().toString(36).toUpperCase()+'-'+crypto.randomUUID().slice(0,8).toUpperCase();
