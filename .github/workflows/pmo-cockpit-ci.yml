@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - 'src/pmo-cockpit-v2.mjs'
+      - 'src/pmo-cockpit-api.js'
       - 'test/pmo-cockpit-v2.test.mjs'
+      - 'scripts/harden-pmo-cockpit-v2.mjs'
       - 'scripts/validate-pmo-cockpit-v2.mjs'
       - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
       - 'docs/PMO-SCOPE-GUARDRAIL.md'
@@ -14,7 +16,9 @@ on:
       - develop
     paths:
       - 'src/pmo-cockpit-v2.mjs'
+      - 'src/pmo-cockpit-api.js'
       - 'test/pmo-cockpit-v2.test.mjs'
+      - 'scripts/harden-pmo-cockpit-v2.mjs'
       - 'scripts/validate-pmo-cockpit-v2.mjs'
       - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
       - 'docs/PMO-SCOPE-GUARDRAIL.md'
@@ -31,5 +35,7 @@ jobs:
           node-version: 20
       - name: Testar domínio do Cockpit PMO
         run: node --test test/pmo-cockpit-v2.test.mjs
-      - name: Validar contratos PMO existentes
+      - name: Injetar API do Cockpit no Worker de teste
+        run: node scripts/harden-pmo-cockpit-v2.mjs
+      - name: Validar domínio, API e contratos PMO
         run: node scripts/validate-pmo-cockpit-v2.mjs
