@@ -1,1 +1,139 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dual Clima · Status Report Executivo</title><link rel="stylesheet" href="/dual-shared/shared.css"></head><body><div class="wrap"><div class="hero"><div class="ey">Instituto Államo · PMO</div><h1>Dual Clima · Status Report Executivo</h1><div class="sub">Implantação TOTVS Protheus · link permanente do cliente derivado do banco e do Plano de Ação</div><div class="kpis"><div class="kpi"><span>Avanço oficial TOTVS</span><b>37% / 37%</b><small>Realizado / previsto · SPI 1,0</small></div><div class="kpi"><span>Próximo marco</span><b>01/09</b><small>Cadastros + Teste Unitário/SIT</small></div><div class="kpi"><span>Go-Live</span><b>23/11</b><small>Data vigente</small></div><div class="kpi"><span>Situação PMO</span><b>Atenção</b><small id="pmot">Carregando banco...</small></div></div></div><div id="nav"></div><div class="tabs"><button class="active" data-tab="exec">1. Executivo</button><button data-tab="att">2. Atenções & Decisões</button><button data-tab="next">3. Próximos Marcos</button><button data-tab="cad">4. Cadência & Governança</button></div><section id="exec" class="tab active"><div class="panel"><h2>Situação do Plano de Ação</h2><div id="kpiCards" class="cards"></div></div><div class="panel"><h2>Onde estamos</h2><div class="cards"><div class="card"><span class="tag amber">Preparação</span><h3>Cadastros e estrutura de produto</h3><p>Materiais, intermediários, fichas técnicas e estruturas seguem como condição de entrada para cargas e testes.</p></div><div class="card"><span class="tag red">MIT053</span><h3>Conversão de dados</h3><p>Os objetos de carga são controlados no Plano e dependem de responsáveis, método, sequência e critério de validação.</p></div><div class="card"><span class="tag blue">Governança</span><h3>Plano = fonte central</h3><p>O Status Report não possui base paralela; ele reflete o banco operacional e evidências validadas.</p></div></div></div></section><section id="att" class="tab"><div class="panel"><h2>Principais atenções</h2><div id="attCards" class="cards"></div></div><div class="panel"><h2>Customizações / MITs</h2><div id="mitCards" class="cards"></div></div></section><section id="next" class="tab"><div class="panel"><h2>Próximos marcos</h2><div class="tablewrap"><table><thead><tr><th>Período</th><th>Marco</th><th>Status</th><th>Responsabilidade</th><th>Próximo passo</th></tr></thead><tbody id="nextRows"></tbody></table></div></div></section><section id="cad" class="tab"><div class="panel"><h2>Cadência completa do projeto</h2><div class="tablewrap"><table><thead><tr><th>Data / Período</th><th>Agenda</th><th>Participantes / Responsável</th><th>Status</th><th>Resultado / Próximo passo</th></tr></thead><tbody id="cadRows"></tbody></table></div></div><div class="panel"><div class="note">Toda reunião deve terminar com decisões, ações, responsável nominal, prazo e evidência. Nova demanda entra no Plano antes de aparecer no próximo Status Report.</div></div></section><div class="muted" style="padding:10px 4px 24px">A visão do cliente não apresenta FCH/horas internas. Percentuais do projeto só são exibidos quando existe baseline formal.</div></div><script src="/dual-shared/config.js"></script><script src="/dual-shared/shared.js"></script><script>document.getElementById('nav').innerHTML=DualFixed.nav('Status Report');document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button,.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.tab).classList.add('active')});(async()=>{const C=DUAL_DB;const [a,m,c]=await Promise.all([DualFixed.db(`/rest/v1/action_items?project_id=eq.${C.projectId}&deleted_at=is.null&select=*&order=action_code.asc`),DualFixed.db(`/rest/v1/customizations?project_id=eq.${C.projectId}&deleted_at=is.null&select=*&order=code.asc`),DualFixed.db(`/rest/v1/cadence_events?project_id=eq.${C.projectId}&deleted_at=is.null&select=*&order=sort_order.asc`)]);const cnt=s=>a.filter(x=>x.status===s).length;const late=a.filter(x=>x.status==='Atrasado');document.getElementById('pmot').textContent=`${late.length} ação(ões) atrasada(s) no Plano`;document.getElementById('kpiCards').innerHTML=[['Total de ações',a.length],['Planejado',cnt('Planejado')],['Em andamento',cnt('Em andamento')],['Atrasado',cnt('Atrasado')],['Concluído',cnt('Concluído')]].map(x=>`<div class="card"><h3>${x[0]}</h3><p style="font-size:28px;font-weight:900">${x[1]}</p></div>`).join('');document.getElementById('attCards').innerHTML=late.slice(0,6).map(x=>`<div class="card"><span class="tag red">${DualFixed.esc(x.action_code)}</span><h3>${DualFixed.esc(x.title)}</h3><p><b>Responsável:</b> ${DualFixed.esc(x.owner||'PENDENTE DE VALIDAÇÃO')}</p><p><b>Próximo passo:</b> ${DualFixed.esc(x.next_step||'A confirmar')}</p></div>`).join('')||'<div class="card"><span class="tag green">Sem atrasos</span><p>Nenhuma ação atrasada no momento.</p></div>';document.getElementById('mitCards').innerHTML=m.map(x=>`<div class="card"><span class="tag amber">${DualFixed.esc(x.code)}</span><h3>${DualFixed.esc(x.subject)}</h3><p>${DualFixed.esc(x.signature_status||'A confirmar')}</p></div>`).join('');const future=c.filter(x=>['Planejada','A confirmar'].includes(x.status));document.getElementById('nextRows').innerHTML=future.slice(0,10).map(x=>`<tr><td>${DualFixed.esc(x.period_label)}</td><td>${DualFixed.esc(x.agenda)}</td><td>${DualFixed.tag(x.status)}</td><td>${DualFixed.esc(x.participants||'A confirmar')}</td><td>${DualFixed.esc(x.result_next_step||'A confirmar')}</td></tr>`).join('');document.getElementById('cadRows').innerHTML=c.map(x=>`<tr><td>${DualFixed.esc(x.period_label)}</td><td>${DualFixed.esc(x.agenda)}</td><td>${DualFixed.esc(x.participants||'A confirmar')}</td><td>${DualFixed.tag(x.status)}</td><td>${DualFixed.esc(x.result_next_step||'')}</td></tr>`).join('')})().catch(e=>alert(e.message));</script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dual Clima · Status Report Executivo</title>
+  <link rel="stylesheet" href="/dual-shared/shared.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="ey">Instituto Államo · PMO</div>
+    <h1>Dual Clima · Status Report Executivo</h1>
+    <div class="sub">Implantação TOTVS Protheus · link permanente do cliente derivado do banco e do Plano de Ação · baseline documental 03/09/2026</div>
+    <div class="kpis">
+      <div class="kpi"><span>Avanço oficial TOTVS</span><b>43% / 43%</b><small>Realizado / previsto · SPI 1,0</small></div>
+      <div class="kpi"><span>Próximo marco</span><b>04/09</b><small>Checkpoint fichas técnicas / preparação</small></div>
+      <div class="kpi"><span>Go-Live</span><b>23/11</b><small>Data vigente</small></div>
+      <div class="kpi"><span>Situação PMO</span><b>Atenção</b><small id="pmot">Carregando banco...</small></div>
+    </div>
+  </div>
+  <div id="nav"></div>
+
+  <div class="tabs">
+    <button class="active" data-tab="exec">1. Executivo</button>
+    <button data-tab="att">2. Atenções & Decisões</button>
+    <button data-tab="next">3. Próximos Marcos</button>
+    <button data-tab="cad">4. Cadência & Governança</button>
+  </div>
+
+  <section id="exec" class="tab active">
+    <div class="panel">
+      <h2>Situação do Plano de Ação</h2>
+      <div id="kpiCards" class="cards"></div>
+    </div>
+    <div class="panel">
+      <h2>Onde estamos</h2>
+      <div class="cards">
+        <div class="card">
+          <span class="tag green">Capacitação</span>
+          <h3>Cadastros 100% realizados</h3>
+          <p>O Status Report TOTVS de 03/09 consolidou as capacitações de cadastros como 100% realizadas. A execução agora se concentra em prática, saneamento e preparação/carga dos dados.</p>
+        </div>
+        <div class="card">
+          <span class="tag red">MIT053</span>
+          <h3>30 itens reportados x 35 objetos controlados</h3>
+          <p>A TOTVS reportou 23 não iniciados, 5 em andamento e 2 concluídos em um universo de 30 itens. O Plano mantém 35 objetos auditados e exige reconciliação dos 5 itens fora desse recorte.</p>
+        </div>
+        <div class="card">
+          <span class="tag amber">Governança</span>
+          <h3>43% oficial x 48% cronograma</h3>
+          <p>O avanço executivo oficial é 43% realizado / 43% previsto / SPI 1,0. O cronograma detalhado registra 48% / 43% / SPI 1,12. A divergência segue aberta na PA-075.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="att" class="tab">
+    <div class="panel">
+      <h2>Principais atenções</h2>
+      <div id="attCards" class="cards"></div>
+    </div>
+    <div class="panel">
+      <h2>Riscos oficiais TOTVS</h2>
+      <div id="riskCards" class="cards"></div>
+    </div>
+    <div class="panel">
+      <h2>Customizações / MITs</h2>
+      <div id="mitCards" class="cards"></div>
+    </div>
+  </section>
+
+  <section id="next" class="tab">
+    <div class="panel">
+      <h2>Próximos marcos</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Período</th><th>Marco</th><th>Status</th><th>Responsabilidade</th><th>Próximo passo</th></tr></thead>
+          <tbody id="nextRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="cad" class="tab">
+    <div class="panel">
+      <h2>Cadência completa do projeto</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Data / Período</th><th>Agenda</th><th>Participantes / Responsável</th><th>Status</th><th>Resultado / Próximo passo</th></tr></thead>
+          <tbody id="cadRows"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel"><div class="note">Toda reunião deve terminar com decisões, ações, responsável nominal, prazo e evidência. Nova demanda entra no Plano antes de aparecer no próximo Status Report.</div></div>
+  </section>
+
+  <div class="muted" style="padding:10px 4px 24px">A visão do cliente não apresenta FCH/horas internas. Fonte executiva de avanço: Status Report TOTVS MIT008 de 03/09/2026. Divergências com o cronograma detalhado permanecem rastreadas no Plano.</div>
+</div>
+
+<script src="/dual-shared/config.js"></script>
+<script src="/dual-shared/shared.js"></script>
+<script>
+document.getElementById('nav').innerHTML=DualFixed.nav('Status Report');
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button,.tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  document.getElementById(b.dataset.tab).classList.add('active');
+});
+(async()=>{
+  const C=DUAL_DB;
+  const [a,m,c,r]=await Promise.all([
+    DualFixed.db(`/rest/v1/action_items?project_id=eq.${C.projectId}&deleted_at=is.null&select=*&order=action_code.asc`),
+    DualFixed.db(`/rest/v1/customizations?project_id=eq.${C.projectId}&deleted_at=is.null&select=*&order=code.asc`),
+    DualFixed.db(`/rest/v1/cadence_events?project_id=eq.${C.projectId}&deleted_at=is.null&select=*&order=sort_order.asc`),
+    DualFixed.db(`/rest/v1/project_risks?project_id=eq.${C.projectId}&deleted_at=is.null&select=*&order=risk_code.asc`)
+  ]);
+  const cnt=s=>a.filter(x=>x.status===s).length;
+  const late=a.filter(x=>x.status==='Atrasado');
+  document.getElementById('pmot').textContent=`${late.length} ação(ões) atrasada(s) no Plano`;
+  document.getElementById('kpiCards').innerHTML=[
+    ['Total de ações',a.length],['Planejado',cnt('Planejado')],['Em andamento',cnt('Em andamento')],['Atrasado',cnt('Atrasado')],['Concluído',cnt('Concluído')]
+  ].map(x=>`<div class="card"><h3>${x[0]}</h3><p style="font-size:28px;font-weight:900">${x[1]}</p></div>`).join('');
+
+  const selected=['PA-075','PA-115','PA-222','PA-035'];
+  const attention=[...late,...a.filter(x=>selected.includes(x.action_code) && !late.some(l=>l.id===x.id))];
+  document.getElementById('attCards').innerHTML=attention.slice(0,8).map(x=>`<div class="card"><span class="tag ${x.status==='Atrasado'?'red':'amber'}">${DualFixed.esc(x.action_code)}</span><h3>${DualFixed.esc(x.title)}</h3><p><b>Status:</b> ${DualFixed.esc(x.status)}</p><p><b>Responsável:</b> ${DualFixed.esc(x.owner||'PENDENTE DE VALIDAÇÃO')}</p><p><b>Próximo passo:</b> ${DualFixed.esc(x.next_step||'A confirmar')}</p></div>`).join('');
+
+  document.getElementById('riskCards').innerHTML=r.map(x=>`<div class="card"><span class="tag ${x.status==='Controlado'?'green':'amber'}">${DualFixed.esc(x.risk_code)}</span><h3>${DualFixed.esc(x.description)}</h3><p><b>Severidade:</b> ${DualFixed.esc(x.severity||'A confirmar')} · <b>Status:</b> ${DualFixed.esc(x.status||'A confirmar')}</p><p><b>Ação:</b> ${DualFixed.esc(x.mitigation||'A confirmar')}</p></div>`).join('')||'<div class="card"><p>Sem riscos oficiais cadastrados.</p></div>';
+
+  document.getElementById('mitCards').innerHTML=m.map(x=>`<div class="card"><span class="tag amber">${DualFixed.esc(x.code)}</span><h3>${DualFixed.esc(x.subject)}</h3><p>${DualFixed.esc(x.signature_status||'A confirmar')}</p></div>`).join('');
+
+  const future=c.filter(x=>['Planejada','A confirmar'].includes(x.status));
+  document.getElementById('nextRows').innerHTML=future.slice(0,10).map(x=>`<tr><td>${DualFixed.esc(x.period_label)}</td><td>${DualFixed.esc(x.agenda)}</td><td>${DualFixed.tag(x.status)}</td><td>${DualFixed.esc(x.participants||'A confirmar')}</td><td>${DualFixed.esc(x.result_next_step||'A confirmar')}</td></tr>`).join('');
+  document.getElementById('cadRows').innerHTML=c.map(x=>`<tr><td>${DualFixed.esc(x.period_label)}</td><td>${DualFixed.esc(x.agenda)}</td><td>${DualFixed.esc(x.participants||'A confirmar')}</td><td>${DualFixed.tag(x.status)}</td><td>${DualFixed.esc(x.result_next_step||'')}</td></tr>`).join('');
+})().catch(e=>alert(e.message));
+</script>
+</body>
+</html>
