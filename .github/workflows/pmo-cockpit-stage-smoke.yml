@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Validar acesso ao D1 STAGE
         run: npx wrangler@4.124.0 d1 execute allamo-pmo-stage --remote --config wrangler.stage.toml --command "SELECT 1 AS ok;"
