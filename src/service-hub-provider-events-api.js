@@ -1,15 +1,21 @@
 // Valkíria Service Hub — fila administrativa de eventos de provedores.
 // Executa após autenticação de usuário e antes do guard tenant-scoped da API principal.
 const shpPathPrefix='service-hub/provider-events';
-const shpCanReview=['admin','pmo','techlead'].includes(user.role);
+const shpHasRealSession=!!user&&user.__portal_no_login!==true;
+const shpCanReview=shpHasRealSession&&['admin','pmo','techlead'].includes(user.role);
 const shpClean=(v,max=500)=>String(v??'').trim().slice(0,max);
 const shpId=()=>`aud:${crypto.randomUUID()}`;
 const shpJsonBody=()=>request.json().catch(()=>({}));
 const shpTable=async name=>!!(await DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1").bind(name).first());
 const shpReady=async()=>await shpTable('service_hub_provider_events');
+const shpAuthorize=()=>{
+  if(!shpHasRealSession)return json({error:'Sessão autenticada obrigatória para revisar a quarentena do WhatsApp',code:'authenticated_session_required'},401);
+  if(!shpCanReview)return json({error:'Sem permissão para revisar a quarentena do WhatsApp'},403);
+  return null;
+};
 
 if(path===shpPathPrefix&&request.method==='GET'){
-  if(!shpCanReview)return json({error:'Sem permissão para revisar a quarentena do WhatsApp'},403);
+  const denied=shpAuthorize();if(denied)return denied;
   if(!(await shpReady()))return json({error:'Quarentena WhatsApp ainda não foi provisionada',code:'whatsapp_ingress_schema_missing'},503);
   const allowed=['unresolved','resolved','rejected','ignored'];
   const status=shpClean(url.searchParams.get('status')||'unresolved',30).toLowerCase();
@@ -20,12 +26,13 @@ if(path===shpPathPrefix&&request.method==='GET'){
 }
 
 if(path.startsWith(shpPathPrefix+'/')&&request.method==='POST'){
-  if(!shpCanReview)return json({error:'Sem permissão para revisar a quarentena do WhatsApp'},403);
+  const denied=shpAuthorize();if(denied)return denied;
   if(!(await shpReady()))return json({error:'Quarentena WhatsApp ainda não foi provisionada',code:'whatsapp_ingress_schema_missing'},503);
   const parts=path.split('/'),eventId=shpClean(parts[2],180),action=shpClean(parts[3],30).toLowerCase();
   if(!eventId||!['resolve','ignore','reject'].includes(action))return json({error:'Ação de quarentena inválida'},400);
   const event=await DB.prepare('SELECT * FROM service_hub_provider_events WHERE id=? LIMIT 1').bind(eventId).first();
   if(!event)return json({error:'Evento de provedor não encontrado'},404);
+  if(String(event.status)!=='unresolved')return json({error:'Evento de provedor já revisado',code:'provider_event_already_reviewed',status:event.status},409);
   const now=new Date().toISOString(),actor=String(user.id||user.email||user.name||'');
 
   if(action==='resolve'){
@@ -34,7 +41,7 @@ if(path.startsWith(shpPathPrefix+'/')&&request.method==='POST'){
     const channel=await DB.prepare("SELECT id,tenant_id,project_id,provider,name FROM service_hub_channels WHERE id=? AND active=1 LIMIT 1").bind(channelId).first();
     if(!channel)return json({error:'Canal não encontrado ou inativo'},404);
     if(String(channel.provider)!=='whatsapp')return json({error:'O evento WhatsApp só pode ser associado a canal WhatsApp'},400);
-    await DB.prepare("UPDATE service_hub_provider_events SET status='resolved',channel_id=?,tenant_id=?,project_id=?,error_code=NULL WHERE id=?").bind(channel.id,channel.tenant_id,channel.project_id,eventId).run();
+    await DB.prepare("UPDATE service_hub_provider_events SET status='resolved',channel_id=?,tenant_id=?,project_id=?,error_code=NULL WHERE id=? AND status='unresolved'").bind(channel.id,channel.tenant_id,channel.project_id,eventId).run();
     if(await shpTable('service_hub_audit_log')){
       await DB.prepare('INSERT INTO service_hub_audit_log(id,tenant_id,entity_type,entity_id,action,actor_type,actor_ref,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(shpId(),channel.tenant_id,'provider_event',eventId,'resolve','user',actor,JSON.stringify({channelId:channel.id,projectId:channel.project_id,provider:'whatsapp'}),now).run();
     }
@@ -44,7 +51,7 @@ if(path.startsWith(shpPathPrefix+'/')&&request.method==='POST'){
 
   const nextStatus=action==='ignore'?'ignored':'rejected';
   const body=await shpJsonBody(),reason=shpClean(body.reason,500);
-  await DB.prepare('UPDATE service_hub_provider_events SET status=?,error_code=? WHERE id=?').bind(nextStatus,reason||action,eventId).run();
+  await DB.prepare("UPDATE service_hub_provider_events SET status=?,error_code=? WHERE id=? AND status='unresolved'").bind(nextStatus,reason||action,eventId).run();
   if(event.tenant_id&&await shpTable('service_hub_audit_log')){
     await DB.prepare('INSERT INTO service_hub_audit_log(id,tenant_id,entity_type,entity_id,action,actor_type,actor_ref,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(shpId(),event.tenant_id,'provider_event',eventId,action,'user',actor,JSON.stringify({reason:reason||null}),now).run();
   }
