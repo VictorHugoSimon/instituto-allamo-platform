@@ -1,0 +1,35 @@
+name: Semeali Commercial Domain CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/src/app/(protected)/dashboard/comercial/**"
+      - "apps/web/src/components/commercial/**"
+      - "supabase/migrations/20260903*.sql"
+      - "scripts/validate-semeali-commercial-domain.mjs"
+      - ".github/workflows/semeali-commercial-domain-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semeali-commercial-domain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate commercial domain contract
+        run: node scripts/validate-semeali-commercial-domain.mjs
