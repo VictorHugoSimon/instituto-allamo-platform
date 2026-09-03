@@ -25,7 +25,7 @@ alter table public.commercial_interactions
   add constraint commercial_interactions_opportunity_same_org_fk
     foreign key (opportunity_id, organization_id)
     references public.commercial_opportunities (id, organization_id)
-    on delete set null;
+    on delete no action;
 
 alter table public.commercial_route_stops
   add constraint commercial_route_stops_route_same_org_fk
@@ -41,11 +41,11 @@ alter table public.commercial_approvals
   add constraint commercial_approvals_opportunity_same_org_fk
     foreign key (opportunity_id, organization_id)
     references public.commercial_opportunities (id, organization_id)
-    on delete set null,
+    on delete no action,
   add constraint commercial_approvals_account_same_org_fk
     foreign key (account_id, organization_id)
     references public.commercial_accounts (id, organization_id)
-    on delete set null;
+    on delete no action;
 
 -- Reescreve as políticas de paradas com referências externas qualificadas.
 drop policy if exists "commercial_route_stops_insert" on public.commercial_route_stops;
