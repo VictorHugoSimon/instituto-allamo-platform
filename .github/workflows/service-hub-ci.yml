@@ -47,6 +47,7 @@ jobs:
           node --check service-hub/src/api.mjs
           node --check service-hub/src/classifier.mjs
           node --check service-hub/src/intake.mjs
+          node --check service-hub/src/providers/meta-whatsapp.mjs
           node --check scripts/harden-service-hub.mjs
           node --check scripts/validate-service-hub-worker.mjs
           node --check scripts/smoke-service-hub-stage.mjs
