@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const worker='public/_worker.js';
 const publicApi=fs.readFileSync('src/madri-pmo-public-api.js','utf8');
 let privateApi=fs.readFileSync('src/madri-pmo-api.js','utf8');
-const governanceApi=fs.readFileSync('src/madri-governance-platform-api.js','utf8');
+let governanceApi=fs.readFileSync('src/madri-governance-platform-api.js','utf8');
 
 // Correção defensiva do contrato de criação de ações MADRI.
 // Os INSERTs em work_items possuem 25 colunas: 24 parâmetros + version=1.
@@ -20,6 +20,22 @@ if(normalizedPrivateInserts<2){
 if(badArityPattern().test(privateApi)){
   throw new Error('API MADRI ainda contém INSERT com 26 valores para 25 colunas.');
 }
+
+// Hardening defensivo da Governance Platform antes de injetar no Worker.
+// 1) Corrige parsing da rota /entity/:id/history.
+// 2) Zero testes/readiness nunca pode resultar em status VERDE.
+const normalizeGovernanceApi=text=>{
+  const badHistory="const [,entity,ref]=path.split('/').slice(1),cfg=mgEntities[entity];";
+  const goodHistory="const p=path.split('/'),entity=p[1],ref=decodeURIComponent(p[2]),cfg=mgEntities[entity];";
+  if(!text.includes(badHistory)&&!text.includes(goodHistory))throw new Error('Contrato da rota de histórico MADRI não localizado.');
+  let out=text.replace(badHistory,goodHistory);
+  const oldOverall="const hard=p1+criticalRisks+blockedInts,soft=Number(a.late||0)+gaps+readyBlock+pendingDec;const overall=hard?'VERMELHO':soft?'AMARELO':'VERDE';const gono=hard?'NO-GO':(!tests||approvedTests<tests||readyBlock)?'PENDENTE DE TESTES':'PRONTO PARA DECISÃO';";
+  const newOverall="const readyTotal=await mgCount(`SELECT COUNT(*) n FROM madri_readiness WHERE project_id=? AND archived_at IS NULL`,ctx.project_id);const hard=p1+criticalRisks+blockedInts,soft=Number(a.late||0)+gaps+readyBlock+pendingDec+(!tests?1:0)+(!readyTotal?1:0);const overall=hard?'VERMELHO':soft?'AMARELO':'VERDE';const gono=hard?'NO-GO':(!tests||approvedTests<tests||readyBlock||!readyTotal)?'PENDENTE DE TESTES':'PRONTO PARA DECISÃO';";
+  if(!out.includes(oldOverall)&&!out.includes(newOverall))throw new Error('Contrato de status/readiness MADRI não localizado.');
+  out=out.replace(oldOverall,newOverall);
+  return out;
+};
+governanceApi=normalizeGovernanceApi(governanceApi);
 
 const sync=(text,start,end,content,needle,indent='')=>{
   const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
@@ -67,9 +83,11 @@ const governanceBlocks=(w.match(/BEGIN MADRI GOVERNANCE PLATFORM API/g)||[]).len
 if(privateBlocks!==1)throw new Error(`Worker MADRI inválido: ${privateBlocks} blocos privados encontrados.`);
 if(publicBlocks!==1)throw new Error(`Worker MADRI inválido: ${publicBlocks} blocos públicos encontrados.`);
 if(governanceBlocks!==1)throw new Error(`Worker MADRI inválido: ${governanceBlocks} blocos de governança encontrados.`);
+if(!w.includes("entity=p[1],ref=decodeURIComponent(p[2]),cfg=mgEntities[entity]"))throw new Error('Worker final sem correção da rota de histórico MADRI.');
+if(!w.includes('(!tests?1:0)+(!readyTotal?1:0)'))throw new Error('Worker final pode sinalizar VERDE sem testes/readiness.');
 if(badArityPattern().test(w))throw new Error('Worker final ainda contém INSERT MADRI com 26 valores para 25 colunas.');
 const workerGoodInserts=w.split(goodInsert).length-1;
 if(workerGoodInserts<2)throw new Error(`Worker final não contém os dois INSERTs MADRI normalizados; encontrado ${workerGoodInserts}.`);
 
 fs.writeFileSync(worker,w);
-console.log(`OK: APIs MADRI PMO + Governance Platform injetadas uma única vez; ${workerGoodInserts} INSERTs de work_items com aridade 25×25 validados.`);
+console.log(`OK: APIs MADRI PMO + Governance Platform injetadas; histórico/readiness endurecidos; ${workerGoodInserts} INSERTs work_items 25×25 validados.`);
