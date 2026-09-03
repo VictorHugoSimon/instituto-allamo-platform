@@ -4,6 +4,7 @@ const shpPathPrefix='service-hub/provider-events';
 const shpHasRealSession=!!user&&user.__portal_no_login!==true;
 const shpCanReview=shpHasRealSession&&['admin','pmo','techlead'].includes(user.role);
 const shpClean=(v,max=500)=>String(v??'').trim().slice(0,max);
+const shpDecode=v=>{try{return decodeURIComponent(String(v??''))}catch{return ''}};
 const shpId=()=>`aud:${crypto.randomUUID()}`;
 const shpJsonBody=()=>request.json().catch(()=>({}));
 const shpTable=async name=>!!(await DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1").bind(name).first());
@@ -29,7 +30,7 @@ if(path===shpPathPrefix&&request.method==='GET'){
 if(path.startsWith(shpPathPrefix+'/')&&request.method==='POST'){
   const denied=shpAuthorize();if(denied)return denied;
   if(!(await shpReady()))return json({error:'Quarentena WhatsApp ainda não foi provisionada',code:'whatsapp_ingress_schema_missing'},503);
-  const parts=path.split('/'),eventId=shpClean(parts[2],180),action=shpClean(parts[3],30).toLowerCase();
+  const parts=path.split('/'),eventId=shpClean(shpDecode(parts[2]),180),action=shpClean(parts[3],30).toLowerCase();
   if(!eventId||!['resolve','ignore','reject'].includes(action))return json({error:'Ação de quarentena inválida'},400);
   const event=await DB.prepare('SELECT * FROM service_hub_provider_events WHERE id=? LIMIT 1').bind(eventId).first();
   if(!event)return json({error:'Evento de provedor não encontrado'},404);
