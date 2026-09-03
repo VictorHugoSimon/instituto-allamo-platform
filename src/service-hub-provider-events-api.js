@@ -1,6 +1,7 @@
 // Valkíria Service Hub — fila administrativa de eventos de provedores.
 // Executa após autenticação de usuário e antes do guard tenant-scoped da API principal.
 const shpPathPrefix='service-hub/provider-events';
+const shpReadinessPath='service-hub/providers/whatsapp/readiness';
 const shpHasRealSession=!!user&&user.__portal_no_login!==true;
 const shpCanReview=shpHasRealSession&&['admin','pmo','techlead'].includes(user.role);
 const shpClean=(v,max=500)=>String(v??'').trim().slice(0,max);
@@ -15,6 +16,49 @@ const shpAuthorize=()=>{
   if(!shpCanReview)return json({error:'Sem permissão para revisar a quarentena do WhatsApp'},403);
   return null;
 };
+
+if(path===shpReadinessPath&&request.method==='GET'){
+  const denied=shpAuthorize();if(denied)return denied;
+  const ingressSchemaReady=await shpReady();
+  const channelsSchemaReady=await shpTable('service_hub_channels');
+  if(!ingressSchemaReady||!channelsSchemaReady)return json({error:'Schema do WhatsApp ainda não foi provisionado',code:'whatsapp_readiness_schema_missing'},503);
+
+  const verifyTokenConfigured=!!shpClean(env.WHATSAPP_VERIFY_TOKEN,500);
+  const appSecretConfigured=!!shpClean(env.WHATSAPP_APP_SECRET,500);
+  const accessTokenConfigured=!!shpClean(env.WHATSAPP_ACCESS_TOKEN,2000);
+  const graphVersionConfigured=/^v\d+\.\d+$/.test(shpClean(env.WHATSAPP_GRAPH_VERSION,30));
+  const wabaIdConfigured=!!shpClean(env.WHATSAPP_WABA_ID,120);
+  const phoneNumberIdConfigured=!!shpClean(env.WHATSAPP_PHONE_NUMBER_ID,120);
+
+  const counts=await DB.prepare("SELECT SUM(CASE WHEN status='unresolved' THEN 1 ELSE 0 END) unresolved,SUM(CASE WHEN status='resolved' THEN 1 ELSE 0 END) resolved,SUM(CASE WHEN status='rejected' THEN 1 ELSE 0 END) rejected,SUM(CASE WHEN status='ignored' THEN 1 ELSE 0 END) ignored,MAX(received_at) last_event_at FROM service_hub_provider_events WHERE provider='whatsapp'").first()||{};
+  const channels=await DB.prepare("SELECT COUNT(*) total,SUM(CASE WHEN external_channel_id IS NOT NULL AND TRIM(external_channel_id)<>'' THEN 1 ELSE 0 END) mapped FROM service_hub_channels WHERE provider='whatsapp' AND active=1").first()||{};
+
+  return json({
+    provider:'whatsapp',
+    schemaReady:true,
+    inboundReady:verifyTokenConfigured&&appSecretConfigured,
+    outboundReady:accessTokenConfigured&&graphVersionConfigured&&phoneNumberIdConfigured,
+    wabaSubscriptionReady:accessTokenConfigured&&graphVersionConfigured&&wabaIdConfigured,
+    configuration:{
+      verifyTokenConfigured,
+      appSecretConfigured,
+      accessTokenConfigured,
+      graphVersionConfigured,
+      wabaIdConfigured,
+      phoneNumberIdConfigured
+    },
+    channels:{active:Number(channels.total||0),mapped:Number(channels.mapped||0)},
+    quarantine:{
+      unresolved:Number(counts.unresolved||0),
+      resolved:Number(counts.resolved||0),
+      rejected:Number(counts.rejected||0),
+      ignored:Number(counts.ignored||0),
+      lastEventAt:counts.last_event_at||null
+    },
+    groups:{status:'external_validation_required'},
+    secretsExposed:false
+  });
+}
 
 if(path===shpPathPrefix&&request.method==='GET'){
   const denied=shpAuthorize();if(denied)return denied;
