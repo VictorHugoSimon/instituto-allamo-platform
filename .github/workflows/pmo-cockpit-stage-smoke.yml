@@ -1,0 +1,44 @@
+name: PMO Cockpit STAGE Smoke
+
+on:
+  push:
+    branches:
+      - feature/pmo-cockpit-stage-smoke
+    paths:
+      - 'scripts/smoke-pmo-cockpit-stage.mjs'
+      - '.github/workflows/pmo-cockpit-stage-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cockpit-stage-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validar acesso ao D1 STAGE
+        run: npx wrangler@4.124.0 d1 execute allamo-pmo-stage --remote --config wrangler.stage.toml --command "SELECT 1 AS ok;"
+
+      - name: Smoke runtime autenticado do Cockpit PMO
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(node -e "console.log(require('node:crypto').randomUUID())")"
+          echo "::add-mask::$TOKEN"
+          cleanup() {
+            npx wrangler@4.124.0 d1 execute allamo-pmo-stage --remote --config wrangler.stage.toml --command "DELETE FROM sessions WHERE token='$TOKEN';" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          npx wrangler@4.124.0 d1 execute allamo-pmo-stage --remote --config wrangler.stage.toml --command "INSERT INTO sessions (token,user_id,expires_at) SELECT '$TOKEN',id,datetime('now','+10 minutes') FROM users WHERE role IN ('pmo','admin') AND (status IS NULL OR status <> 'Bloqueado') ORDER BY CASE role WHEN 'pmo' THEN 0 ELSE 1 END,id LIMIT 1;" >/dev/null
+          ALLAMO_PMO_SMOKE_TOKEN="$TOKEN" node scripts/smoke-pmo-cockpit-stage.mjs
