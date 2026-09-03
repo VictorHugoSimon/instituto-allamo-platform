@@ -2,8 +2,8 @@ import fs from 'node:fs';
 
 const file='public/_worker.js';
 let worker=fs.readFileSync(file,'utf8');
-const marker="code:'authenticated_session_required'";
-if(worker.includes(marker)){
+const deleteGuard="user.__portal_no_login === true && request.method === 'DELETE'";
+if(worker.includes(deleteGuard)){
   console.log('OK: proteção de exclusões no modo sem login já aplicada.');
   process.exit(0);
 }
