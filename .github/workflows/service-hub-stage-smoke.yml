@@ -1,0 +1,68 @@
+name: Valkiria Service Hub STAGE Smoke
+
+on:
+  workflow_run:
+    workflows: ['Release STAGE - Auto + Manual Gate']
+    types: [completed]
+    branches: [develop]
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: valkiria-service-hub-stage-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout do commit efetivamente publicado
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Marcar smoke em andamento
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${TARGET_SHA}" -f state=pending -f context=allamo/service-hub-stage-smoke -f description='Smoke real do Valkíria Service Hub em andamento'
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Validar autenticação e D1 Stage
+        run: npx --yes wrangler@4.124.0 whoami
+      - name: Smoke CRUD real do Service Hub
+        run: node scripts/smoke-service-hub-stage.mjs
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+          ALLAMO_STAGE_WRANGLER_CONFIG: wrangler.stage.toml
+      - name: Registrar smoke aprovado
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${TARGET_SHA}" -f state=success -f context=allamo/service-hub-stage-smoke -f description='Valkíria Service Hub validado no STAGE real'
+      - name: Registrar smoke reprovado
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${TARGET_SHA}" -f state=failure -f context=allamo/service-hub-stage-smoke -f description='Smoke do Valkíria Service Hub falhou no STAGE'
+      - name: Resumo
+        if: always()
+        run: |
+          echo '### Valkíria Service Hub · STAGE Smoke' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Commit publicado: ${{ github.event.workflow_run.head_sha }}' >> "$GITHUB_STEP_SUMMARY"
+          echo '- STAGE: https://allamo-pmo-stage.pages.dev' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Verificações: readiness, CRUD, redaction, SLA de primeira resposta, auditoria e isolamento tenant' >> "$GITHUB_STEP_SUMMARY"
