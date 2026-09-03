@@ -1,0 +1,1 @@
+Testes do domínio do Cockpit Executivo 2.0 são executados com `node:test` e validam exclusivamente regras do Painel PMO. Este arquivo existe apenas para documentar o escopo dos testes e não altera runtime.
