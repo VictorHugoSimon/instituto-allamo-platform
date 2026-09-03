@@ -37,15 +37,22 @@ const normalizeGovernanceApi=text=>{
 };
 governanceApi=normalizeGovernanceApi(governanceApi);
 
+const stripAllBlocks=(text,start,end)=>{
+  let out=text,count=0;
+  while(out.includes(start)){
+    const a=out.indexOf(start),b=out.indexOf(end,a);
+    if(b<0)throw new Error('Marcador final ausente: '+end);
+    out=out.slice(0,a)+out.slice(b+end.length);
+    count++;
+    if(count>20)throw new Error('Quantidade anormal de blocos duplicados: '+start);
+  }
+  return out;
+};
 const sync=(text,start,end,content,needle,indent='')=>{
   const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
-  if(text.includes(start)){
-    const a=text.indexOf(start),b=text.indexOf(end,a);
-    if(b<0)throw new Error('Marcador final ausente: '+end);
-    return text.slice(0,a)+block+text.slice(b+end.length);
-  }
-  if(!text.includes(needle))throw new Error('Ponto de injeção MADRI não encontrado: '+needle);
-  return text.replace(needle,block+'\n'+needle);
+  const clean=stripAllBlocks(text,start,end);
+  if(!clean.includes(needle))throw new Error('Ponto de injeção MADRI não encontrado: '+needle);
+  return clean.replace(needle,block+'\n'+needle);
 };
 
 let w=fs.readFileSync(worker,'utf8');
@@ -74,8 +81,8 @@ w=sync(
   '    '
 );
 
-// Hardening final: também corrige qualquer bloco MADRI legado já presente no Worker
-// e impede publicação com rotas privadas duplicadas ou SQL de aridade inválida.
+// Hardening final: corrige qualquer bloco MADRI legado já presente no Worker,
+// garante exatamente uma cópia canônica e impede SQL de aridade inválida.
 w=normalizeInsertArity(w);
 const privateBlocks=(w.match(/BEGIN MADRI PMO PRIVATE API/g)||[]).length;
 const publicBlocks=(w.match(/BEGIN MADRI PMO PUBLIC API/g)||[]).length;
@@ -90,4 +97,4 @@ const workerGoodInserts=w.split(goodInsert).length-1;
 if(workerGoodInserts<2)throw new Error(`Worker final não contém os dois INSERTs MADRI normalizados; encontrado ${workerGoodInserts}.`);
 
 fs.writeFileSync(worker,w);
-console.log(`OK: APIs MADRI PMO + Governance Platform injetadas; histórico/readiness endurecidos; ${workerGoodInserts} INSERTs work_items 25×25 validados.`);
+console.log(`OK: APIs MADRI PMO + Governance Platform canônicas; blocos legados deduplicados; histórico/readiness endurecidos; ${workerGoodInserts} INSERTs work_items 25×25 validados.`);
