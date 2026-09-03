@@ -1,0 +1,56 @@
+name: Semeali Commercial Domain CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/src/app/(protected)/dashboard/comercial/**"
+      - "apps/web/src/components/commercial/**"
+      - "supabase/migrations/20260903*.sql"
+      - "migrations/2026-09-03-commercial-*.sql"
+      - "migrations/2026-09-03-access-invitations.sql"
+      - "src/commercial-sales-intelligence-*.js"
+      - "src/access-invitation-*.js"
+      - "scripts/harden-commercial-sales-intelligence.mjs"
+      - "scripts/harden-fch-hours.mjs"
+      - "scripts/ensure-additive-schema.mjs"
+      - "scripts/ensure-semeali-tenant.mjs"
+      - "scripts/validate-semeali-commercial-domain.mjs"
+      - "scripts/validate-semeali-d1-sales-intelligence.mjs"
+      - ".github/workflows/deploy-stage.yml"
+      - ".github/workflows/semeali-commercial-domain-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semeali-commercial-domain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build canonical portal artifact
+        run: npm run build:work
+
+      - name: Validate Next/Supabase commercial contract
+        run: node scripts/validate-semeali-commercial-domain.mjs
+
+      - name: Validate canonical D1 Sales Intelligence contract
+        run: node scripts/validate-semeali-d1-sales-intelligence.mjs

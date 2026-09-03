@@ -85,3 +85,7 @@ for(const marker of ['fch-hours-ingest','fch-hours-status','fch-curve','allamo-f
   if(!combined.includes(marker))throw new Error('Integração FCH incompleta: '+marker);
 }
 console.log('OK: FCH Drive read-only priorizado em OPR/MADRI, com ingestão segura, report e Curva S automática.');
+
+// O Sales Intelligence usa o mesmo artefato canônico do portal e permanece
+// idempotente. O encadeamento aqui evita criar uma segunda pipeline de build.
+await import('./harden-commercial-sales-intelligence.mjs');

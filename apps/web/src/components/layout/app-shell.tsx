@@ -4,50 +4,23 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
 
+import { getTenantExperience } from "@/lib/tenants/catalog";
+
 import { SignOutButton } from "./sign-out-button";
 
 type AppShellProps = {
   children: ReactNode;
   organizationName: string;
+  organizationSlug: string;
   userEmail: string;
+  isPlatformAdmin?: boolean;
 };
 
-const navigationItems = [
-  {
-    href: "/dashboard",
-    label: "Visão geral",
-  },
-  {
-    href: "/dashboard/projetos",
-    label: "Projetos",
-    disabled: true,
-  },
-  {
-    href: "/dashboard/contatos",
-    label: "Contatos e CRM",
-    disabled: true,
-  },
-  {
-    href: "/dashboard/agenda",
-    label: "Agenda",
-    disabled: true,
-  },
-  {
-    href: "/dashboard/financeiro",
-    label: "Financeiro",
-    disabled: true,
-  },
-  {
-    href: "/dashboard/documentos",
-    label: "Documentos",
-    disabled: true,
-  },
-  {
-    href: "/dashboard/inteligencia",
-    label: "Inteligência",
-    disabled: true,
-  },
-];
+type NavigationItem = {
+  href: string;
+  label: string;
+  disabled?: boolean;
+};
 
 function getInitials(value: string) {
   const normalizedValue = value.trim();
@@ -63,16 +36,46 @@ function getInitials(value: string) {
     .join("");
 }
 
+function getNavigationItems(organizationSlug: string): NavigationItem[] {
+  const experience = getTenantExperience(organizationSlug);
+
+  if (experience.modules.includes("commercial")) {
+    return [
+      { href: "/dashboard", label: "Visão geral" },
+      { href: "/dashboard/comercial", label: "Comercial & Inteligência" },
+    ];
+  }
+
+  return [
+    { href: "/dashboard", label: "Visão geral" },
+    { href: "/dashboard/projetos", label: "Projetos", disabled: true },
+    { href: "/dashboard/contatos", label: "Contatos e CRM", disabled: true },
+    { href: "/dashboard/agenda", label: "Agenda", disabled: true },
+    { href: "/dashboard/financeiro", label: "Financeiro", disabled: true },
+    { href: "/dashboard/documentos", label: "Documentos", disabled: true },
+    { href: "/dashboard/inteligencia", label: "Inteligência", disabled: true },
+  ];
+}
+
 export function AppShell({
   children,
   organizationName,
+  organizationSlug,
   userEmail,
+  isPlatformAdmin = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   const organizationInitials = getInitials(organizationName);
   const userInitials = getInitials(userEmail.split("@")[0]);
+  const experience = getTenantExperience(organizationSlug);
+  const navigationItems = getNavigationItems(organizationSlug);
+  const normalizedSlug = organizationSlug.toLowerCase();
+  const showControlCenter =
+    isPlatformAdmin ||
+    normalizedSlug === "allamo" ||
+    normalizedSlug === "instituto-allamo" ||
+    normalizedSlug === "instituto-allamo-platform";
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -103,7 +106,7 @@ export function AppShell({
               {organizationName}
             </p>
             <p className="truncate text-xs text-slate-500">
-              Plataforma Enterprise
+              {experience.productLabel}
             </p>
           </div>
 
@@ -126,8 +129,7 @@ export function AppShell({
             {navigationItems.map((item) => {
               const isActive =
                 pathname === item.href ||
-                (item.href !== "/dashboard" &&
-                  pathname.startsWith(`${item.href}/`));
+                (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
 
               if (item.disabled) {
                 return (
@@ -136,7 +138,6 @@ export function AppShell({
                     key={item.href}
                   >
                     <span>{item.label}</span>
-
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                       Em breve
                     </span>
@@ -167,17 +168,36 @@ export function AppShell({
           </p>
 
           <div className="space-y-1">
-            <div className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400">
-              <span>Usuários e acessos</span>
+            {showControlCenter ? (
+              <Link
+                className={[
+                  "block rounded-lg px-3 py-2.5 text-sm font-semibold transition",
+                  pathname.startsWith("/dashboard/control-center")
+                    ? "bg-slate-950 text-white"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+                ].join(" ")}
+                href="/dashboard/control-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Államo Control Center
+              </Link>
+            ) : null}
 
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                Em breve
-              </span>
-            </div>
+            <Link
+              className={[
+                "block rounded-lg px-3 py-2.5 text-sm font-semibold transition",
+                pathname.startsWith("/dashboard/acessos")
+                  ? "bg-slate-950 text-white"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+              ].join(" ")}
+              href="/dashboard/acessos"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Usuários e acessos
+            </Link>
 
             <div className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400">
               <span>Configurações</span>
-
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 Em breve
               </span>
@@ -224,6 +244,9 @@ export function AppShell({
           </div>
 
           <div className="hidden items-center gap-3 sm:flex">
+            <span className="hidden text-xs font-semibold text-slate-400 lg:block">
+              {experience.segmentLabel}
+            </span>
             <button
               aria-label="Notificações"
               className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
@@ -242,7 +265,7 @@ export function AppShell({
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
 
         <footer className="border-t border-slate-200 bg-white px-4 py-5 text-center text-xs text-slate-500 sm:px-6 lg:px-8">
-          Instituto Államo Platform · Ambiente de desenvolvimento
+          Tecnologia Államo · ambiente de desenvolvimento
         </footer>
       </div>
     </div>
