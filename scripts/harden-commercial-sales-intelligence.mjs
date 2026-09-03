@@ -2,7 +2,13 @@ import fs from 'node:fs';
 
 const worker='public/_worker.js';
 const index='public/index.html';
-const api=fs.readFileSync('src/commercial-sales-intelligence-api.js','utf8');
+let api=fs.readFileSync('src/commercial-sales-intelligence-api.js','utf8');
+// No core D1, `usuario` é o perfil de campo do cliente. Ele pode registrar
+// visita, rota e solicitar aprovação, mas continua fora de csWrite/csApprove.
+api=api.replace(
+  "const csField=['admin','pmo','gestor','techlead','comercial','vendedor','representante'].includes(user.role);",
+  "const csField=['admin','pmo','gestor','techlead','comercial','vendedor','representante','usuario'].includes(user.role);"
+);
 const routeGuard=fs.readFileSync('src/commercial-sales-intelligence-route-guard.js','utf8');
 const ui=fs.readFileSync('src/commercial-sales-intelligence-ui.js','utf8');
 const accessPublicApi=fs.readFileSync('src/access-invitation-public-api.js','utf8');
@@ -81,6 +87,7 @@ const combined=fs.readFileSync(worker,'utf8')+'\n'+fs.readFileSync(index,'utf8')
 for(const marker of [
   'BEGIN ALLAMO SALES INTELLIGENCE API',
   "path==='commercial-summary'",
+  "'representante','usuario'].includes(user.role)",
   'Conta não pertence à empresa',
   'Conta incompatível na rota',
   'data-allamo-sales-intelligence',
