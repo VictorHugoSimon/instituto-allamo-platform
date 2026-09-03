@@ -3,6 +3,7 @@ const read=path=>fs.readFileSync(path,'utf8');
 const nav=read('src/pmo-cockpit-navigation.js');
 const hardener=read('scripts/harden-pmo-cockpit-navigation.mjs');
 const pkg=JSON.parse(read('package.json'));
+const html=read('public/index.html');
 const must=(text,needle,label)=>{if(!text.includes(needle))throw new Error(`Ausente: ${label} (${needle})`)};
 
 must(nav,"window.__allamoPmoCockpitNavigationLoaded",'proteção idempotente da navegação');
@@ -20,4 +21,12 @@ must(hardener,"html.replace('</body>',block+'\\n</body>')",'injeção antes do f
 
 const build=String(pkg.scripts?.['build:work']||'');
 must(build,'node scripts/harden-pmo-cockpit-navigation.mjs','pipeline principal executa hardening PMO');
-console.log('OK: Cockpit Executivo integrado à navegação após Visão Executiva, sem API/mutation e persistente no build.');
+
+must(html,'<!-- BEGIN ALLAMO PMO COCKPIT NAVIGATION -->','artefato contém marcador inicial da navegação');
+must(html,'<!-- END ALLAMO PMO COCKPIT NAVIGATION -->','artefato contém marcador final da navegação');
+must(html,"link.href='/pmo-cockpit/'",'artefato contém rota canônica do Cockpit');
+must(html,'Cockpit Executivo','artefato contém rótulo executivo');
+const occurrences=(html.match(/id=NAV_ID/g)||[]).length;
+if(occurrences!==1)throw new Error(`Navegação PMO deveria ser injetada uma vez; encontrei ${occurrences}.`);
+
+console.log('OK: Cockpit Executivo integrado após Visão Executiva, sem API/mutation e materializado uma única vez no build.');
