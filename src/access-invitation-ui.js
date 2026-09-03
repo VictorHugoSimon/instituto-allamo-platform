@@ -5,7 +5,7 @@
   const ROOT='allamo-access-invitation-root';
   const BTN='allamo-access-invitation-button';
   const STYLE='allamo-access-invitation-style';
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const session=()=>{try{return JSON.parse(localStorage.getItem('allamo_session')||'null')}catch(e){return null}};
   const token=()=>session()?.token||localStorage.getItem('allamo_session_token')||localStorage.getItem('token')||localStorage.getItem('allamo_token')||sessionStorage.getItem('token')||'';
   const api=async(path,options={})=>{const t=token();const headers={'content-type':'application/json',...(options.headers||{})};if(t)headers.authorization='Bearer '+t;const r=await fetch('/api/'+path,{...options,headers,cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Erro '+r.status);return d};
