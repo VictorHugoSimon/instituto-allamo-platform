@@ -49,6 +49,7 @@ must(webhook,'shwMetaRedact','redaction antes de persistir');
 must(reviewApi,"['admin','pmo','techlead']",'RBAC restrito da quarentena');
 must(reviewApi,"user.__portal_no_login!==true",'PMO sintético sem login bloqueado na quarentena');
 must(reviewApi,"authenticated_session_required",'fila exige sessão real');
+must(reviewApi,"decodeURIComponent",'ID URL-encoded da quarentena é decodificado');
 must(reviewApi,"path===shpPathPrefix&&request.method==='GET'",'listagem da quarentena');
 must(reviewApi,"['resolve','ignore','reject']",'decisões da quarentena');
 must(reviewApi,"provider_event_already_reviewed",'máquina de estados bloqueia nova decisão sobre evento finalizado');
