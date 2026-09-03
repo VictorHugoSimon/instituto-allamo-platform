@@ -96,6 +96,11 @@ jobs:
           ALLAMO_SMOKE_COMPANIES: ${{ vars.ALLAMO_SMOKE_COMPANIES }}
       - name: Smoke dos tenants essenciais pós-deploy
         run: node scripts/smoke-core-tenants.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage
+      - name: Smoke CRUD real Valkíria Service Hub
+        run: node scripts/smoke-service-hub-stage.mjs
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+          ALLAMO_STAGE_WRANGLER_CONFIG: wrangler.stage.toml
       - name: Smoke CRUD real POP OPR
         run: npm run smoke:opr-pop
         env: { ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev }
@@ -126,5 +131,5 @@ jobs:
           echo "- Backup D1: obrigatório e retido por 14 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Smokes: governança multitenant + tenants + POP OPR + OPR Governance Platform v2" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smokes: governança multitenant + tenants + Valkíria Service Hub + POP OPR + OPR Governance Platform v2" >> "$GITHUB_STEP_SUMMARY"
           echo "- Reuniões OPR: sincronização idempotente para Plano de Ação + Cadência" >> "$GITHUB_STEP_SUMMARY"

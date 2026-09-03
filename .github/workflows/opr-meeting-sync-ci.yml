@@ -32,21 +32,25 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const dir='data/opr/meeting-actions';
-          const files=fs.readdirSync(dir).filter(x=>x.endsWith('.json'));
+          const files=fs.readdirSync(dir).filter(x=>x.endsWith('.json')).sort();
           if(!files.length) throw new Error('Nenhum manifesto OPR encontrado');
-          const sources=new Set();
+          const globalSources=new Set();
+          const reusedSources=new Set();
           for(const file of files){
             const m=JSON.parse(fs.readFileSync(`${dir}/${file}`,'utf8'));
             if(!m.meeting_date||!m.project_id||!Array.isArray(m.actions)||!m.actions.length) throw new Error(`${file}: estrutura incompleta`);
+            const fileSources=new Set();
             for(const a of m.actions){
               for(const f of ['source','front','action','status','impact','next_step','evidence']) if(!String(a[f]??'').trim()) throw new Error(`${file}: ação sem ${f}`);
               if(!['Planejado','Em andamento','Atrasado','Concluído'].includes(a.status)) throw new Error(`${file}: status inválido em ${a.source}`);
-              if(sources.has(a.source)) throw new Error(`source duplicado: ${a.source}`);
-              sources.add(a.source);
+              if(fileSources.has(a.source)) throw new Error(`${file}: source duplicado dentro do mesmo manifesto: ${a.source}`);
+              fileSources.add(a.source);
+              if(globalSources.has(a.source)) reusedSources.add(a.source);
+              globalSources.add(a.source);
             }
             if(m.cadence){
               if(!m.cadence.source||!m.cadence.agenda||!['Realizada','Planejada','A confirmar','Cancelada','Não realizada'].includes(m.cadence.status)) throw new Error(`${file}: cadência inválida`);
             }
           }
-          console.log(`[OK] ${files.length} manifesto(s), ${sources.size} ação(ões) únicas.`);
+          console.log(`[OK] ${files.length} manifesto(s), ${globalSources.size} source(s) distintos, ${reusedSources.size} source(s) evoluído(s) entre reuniões.`);
           NODE
