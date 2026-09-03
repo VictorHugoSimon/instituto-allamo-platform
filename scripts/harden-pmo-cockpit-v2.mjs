@@ -4,9 +4,9 @@ const workerFile='public/_worker.js';
 const apiFile='src/pmo-cockpit-api.js';
 const start='    // BEGIN ALLAMO PMO COCKPIT V2';
 const end='    // END ALLAMO PMO COCKPIT V2';
-// Ponto estável do Worker base. Não dependemos de Sprint Governance já ter sido injetado,
-// pois o gate isolado do Cockpit executa este hardener diretamente sobre o Worker versionado.
-const needle='    // BEGIN ALLAMO REPORT MANAGEMENT';
+// Ponto-base estável do Worker bruto, usado também pela montagem das APIs do portal.
+// O hardener precisa funcionar tanto antes quanto depois dos demais blocos serem injetados.
+const needle="if (path === 'projects' && request.method === 'GET')";
 
 const api=fs.readFileSync(apiFile,'utf8');
 let worker=fs.readFileSync(workerFile,'utf8');
@@ -17,8 +17,9 @@ if(worker.includes(start)){
   if(b<0)throw new Error('Marcador final do PMO Cockpit v2 ausente.');
   worker=worker.slice(0,a)+block+worker.slice(b+end.length);
 }else{
-  if(!worker.includes(needle))throw new Error('Ponto de injeção antes do Report Management não encontrado.');
-  worker=worker.replace(needle,block+'\n'+needle);
+  const p=worker.indexOf(needle);
+  if(p<0)throw new Error('Ponto-base projects GET não encontrado no Worker.');
+  worker=worker.slice(0,p)+block+'\n    '+worker.slice(p);
 }
 
 if(!worker.includes("path==='pmo-cockpit'"))throw new Error('Endpoint pmo-cockpit não foi injetado.');
