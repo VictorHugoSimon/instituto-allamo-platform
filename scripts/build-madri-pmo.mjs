@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const worker='public/_worker.js';
 const publicApi=fs.readFileSync('src/madri-pmo-public-api.js','utf8');
 let privateApi=fs.readFileSync('src/madri-pmo-api.js','utf8');
+const governanceApi=fs.readFileSync('src/madri-governance-platform-api.js','utf8');
 
 // Correção defensiva do contrato de criação de ações MADRI.
 // Os INSERTs em work_items possuem 25 colunas: 24 parâmetros + version=1.
@@ -48,17 +49,27 @@ w=sync(
   "    if (path === 'projects' && request.method === 'GET')",
   '    '
 );
+w=sync(
+  w,
+  '    // BEGIN MADRI GOVERNANCE PLATFORM API',
+  '    // END MADRI GOVERNANCE PLATFORM API',
+  governanceApi,
+  "    if (path === 'projects' && request.method === 'GET')",
+  '    '
+);
 
 // Hardening final: também corrige qualquer bloco MADRI legado já presente no Worker
 // e impede publicação com rotas privadas duplicadas ou SQL de aridade inválida.
 w=normalizeInsertArity(w);
 const privateBlocks=(w.match(/BEGIN MADRI PMO PRIVATE API/g)||[]).length;
 const publicBlocks=(w.match(/BEGIN MADRI PMO PUBLIC API/g)||[]).length;
+const governanceBlocks=(w.match(/BEGIN MADRI GOVERNANCE PLATFORM API/g)||[]).length;
 if(privateBlocks!==1)throw new Error(`Worker MADRI inválido: ${privateBlocks} blocos privados encontrados.`);
 if(publicBlocks!==1)throw new Error(`Worker MADRI inválido: ${publicBlocks} blocos públicos encontrados.`);
+if(governanceBlocks!==1)throw new Error(`Worker MADRI inválido: ${governanceBlocks} blocos de governança encontrados.`);
 if(badArityPattern().test(w))throw new Error('Worker final ainda contém INSERT MADRI com 26 valores para 25 colunas.');
 const workerGoodInserts=w.split(goodInsert).length-1;
 if(workerGoodInserts<2)throw new Error(`Worker final não contém os dois INSERTs MADRI normalizados; encontrado ${workerGoodInserts}.`);
 
 fs.writeFileSync(worker,w);
-console.log(`OK: APIs MADRI PMO injetadas uma única vez; ${workerGoodInserts} INSERTs de work_items com aridade 25×25 validados.`);
+console.log(`OK: APIs MADRI PMO + Governance Platform injetadas uma única vez; ${workerGoodInserts} INSERTs de work_items com aridade 25×25 validados.`);
