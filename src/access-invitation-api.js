@@ -40,15 +40,17 @@ if(path==='access-invitations'&&request.method==='POST'){
     .bind(id,companyId,email,role,tokenHash,user.name,String(expiresHours)).run();
   const row=await DB.prepare('SELECT expires_at FROM access_invitations WHERE id=?').bind(id).first();
   const inviteUrl=url.origin+'/?convite='+encodeURIComponent(token);
-  let email_sent=false;
+  let email_status='nao_solicitado';
   if(b.send_email!==false){
+    await sendEmail(env,email,'Convite de acesso — '+company.name,'Você recebeu um convite para acessar '+company.name+' na plataforma Államo.\n\nAbra o link abaixo para definir sua própria senha:\n'+inviteUrl+'\n\nO convite expira em '+expiresHours+' horas. Se você não esperava este convite, ignore esta mensagem.');
     try{
-      await sendEmail(env,email,'Convite de acesso — '+company.name,'Você recebeu um convite para acessar '+company.name+' na plataforma Államo.\n\nAbra o link abaixo para definir sua própria senha:\n'+inviteUrl+'\n\nO convite expira em '+expiresHours+' horas. Se você não esperava este convite, ignore esta mensagem.');
-      email_sent=true;
-    }catch(e){ email_sent=false; }
+      const outbox=await DB.prepare('SELECT status FROM email_outbox WHERE to_email=? ORDER BY id DESC LIMIT 1').bind(email).first();
+      email_status=String(outbox?.status||'desconhecido');
+    }catch(e){ email_status='desconhecido'; }
   }
-  await logEvent(env,user,'acesso:convite-criar',email,company.name+' · '+role);
-  return json({ok:true,id,email,role,company_id:companyId,company_name:company.name,expires_at:row?.expires_at||null,invite_url:inviteUrl,email_sent},201);
+  const email_sent=email_status==='enviado';
+  await logEvent(env,user,'acesso:convite-criar',email,company.name+' · '+role+' · email:'+email_status);
+  return json({ok:true,id,email,role,company_id:companyId,company_name:company.name,expires_at:row?.expires_at||null,invite_url:inviteUrl,email_sent,email_status},201);
 }
 
 if(path.match(/^access-invitations\/[^/]+\/cancel$/)&&request.method==='POST'){
