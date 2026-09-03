@@ -47,8 +47,12 @@ must(webhook,'shwMetaSenderHash','hash do remetente');
 must(webhook,'shwMetaRedact','redaction antes de persistir');
 
 must(reviewApi,"['admin','pmo','techlead']",'RBAC restrito da quarentena');
+must(reviewApi,"user.__portal_no_login!==true",'PMO sintético sem login bloqueado na quarentena');
+must(reviewApi,"authenticated_session_required",'fila exige sessão real');
 must(reviewApi,"path===shpPathPrefix&&request.method==='GET'",'listagem da quarentena');
 must(reviewApi,"['resolve','ignore','reject']",'decisões da quarentena');
+must(reviewApi,"provider_event_already_reviewed",'máquina de estados bloqueia nova decisão sobre evento finalizado');
+must(reviewApi,"WHERE id=? AND status='unresolved'",'transição concorrente somente a partir de unresolved');
 must(reviewApi,"String(channel.provider)!=='whatsapp'",'resolução apenas para canal WhatsApp');
 must(reviewApi,"SET status='resolved',channel_id=?,tenant_id=?,project_id=?",'resolução atribui tenant/projeto pelo canal');
 must(reviewApi,'safeProviderMetadata','metadata filtrada');
