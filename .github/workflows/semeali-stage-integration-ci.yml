@@ -1,0 +1,43 @@
+name: Semeali Stage Integration CI
+
+on:
+  pull_request:
+    paths:
+      - "migrations/2026-09-03-commercial-*.sql"
+      - "migrations/2026-09-03-access-invitations.sql"
+      - "src/commercial-sales-intelligence-*.js"
+      - "src/access-invitation-*.js"
+      - "scripts/harden-commercial-sales-intelligence.mjs"
+      - "scripts/harden-fch-hours.mjs"
+      - "scripts/ensure-additive-schema.mjs"
+      - "scripts/ensure-semeali-tenant.mjs"
+      - "scripts/validate-semeali-d1-sales-intelligence.mjs"
+      - ".github/workflows/deploy-stage.yml"
+      - ".github/workflows/semeali-stage-integration-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semeali-stage-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build canonical portal artifact
+        run: npm run build:work
+      - name: Validate Semeali D1 contract
+        run: node scripts/validate-semeali-d1-sales-intelligence.mjs

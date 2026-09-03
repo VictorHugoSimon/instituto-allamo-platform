@@ -40,6 +40,8 @@ jobs:
         run: npm ci
       - name: Gerar um único artefato de release
         run: npm run build:work
+      - name: Gate específico Semeali Sales Intelligence
+        run: node scripts/validate-semeali-d1-sales-intelligence.mjs
       - name: Gate consolidado da plataforma
         run: npm run test:release
       - name: Registrar gates aprovados
@@ -73,6 +75,7 @@ jobs:
         run: |
           node scripts/ensure-additive-schema.mjs --env=stage
           node scripts/repair-core-tenants-portable.mjs --env=stage
+          node scripts/ensure-semeali-tenant.mjs
       - name: Aplicar somente schema aditivo no Stage
         timeout-minutes: 10
         run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
@@ -82,6 +85,11 @@ jobs:
       - name: Pós-validar reparo dos tenants essenciais no Stage
         timeout-minutes: 10
         run: node scripts/repair-core-tenants-portable.mjs --env=stage
+      - name: Provisionar Semeali somente no Stage
+        timeout-minutes: 10
+        run: |
+          node scripts/ensure-semeali-tenant.mjs --apply --confirm=ENSURE-SEMEALI-STAGE
+          node scripts/ensure-semeali-tenant.mjs
       - name: Materializar configuração exclusiva de Stage
         run: |
           cp wrangler.stage.toml wrangler.toml
@@ -135,5 +143,6 @@ jobs:
           echo "- Backup D1: obrigatório e retido por 14 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação, cada etapa com timeout dedicado" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Semeali: dry-run + provisionamento idempotente exclusivo de Stage; nenhum usuário/senha automático" >> "$GITHUB_STEP_SUMMARY"
           echo "- Smokes: governança multitenant + tenants + Valkíria Service Hub + POP OPR + OPR Governance Platform v2" >> "$GITHUB_STEP_SUMMARY"
           echo "- Reuniões OPR: sincronização idempotente para Plano de Ação + Cadência" >> "$GITHUB_STEP_SUMMARY"
