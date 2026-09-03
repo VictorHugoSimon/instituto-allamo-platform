@@ -5,7 +5,7 @@ export function verifyMetaChallenge(url, verifyToken) {
   const mode = String(url.searchParams.get('hub.mode') ?? '');
   const token = String(url.searchParams.get('hub.verify_token') ?? '');
   const challenge = String(url.searchParams.get('hub.challenge') ?? '');
-  if (mode !== 'subscribe' || !verifyToken || !safeEqualText(token, String(verifyToken))) return null;
+  if (mode !== 'subscribe' || !verifyToken || !metaSafeEqualText(token, String(verifyToken))) return null;
   return challenge;
 }
 
@@ -24,7 +24,7 @@ export async function verifyMetaSignature(rawBody, signatureHeader, appSecret) {
     await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(String(rawBody ?? '')))
   );
   const expected = 'sha256=' + Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
-  return safeEqualText(expected.toLowerCase(), header.toLowerCase());
+  return metaSafeEqualText(expected.toLowerCase(), header.toLowerCase());
 }
 
 export function parseMetaWebhook(rawBody, { resolveExternalChannelId } = {}) {
@@ -48,31 +48,31 @@ export function parseMetaWebhook(rawBody, { resolveExternalChannelId } = {}) {
       const value = change?.value ?? {};
 
       for (const message of Array.isArray(value.messages) ? value.messages : []) {
-        const providerMessageId = clean(message?.id, 300);
+        const providerMessageId = metaClean(message?.id, 300);
         if (!providerMessageId) continue;
 
-        const occurredAt = fromEpoch(message?.timestamp);
+        const occurredAt = metaFromEpoch(message?.timestamp);
         if (!occurredAt) {
           errors.push({ providerMessageId, error: 'invalid_timestamp' });
           continue;
         }
 
-        const type = clean(message?.type, 40);
-        const text = extractText(message);
+        const type = metaClean(message?.type, 40);
+        const text = metaExtractText(message);
         const externalChannelId = typeof resolveExternalChannelId === 'function'
-          ? clean(resolveExternalChannelId({ entry, change, value, message }), 300)
+          ? metaClean(resolveExternalChannelId({ entry, change, value, message }), 300)
           : '';
 
         messages.push({
           provider: 'whatsapp',
           providerMessageId,
           externalChannelId: externalChannelId || null,
-          senderRef: clean(message?.from, 180) || null,
+          senderRef: metaClean(message?.from, 180) || null,
           occurredAt,
           text,
           providerType: type || 'unknown',
-          phoneNumberId: clean(value?.metadata?.phone_number_id, 120) || null,
-          displayPhoneNumber: clean(value?.metadata?.display_phone_number, 80) || null,
+          phoneNumberId: metaClean(value?.metadata?.phone_number_id, 120) || null,
+          displayPhoneNumber: metaClean(value?.metadata?.display_phone_number, 80) || null,
           requiresChannelResolution: !externalChannelId
         });
       }
@@ -83,25 +83,25 @@ export function parseMetaWebhook(rawBody, { resolveExternalChannelId } = {}) {
 }
 
 export function requireMetaWebhookSecrets(env = {}) {
-  const verifyToken = clean(env.WHATSAPP_VERIFY_TOKEN, 500);
-  const appSecret = clean(env.WHATSAPP_APP_SECRET, 500);
+  const verifyToken = metaClean(env.WHATSAPP_VERIFY_TOKEN, 500);
+  const appSecret = metaClean(env.WHATSAPP_APP_SECRET, 500);
   if (!verifyToken) throw new Error('whatsapp_verify_token_missing');
   if (!appSecret) throw new Error('whatsapp_app_secret_missing');
   return { verifyToken, appSecret };
 }
 
-function extractText(message) {
+function metaExtractText(message) {
   const type = String(message?.type ?? '');
-  if (type === 'text') return clean(message?.text?.body, 12000);
-  if (type === 'button') return clean(message?.button?.text, 12000);
+  if (type === 'text') return metaClean(message?.text?.body, 12000);
+  if (type === 'button') return metaClean(message?.button?.text, 12000);
   if (type === 'interactive') {
-    return clean(message?.interactive?.button_reply?.title ?? message?.interactive?.list_reply?.title, 12000);
+    return metaClean(message?.interactive?.button_reply?.title ?? message?.interactive?.list_reply?.title, 12000);
   }
   // Mídia/documentos ficam sem conteúdo textual até a política de anexos ser definida.
   return '';
 }
 
-function fromEpoch(value) {
+function metaFromEpoch(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   const date = new Date(n * 1000);
@@ -109,11 +109,11 @@ function fromEpoch(value) {
   return date.toISOString();
 }
 
-function clean(value, max = 500) {
+function metaClean(value, max = 500) {
   return String(value ?? '').trim().slice(0, max);
 }
 
-function safeEqualText(a, b) {
+function metaSafeEqualText(a, b) {
   const aa = new TextEncoder().encode(String(a ?? ''));
   const bb = new TextEncoder().encode(String(b ?? ''));
   if (aa.length !== bb.length) return false;
