@@ -13,6 +13,7 @@ type AppShellProps = {
   organizationName: string;
   organizationSlug: string;
   userEmail: string;
+  isPlatformAdmin?: boolean;
 };
 
 type NavigationItem = {
@@ -61,6 +62,7 @@ export function AppShell({
   organizationName,
   organizationSlug,
   userEmail,
+  isPlatformAdmin = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -68,6 +70,12 @@ export function AppShell({
   const userInitials = getInitials(userEmail.split("@")[0]);
   const experience = getTenantExperience(organizationSlug);
   const navigationItems = getNavigationItems(organizationSlug);
+  const normalizedSlug = organizationSlug.toLowerCase();
+  const showControlCenter =
+    isPlatformAdmin ||
+    normalizedSlug === "allamo" ||
+    normalizedSlug === "instituto-allamo" ||
+    normalizedSlug === "instituto-allamo-platform";
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -160,6 +168,21 @@ export function AppShell({
           </p>
 
           <div className="space-y-1">
+            {showControlCenter ? (
+              <Link
+                className={[
+                  "block rounded-lg px-3 py-2.5 text-sm font-semibold transition",
+                  pathname.startsWith("/dashboard/control-center")
+                    ? "bg-slate-950 text-white"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+                ].join(" ")}
+                href="/dashboard/control-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Államo Control Center
+              </Link>
+            ) : null}
+
             <Link
               className={[
                 "block rounded-lg px-3 py-2.5 text-sm font-semibold transition",
