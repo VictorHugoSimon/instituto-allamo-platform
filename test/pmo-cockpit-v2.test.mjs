@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPortfolioSummary, classifyProjectHealth, displayMetric } from '../src/pmo-cockpit-v2.js';
+import { buildPortfolioSummary, classifyProjectHealth, displayMetric } from '../src/pmo-cockpit-v2.mjs';
 
 test('classifica projeto sem report como sem atualização', () => {
   assert.equal(classifyProjectHealth({ status: 'Em andamento' }, null), 'stale');
