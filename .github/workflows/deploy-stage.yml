@@ -72,12 +72,15 @@ jobs:
         run: |
           node scripts/ensure-additive-schema.mjs --env=stage
           node scripts/repair-core-tenants-portable.mjs --env=stage
+          node scripts/ensure-semeali-tenant.mjs
       - name: Aplicar somente schema aditivo no Stage
         run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
-      - name: Reparar tenants essenciais de forma idempotente no Stage
+      - name: Reparar tenants essenciais e provisionar Semeali no Stage
         run: |
           node scripts/repair-core-tenants-portable.mjs --env=stage --apply --confirm=REPAIR-STAGE
           node scripts/repair-core-tenants-portable.mjs --env=stage
+          node scripts/ensure-semeali-tenant.mjs --apply --confirm=ENSURE-SEMEALI-STAGE
+          node scripts/ensure-semeali-tenant.mjs
       - name: Materializar configuração exclusiva de Stage
         run: |
           cp wrangler.stage.toml wrangler.toml
@@ -126,5 +129,6 @@ jobs:
           echo "- Backup D1: obrigatório e retido por 14 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
           echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Semeali: provisionamento idempotente somente em STAGE; nenhum usuário/senha criado automaticamente" >> "$GITHUB_STEP_SUMMARY"
           echo "- Smokes: governança multitenant + tenants + POP OPR + OPR Governance Platform v2" >> "$GITHUB_STEP_SUMMARY"
           echo "- Reuniões OPR: sincronização idempotente para Plano de Ação + Cadência" >> "$GITHUB_STEP_SUMMARY"
