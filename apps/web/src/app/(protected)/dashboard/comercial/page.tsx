@@ -1,8 +1,28 @@
 import { redirect } from "next/navigation";
 
+import { SemealiLiveWorkspace } from "@/components/commercial/semeali-live-workspace";
 import { SemealiSalesWorkspace } from "@/components/commercial/semeali-sales-workspace";
 import { tenantHasModule } from "@/lib/tenants/catalog";
 import { createClient } from "@/lib/supabase/server";
+
+function hasLiveCommercialData(
+  summary: Record<string, unknown> | null,
+  opportunities: unknown[],
+) {
+  if (opportunities.length > 0) return true;
+  if (!summary) return false;
+
+  return [
+    "accounts",
+    "prospects",
+    "qualifiedOpportunities",
+    "openOpportunities",
+    "pipelineValue",
+    "pipelineHectares",
+    "pendingApprovals",
+    "visitsLast30Days",
+  ].some((key) => Number(summary[key] ?? 0) > 0);
+}
 
 export default async function CommercialPage() {
   const supabase = await createClient();
@@ -50,6 +70,39 @@ export default async function CommercialPage() {
           Este módulo não está habilitado para a organização ativa.
         </p>
       </section>
+    );
+  }
+
+  const [summaryResult, opportunitiesResult] = await Promise.all([
+    supabase.rpc("commercial_workspace_summary", {
+      p_organization_id: organization.id,
+    }),
+    supabase.rpc("list_commercial_opportunities", {
+      p_organization_id: organization.id,
+      p_limit: 100,
+    }),
+  ]);
+
+  const summary =
+    !summaryResult.error &&
+    summaryResult.data &&
+    typeof summaryResult.data === "object" &&
+    !Array.isArray(summaryResult.data)
+      ? (summaryResult.data as Record<string, unknown>)
+      : null;
+
+  const opportunities =
+    !opportunitiesResult.error && Array.isArray(opportunitiesResult.data)
+      ? opportunitiesResult.data
+      : [];
+
+  if (hasLiveCommercialData(summary, opportunities)) {
+    return (
+      <SemealiLiveWorkspace
+        opportunities={opportunities}
+        organizationName={organization.name}
+        summary={summary ?? {}}
+      />
     );
   }
 
