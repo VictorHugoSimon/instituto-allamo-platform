@@ -45,21 +45,21 @@ on:
 jobs:
   cockpit-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Instalar dependências travadas
+        run: npm ci
       - name: Testar domínio do Cockpit PMO
         run: node --test test/pmo-cockpit-v2.test.mjs
       - name: Injetar API do Cockpit no Worker de teste
         run: node scripts/harden-pmo-cockpit-v2.mjs
-      - name: Validar domínio, API, UI e contratos PMO
+      - name: Gerar artefato real do portal
+        run: npm run build:work
+      - name: Validar domínio, API, UI e contratos PMO após build
         run: node scripts/validate-pmo-cockpit-v2.mjs
-      - name: Validar contrato da navegação do Cockpit
+      - name: Validar navegação do Cockpit materializada no build
         run: node scripts/validate-pmo-cockpit-navigation.mjs
-      - name: Injetar navegação no artefato de teste
-        run: node scripts/harden-pmo-cockpit-navigation.mjs
-      - name: Validar integridade do bundle após navegação
-        run: node scripts/validate-bundle-json.mjs
