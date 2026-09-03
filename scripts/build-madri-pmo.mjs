@@ -37,14 +37,20 @@ const normalizeGovernanceApi=text=>{
 };
 governanceApi=normalizeGovernanceApi(governanceApi);
 
+// Remove qualquer cópia anterior, mesmo que tenha indentação diferente.
 const stripAllBlocks=(text,start,end)=>{
   let out=text,count=0;
-  while(out.includes(start)){
-    const a=out.indexOf(start),b=out.indexOf(end,a);
-    if(b<0)throw new Error('Marcador final ausente: '+end);
-    out=out.slice(0,a)+out.slice(b+end.length);
+  const startToken=start.trim(),endToken=end.trim();
+  while(out.includes(startToken)){
+    const marker=out.indexOf(startToken);
+    const a=Math.max(0,out.lastIndexOf('\n',marker)+1);
+    const endMarker=out.indexOf(endToken,marker);
+    if(endMarker<0)throw new Error('Marcador final ausente: '+endToken);
+    const nextNl=out.indexOf('\n',endMarker+endToken.length);
+    const b=nextNl<0?out.length:nextNl+1;
+    out=out.slice(0,a)+out.slice(b);
     count++;
-    if(count>20)throw new Error('Quantidade anormal de blocos duplicados: '+start);
+    if(count>20)throw new Error('Quantidade anormal de blocos duplicados: '+startToken);
   }
   return out;
 };
@@ -97,4 +103,4 @@ const workerGoodInserts=w.split(goodInsert).length-1;
 if(workerGoodInserts<2)throw new Error(`Worker final não contém os dois INSERTs MADRI normalizados; encontrado ${workerGoodInserts}.`);
 
 fs.writeFileSync(worker,w);
-console.log(`OK: APIs MADRI PMO + Governance Platform canônicas; blocos legados deduplicados; histórico/readiness endurecidos; ${workerGoodInserts} INSERTs work_items 25×25 validados.`);
+console.log(`OK: APIs MADRI PMO + Governance Platform canônicas; blocos legados deduplicados sem depender de indentação; histórico/readiness endurecidos; ${workerGoodInserts} INSERTs work_items 25×25 validados.`);
