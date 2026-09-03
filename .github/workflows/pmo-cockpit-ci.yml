@@ -5,29 +5,42 @@ on:
     paths:
       - 'src/pmo-cockpit-v2.mjs'
       - 'src/pmo-cockpit-api.js'
+      - 'src/pmo-cockpit-navigation.js'
       - 'test/pmo-cockpit-v2.test.mjs'
       - 'scripts/harden-pmo-cockpit-v2.mjs'
       - 'scripts/validate-pmo-cockpit-v2.mjs'
+      - 'scripts/harden-pmo-cockpit-navigation.mjs'
+      - 'scripts/validate-pmo-cockpit-navigation.mjs'
+      - 'scripts/smoke-pmo-cockpit-stage.mjs'
       - 'scripts/harden-sprint-governance.mjs'
       - 'public/pmo-cockpit/**'
       - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
       - 'docs/PMO-SCOPE-GUARDRAIL.md'
+      - 'package.json'
       - '.github/workflows/pmo-cockpit-ci.yml'
+      - '.github/workflows/pmo-cockpit-stage-smoke.yml'
   push:
     branches:
       - develop
       - feature/pmo-cockpit-executivo-v2
+      - feature/pmo-cockpit-stage-smoke
     paths:
       - 'src/pmo-cockpit-v2.mjs'
       - 'src/pmo-cockpit-api.js'
+      - 'src/pmo-cockpit-navigation.js'
       - 'test/pmo-cockpit-v2.test.mjs'
       - 'scripts/harden-pmo-cockpit-v2.mjs'
       - 'scripts/validate-pmo-cockpit-v2.mjs'
+      - 'scripts/harden-pmo-cockpit-navigation.mjs'
+      - 'scripts/validate-pmo-cockpit-navigation.mjs'
+      - 'scripts/smoke-pmo-cockpit-stage.mjs'
       - 'scripts/harden-sprint-governance.mjs'
       - 'public/pmo-cockpit/**'
       - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
       - 'docs/PMO-SCOPE-GUARDRAIL.md'
+      - 'package.json'
       - '.github/workflows/pmo-cockpit-ci.yml'
+      - '.github/workflows/pmo-cockpit-stage-smoke.yml'
 
 jobs:
   cockpit-contract:
@@ -37,10 +50,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Testar domínio do Cockpit PMO
         run: node --test test/pmo-cockpit-v2.test.mjs
       - name: Injetar API do Cockpit no Worker de teste
         run: node scripts/harden-pmo-cockpit-v2.mjs
       - name: Validar domínio, API, UI e contratos PMO
         run: node scripts/validate-pmo-cockpit-v2.mjs
+      - name: Validar contrato da navegação do Cockpit
+        run: node scripts/validate-pmo-cockpit-navigation.mjs
+      - name: Injetar navegação no artefato de teste
+        run: node scripts/harden-pmo-cockpit-navigation.mjs
+      - name: Validar integridade do bundle após navegação
+        run: node scripts/validate-bundle-json.mjs
