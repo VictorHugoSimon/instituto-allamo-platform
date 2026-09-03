@@ -14,19 +14,22 @@ must(nav,"data-allamo-pmo-nav",'marcador observável da navegação PMO');
 must(nav,"MutationObserver",'remontagem resiliente após renderizações do portal');
 if(nav.includes('fetch(')||nav.includes('/api/'))throw new Error('Navegação não deve gerar chamadas de API nem alterar dados.');
 
-must(hardener,'<!-- BEGIN ALLAMO PMO COCKPIT NAVIGATION -->','marcador inicial idempotente');
-must(hardener,'<!-- END ALLAMO PMO COCKPIT NAVIGATION -->','marcador final idempotente');
+const start='<!-- BEGIN ALLAMO PMO COCKPIT NAVIGATION -->';
+const end='<!-- END ALLAMO PMO COCKPIT NAVIGATION -->';
+must(hardener,start,'marcador inicial idempotente');
+must(hardener,end,'marcador final idempotente');
 must(hardener,"fs.readFileSync(source,'utf8')",'hardener lê a fonte versionada');
 must(hardener,"html.replace('</body>',block+'\\n</body>')",'injeção antes do fechamento do body');
 
 const build=String(pkg.scripts?.['build:work']||'');
 must(build,'node scripts/harden-pmo-cockpit-navigation.mjs','pipeline principal executa hardening PMO');
 
-must(html,'<!-- BEGIN ALLAMO PMO COCKPIT NAVIGATION -->','artefato contém marcador inicial da navegação');
-must(html,'<!-- END ALLAMO PMO COCKPIT NAVIGATION -->','artefato contém marcador final da navegação');
+must(html,start,'artefato contém marcador inicial da navegação');
+must(html,end,'artefato contém marcador final da navegação');
 must(html,"link.href='/pmo-cockpit/'",'artefato contém rota canônica do Cockpit');
 must(html,'Cockpit Executivo','artefato contém rótulo executivo');
-const occurrences=(html.match(/id=NAV_ID/g)||[]).length;
-if(occurrences!==1)throw new Error(`Navegação PMO deveria ser injetada uma vez; encontrei ${occurrences}.`);
+const starts=html.split(start).length-1;
+const ends=html.split(end).length-1;
+if(starts!==1||ends!==1)throw new Error(`Navegação PMO deveria ter um único bloco; encontrei início=${starts}, fim=${ends}.`);
 
-console.log('OK: Cockpit Executivo integrado após Visão Executiva, sem API/mutation e materializado uma única vez no build.');
+console.log('OK: Cockpit Executivo integrado após Visão Executiva, sem API/mutation e materializado em um único bloco no build.');
