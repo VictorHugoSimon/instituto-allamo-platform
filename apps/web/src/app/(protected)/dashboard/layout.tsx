@@ -33,11 +33,14 @@ export default async function DashboardLayout({
     redirect("/onboarding");
   }
 
-  const { data: organization } = await supabase
-    .from("organizations")
-    .select("id, name, slug")
-    .eq("id", membership.organization_id)
-    .single();
+  const [{ data: organization }, { data: isPlatformAdmin }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("id, name, slug")
+      .eq("id", membership.organization_id)
+      .single(),
+    supabase.rpc("is_platform_admin"),
+  ]);
 
   if (!organization) {
     redirect("/onboarding");
@@ -45,6 +48,7 @@ export default async function DashboardLayout({
 
   return (
     <AppShell
+      isPlatformAdmin={Boolean(isPlatformAdmin)}
       organizationName={organization.name}
       organizationSlug={organization.slug}
       userEmail={user.email ?? "Usuário sem e-mail"}
