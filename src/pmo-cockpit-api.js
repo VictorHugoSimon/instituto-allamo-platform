@@ -23,7 +23,7 @@ if(path==='pmo-cockpit'&&request.method==='GET'){
 
   const [companiesResult,projectsResult,reportsResult]=await Promise.all([
     DB.prepare('SELECT id,name,status_text,progress FROM companies'+companyWhere).bind(...companyArgs).all(),
-    DB.prepare('SELECT p.id,p.name,p.company_id,p.status,p.badge,p.urgency,p.meta_date,p.pmo_read,p.lead FROM projects p'+projectWhere+' ORDER BY p.id').bind(...projectArgs).all(),
+    DB.prepare('SELECT p.id,p.name,p.company_id,c.name AS company_name,p.status,p.badge,p.urgency,p.meta_date,p.pmo_read,p.lead FROM projects p LEFT JOIN companies c ON c.id=p.company_id'+projectWhere+' ORDER BY c.name,p.name,p.id').bind(...projectArgs).all(),
     DB.prepare('SELECT r.project_id,r.updated_at,r.updated_by,r.ref FROM project_reports_p r JOIN projects p ON p.id=r.project_id'+reportWhere).bind(...reportArgs).all()
   ]);
 
@@ -64,7 +64,7 @@ if(path==='pmo-cockpit'&&request.method==='GET'){
     health[h]++;
 
     details.push({
-      id:p.id,name:p.name,company_id:p.company_id,status:p.status||'',pmo_read:p.pmo_read||'',meta_date:p.meta_date||'',
+      id:p.id,name:p.name,company_id:p.company_id,company_name:p.company_name||'',status:p.status||'',pmo_read:p.pmo_read||'',meta_date:p.meta_date||'',lead:p.lead||'',
       delayed,health:h,last_report_at:report?.updated_at||null,last_report_by:report?.updated_by||null,report_ref:report?.ref||null
     });
   }
