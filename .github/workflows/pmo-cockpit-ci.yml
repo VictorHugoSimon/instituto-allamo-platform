@@ -1,0 +1,35 @@
+name: PMO Cockpit CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/pmo-cockpit-v2.mjs'
+      - 'test/pmo-cockpit-v2.test.mjs'
+      - 'scripts/validate-pmo-cockpit-v2.mjs'
+      - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
+      - 'docs/PMO-SCOPE-GUARDRAIL.md'
+      - '.github/workflows/pmo-cockpit-ci.yml'
+  push:
+    branches:
+      - develop
+    paths:
+      - 'src/pmo-cockpit-v2.mjs'
+      - 'test/pmo-cockpit-v2.test.mjs'
+      - 'scripts/validate-pmo-cockpit-v2.mjs'
+      - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
+      - 'docs/PMO-SCOPE-GUARDRAIL.md'
+      - '.github/workflows/pmo-cockpit-ci.yml'
+
+jobs:
+  cockpit-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Testar domínio do Cockpit PMO
+        run: node --test test/pmo-cockpit-v2.test.mjs
+      - name: Validar contratos PMO existentes
+        run: node scripts/validate-pmo-cockpit-v2.mjs
