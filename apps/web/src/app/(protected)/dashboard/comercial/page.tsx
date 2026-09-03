@@ -5,23 +5,46 @@ import { SemealiSalesWorkspace } from "@/components/commercial/semeali-sales-wor
 import { tenantHasModule } from "@/lib/tenants/catalog";
 import { createClient } from "@/lib/supabase/server";
 
-function hasLiveCommercialData(
-  summary: Record<string, unknown> | null,
-  opportunities: unknown[],
-) {
+type LiveSummary = {
+  accounts: number;
+  prospects: number;
+  qualifiedOpportunities: number;
+  openOpportunities: number;
+  pipelineValue: number;
+  pipelineHectares: number;
+  pendingApprovals: number;
+  visitsLast30Days: number;
+};
+
+function toNumber(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeSummary(value: unknown): LiveSummary | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const summary = value as Record<string, unknown>;
+
+  return {
+    accounts: toNumber(summary.accounts),
+    prospects: toNumber(summary.prospects),
+    qualifiedOpportunities: toNumber(summary.qualifiedOpportunities),
+    openOpportunities: toNumber(summary.openOpportunities),
+    pipelineValue: toNumber(summary.pipelineValue),
+    pipelineHectares: toNumber(summary.pipelineHectares),
+    pendingApprovals: toNumber(summary.pendingApprovals),
+    visitsLast30Days: toNumber(summary.visitsLast30Days),
+  };
+}
+
+function hasLiveCommercialData(summary: LiveSummary | null, opportunities: unknown[]) {
   if (opportunities.length > 0) return true;
   if (!summary) return false;
 
-  return [
-    "accounts",
-    "prospects",
-    "qualifiedOpportunities",
-    "openOpportunities",
-    "pipelineValue",
-    "pipelineHectares",
-    "pendingApprovals",
-    "visitsLast30Days",
-  ].some((key) => Number(summary[key] ?? 0) > 0);
+  return Object.values(summary).some((value) => value > 0);
 }
 
 export default async function CommercialPage() {
@@ -83,13 +106,9 @@ export default async function CommercialPage() {
     }),
   ]);
 
-  const summary =
-    !summaryResult.error &&
-    summaryResult.data &&
-    typeof summaryResult.data === "object" &&
-    !Array.isArray(summaryResult.data)
-      ? (summaryResult.data as Record<string, unknown>)
-      : null;
+  const summary = summaryResult.error
+    ? null
+    : normalizeSummary(summaryResult.data);
 
   const opportunities =
     !opportunitiesResult.error && Array.isArray(opportunitiesResult.data)
@@ -101,7 +120,16 @@ export default async function CommercialPage() {
       <SemealiLiveWorkspace
         opportunities={opportunities}
         organizationName={organization.name}
-        summary={summary ?? {}}
+        summary={summary ?? {
+          accounts: 0,
+          prospects: 0,
+          qualifiedOpportunities: 0,
+          openOpportunities: 0,
+          pipelineValue: 0,
+          pipelineHectares: 0,
+          pendingApprovals: 0,
+          visitsLast30Days: 0,
+        }}
       />
     );
   }
