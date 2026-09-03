@@ -9,6 +9,7 @@ on:
       - 'scripts/harden-pmo-cockpit-v2.mjs'
       - 'scripts/validate-pmo-cockpit-v2.mjs'
       - 'scripts/harden-sprint-governance.mjs'
+      - 'public/pmo-cockpit/**'
       - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
       - 'docs/PMO-SCOPE-GUARDRAIL.md'
       - '.github/workflows/pmo-cockpit-ci.yml'
@@ -23,6 +24,7 @@ on:
       - 'scripts/harden-pmo-cockpit-v2.mjs'
       - 'scripts/validate-pmo-cockpit-v2.mjs'
       - 'scripts/harden-sprint-governance.mjs'
+      - 'public/pmo-cockpit/**'
       - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
       - 'docs/PMO-SCOPE-GUARDRAIL.md'
       - '.github/workflows/pmo-cockpit-ci.yml'
@@ -40,5 +42,5 @@ jobs:
         run: node --test test/pmo-cockpit-v2.test.mjs
       - name: Injetar API do Cockpit no Worker de teste
         run: node scripts/harden-pmo-cockpit-v2.mjs
-      - name: Validar domínio, API e contratos PMO
+      - name: Validar domínio, API, UI e contratos PMO
         run: node scripts/validate-pmo-cockpit-v2.mjs
