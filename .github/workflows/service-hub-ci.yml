@@ -7,9 +7,11 @@ on:
       - 'service-hub/**'
       - 'src/service-hub-worker-api.js'
       - 'src/service-hub-whatsapp-webhook-api.js'
+      - 'src/service-hub-provider-events-api.js'
       - 'scripts/harden-service-hub.mjs'
       - 'scripts/validate-service-hub-worker.mjs'
       - 'scripts/smoke-service-hub-stage.mjs'
+      - 'scripts/probe-service-hub-whatsapp-stage.mjs'
       - 'scripts/ensure-additive-schema.mjs'
       - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
       - 'migrations/2026-09-03-valkiria-whatsapp-ingress.sql'
@@ -22,9 +24,11 @@ on:
       - 'service-hub/**'
       - 'src/service-hub-worker-api.js'
       - 'src/service-hub-whatsapp-webhook-api.js'
+      - 'src/service-hub-provider-events-api.js'
       - 'scripts/harden-service-hub.mjs'
       - 'scripts/validate-service-hub-worker.mjs'
       - 'scripts/smoke-service-hub-stage.mjs'
+      - 'scripts/probe-service-hub-whatsapp-stage.mjs'
       - 'scripts/ensure-additive-schema.mjs'
       - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
       - 'migrations/2026-09-03-valkiria-whatsapp-ingress.sql'
@@ -55,6 +59,7 @@ jobs:
           node --check scripts/harden-service-hub.mjs
           node --check scripts/validate-service-hub-worker.mjs
           node --check scripts/smoke-service-hub-stage.mjs
+          node --check scripts/probe-service-hub-whatsapp-stage.mjs
           node --check scripts/ensure-additive-schema.mjs
       - name: Unit tests
         working-directory: service-hub
@@ -94,3 +99,7 @@ jobs:
         run: |
           node scripts/harden-service-hub.mjs
           node scripts/validate-service-hub-worker.mjs
+      - name: Prove Meta webhook fail-closed on live STAGE
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+        run: node scripts/probe-service-hub-whatsapp-stage.mjs

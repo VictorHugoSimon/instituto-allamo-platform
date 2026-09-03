@@ -10,18 +10,19 @@ const PORTAL_HOST_SOURCE='(^|\\.)(?:allamo-pmo-stage|allamo-pmo)\\.pages\\.dev$'
 // Backend: nos hosts oficiais do Portal, todas as APIs internas recebem uma identidade PMO sintética.
 let worker=fs.readFileSync(workerFile,'utf8');
 const userNeedle="async function currentUser(request, env) {\n  const token = (request.headers.get('authorization') || '').replace('Bearer ', '');";
+const portalUserMarker="portalNoLoginHost = /(^|\\.)(?:allamo-pmo-stage|allamo-pmo)\\.pages\\.dev$/i";
 const userReplacement="async function currentUser(request, env) {\n  const portalNoLoginHost = /(^|\\.)(?:allamo-pmo-stage|allamo-pmo)\\.pages\\.dev$/i.test(new URL(request.url).hostname || '');\n  if (portalNoLoginHost) return { id:'portal-no-login', name:'PMO Államo', email:'portal-no-login@allamo.local', role:'pmo', company_id:null, status:'Ativo', __portal_no_login:true };\n  const token = (request.headers.get('authorization') || '').replace('Bearer ', '');";
 
 if(worker.includes('__stage_no_login')){
   worker=worker
     .replace(/const stageNoLoginHost = \/\(\^\|\\\.\)allamo-pmo-stage\\\.pages\\\.dev\$\/i\.test\(new URL\(request\.url\)\.hostname \|\| ''\);/,"const portalNoLoginHost = /(^|\\.)(?:allamo-pmo-stage|allamo-pmo)\\.pages\\.dev$/i.test(new URL(request.url).hostname || '');")
     .replace(/if \(stageNoLoginHost\) return \{ id:'stage-no-login', name:'PMO Stage', email:'stage-no-login@allamo\.local', role:'pmo', company_id:null, status:'Ativo', __stage_no_login:true \};/,"if (portalNoLoginHost) return { id:'portal-no-login', name:'PMO Államo', email:'portal-no-login@allamo.local', role:'pmo', company_id:null, status:'Ativo', __portal_no_login:true };");
-}else if(!worker.includes('__portal_no_login')){
+}else if(!worker.includes(portalUserMarker)){
   if(!worker.includes(userNeedle)) throw new Error('currentUser não encontrado para habilitar Portal sem login.');
   worker=worker.replace(userNeedle,userReplacement);
 }
 
-if(!worker.includes("portalNoLoginHost = /(^|\\.)(?:allamo-pmo-stage|allamo-pmo)\\.pages\\.dev$/i")) throw new Error('Bypass sem login não foi aplicado aos hosts oficiais do Portal.');
+if(!worker.includes(portalUserMarker)) throw new Error('Bypass sem login não foi aplicado aos hosts oficiais do Portal.');
 if(!worker.includes("__portal_no_login:true")) throw new Error('Identidade sintética do Portal sem login ausente.');
 if(!worker.includes("if (!token) return null;")) throw new Error('Fallback autenticado para hosts não oficiais foi removido indevidamente.');
 fs.writeFileSync(workerFile,worker);
