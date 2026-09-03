@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
 const index = fs.readFileSync('public/index.html', 'utf8');
+const page = fs.readFileSync('public/pmo-cockpit/index.html', 'utf8');
 const worker = fs.readFileSync('public/_worker.js', 'utf8');
 const api = fs.readFileSync('src/pmo-cockpit-api.js', 'utf8');
 const hardener = fs.readFileSync('scripts/harden-pmo-cockpit-v2.mjs', 'utf8');
@@ -28,6 +29,14 @@ must(worker, "path==='pmo-cockpit'", 'API injetada no Worker');
 must(domain, "return 'stale'", 'estado sem atualização');
 must(domain, 'Não disponível', 'tratamento de métrica ausente');
 
+// Página isolada de homologação do Cockpit.
+must(page, 'Cockpit Executivo 2.0', 'título do cockpit');
+must(page, "fetch('/api/pmo-cockpit'", 'consumo da API consolidada');
+must(page, "fetch('/api/dash-curve'", 'consumo da Curva S real');
+must(page, 'Sem atualização', 'estado sem atualização na UI');
+must(page, 'Não disponível', 'ausência de dado explícita na UI');
+must(page, 'sem KPI fictício', 'regra visual de dados reais');
+
 // Regras de segurança do pacote.
 const forbidden = [
   'service-hub/',
@@ -41,4 +50,4 @@ for (const token of forbidden) {
   }
 }
 
-console.log('PMO Cockpit v2: domínio, API, injeção e contratos validados.');
+console.log('PMO Cockpit v2: domínio, API, UI, injeção e contratos validados.');
