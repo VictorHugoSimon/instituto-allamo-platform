@@ -46,6 +46,7 @@ export default async function DashboardLayout({
   return (
     <AppShell
       organizationName={organization.name}
+      organizationSlug={organization.slug}
       userEmail={user.email ?? "Usuário sem e-mail"}
     >
       {children}
