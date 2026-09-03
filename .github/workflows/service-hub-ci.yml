@@ -6,11 +6,13 @@ on:
     paths:
       - 'service-hub/**'
       - 'src/service-hub-worker-api.js'
+      - 'src/service-hub-whatsapp-webhook-api.js'
       - 'scripts/harden-service-hub.mjs'
       - 'scripts/validate-service-hub-worker.mjs'
       - 'scripts/smoke-service-hub-stage.mjs'
       - 'scripts/ensure-additive-schema.mjs'
       - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
+      - 'migrations/2026-09-03-valkiria-whatsapp-ingress.sql'
       - 'package.json'
       - '.github/workflows/service-hub-ci.yml'
       - '.github/workflows/deploy-stage.yml'
@@ -19,11 +21,13 @@ on:
     paths:
       - 'service-hub/**'
       - 'src/service-hub-worker-api.js'
+      - 'src/service-hub-whatsapp-webhook-api.js'
       - 'scripts/harden-service-hub.mjs'
       - 'scripts/validate-service-hub-worker.mjs'
       - 'scripts/smoke-service-hub-stage.mjs'
       - 'scripts/ensure-additive-schema.mjs'
       - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
+      - 'migrations/2026-09-03-valkiria-whatsapp-ingress.sql'
       - 'package.json'
       - '.github/workflows/service-hub-ci.yml'
       - '.github/workflows/deploy-stage.yml'
@@ -59,14 +63,15 @@ jobs:
         run: |
           python - <<'PY'
           import sqlite3, pathlib
-          p=pathlib.Path('migrations/2026-09-01-valkiria-service-hub-foundation.sql')
-          sql=p.read_text(encoding='utf-8')
+          base=pathlib.Path('migrations/2026-09-01-valkiria-service-hub-foundation.sql').read_text(encoding='utf-8')
+          ingress=pathlib.Path('migrations/2026-09-03-valkiria-whatsapp-ingress.sql').read_text(encoding='utf-8')
           db=sqlite3.connect(':memory:')
-          db.executescript(sql)
+          db.executescript(base)
+          db.executescript(ingress)
           required={
             'service_hub_systems','service_hub_channels','service_hub_sla_policies',
             'service_hub_routing_rules','service_hub_tickets','service_hub_ticket_events',
-            'service_hub_messages','service_hub_audit_log'
+            'service_hub_messages','service_hub_audit_log','service_hub_provider_events'
           }
           tables={r[0] for r in db.execute("select name from sqlite_master where type='table'")}
           missing=required-tables
@@ -75,6 +80,12 @@ jobs:
           try:
             db.execute("insert into service_hub_messages(id,tenant_id,project_id,channel_id,provider_message_id,direction,text_redacted,occurred_at) values(?,?,?,?,?,?,?,?)",('m2','t1','p1','c1','ext-1','inbound','teste 2','2026-09-01T00:01:00Z'))
             raise AssertionError('duplicate provider message was accepted')
+          except sqlite3.IntegrityError:
+            pass
+          db.execute("insert into service_hub_provider_events(id,provider,provider_message_id,status) values(?,?,?,?)",('p1','whatsapp','wamid.1','unresolved'))
+          try:
+            db.execute("insert into service_hub_provider_events(id,provider,provider_message_id,status) values(?,?,?,?)",('p2','whatsapp','wamid.1','unresolved'))
+            raise AssertionError('duplicate provider event was accepted')
           except sqlite3.IntegrityError:
             pass
           print('SERVICE_HUB_SCHEMA_OK')

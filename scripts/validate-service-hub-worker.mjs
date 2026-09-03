@@ -1,18 +1,28 @@
 import fs from 'node:fs';
 
 const api=fs.readFileSync('src/service-hub-worker-api.js','utf8');
+const webhook=fs.readFileSync('src/service-hub-whatsapp-webhook-api.js','utf8');
+const metaProviderRaw=fs.readFileSync('service-hub/src/providers/meta-whatsapp.mjs','utf8');
+const metaProvider=metaProviderRaw.replace(/\bexport\s+/g,'');
 const hardener=fs.readFileSync('scripts/harden-service-hub.mjs','utf8');
 const worker=fs.readFileSync('public/_worker.js','utf8');
 const migration=fs.readFileSync('migrations/2026-09-01-valkiria-service-hub-foundation.sql','utf8');
+const ingressMigration=fs.readFileSync('migrations/2026-09-03-valkiria-whatsapp-ingress.sql','utf8');
 const ensure=fs.readFileSync('scripts/ensure-additive-schema.mjs','utf8');
 const pkg=fs.readFileSync('package.json','utf8');
 
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
 new AsyncFunction('request','DB','url','path','json','user','scope','logEvent','env',api);
+new AsyncFunction('request','env','url','path','json','DB',metaProvider+'\n'+webhook);
 
 const must=(content,needle,label)=>{if(!content.includes(needle))throw new Error(`Ausente: ${label} (${needle})`)};
 const tables=['service_hub_systems','service_hub_channels','service_hub_sla_policies','service_hub_routing_rules','service_hub_tickets','service_hub_ticket_events','service_hub_messages','service_hub_audit_log'];
 for(const table of tables){must(migration,`CREATE TABLE IF NOT EXISTS ${table}`,`migration ${table}`);must(ensure,`'${table}'`,`gate aditivo ${table}`);must(api,`'${table}'`,`readiness ${table}`)}
+
+must(ingressMigration,'CREATE TABLE IF NOT EXISTS service_hub_provider_events','quarentena de ingressos WhatsApp');
+must(ingressMigration,"status IN ('unresolved','resolved','rejected','ignored')",'estados da quarentena');
+must(ensure,"'service_hub_provider_events'",'gate aditivo da quarentena');
+must(ensure,'migrations/2026-09-03-valkiria-whatsapp-ingress.sql','migration WhatsApp no schema aditivo');
 
 must(api,"path==='service-hub/health'",'health do Service Hub');
 must(api,"path==='service-hub/tickets'",'API de chamados');
@@ -23,9 +33,26 @@ must(api,"[EMAIL_REDACTED]",'sanitização de PII');
 must(api,"title=shwRedact",'sanitização do título do chamado');
 must(api,"first_responded_at=?",'registro de primeira resposta do SLA');
 must(api,"firstResponseRecorded",'auditoria da primeira resposta');
+
+must(metaProviderRaw,'verifyMetaChallenge','challenge Meta');
+must(metaProviderRaw,'verifyMetaSignature','HMAC Meta');
+must(metaProviderRaw,"error: 'invalid_timestamp'",'timestamp Meta fail-closed');
+must(webhook,"path===shwMetaWebhookPath&&request.method==='GET'",'rota GET de verificação');
+must(webhook,"path===shwMetaWebhookPath&&request.method==='POST'",'rota POST do webhook');
+must(webhook,"request.headers.get('x-hub-signature-256')",'assinatura exigida no webhook');
+must(webhook,"processing:'quarantine_only'",'ingresso não abre chamado automaticamente');
+must(webhook,'shwMetaSenderHash','hash do remetente');
+must(webhook,'shwMetaRedact','redaction antes de persistir');
+
 must(hardener,'BEGIN ALLAMO VALKIRIA SERVICE HUB','marcador do hardener');
-must(worker,'BEGIN ALLAMO VALKIRIA SERVICE HUB','bloco injetado no Worker');
-must(ensure,'migrations/2026-09-01-valkiria-service-hub-foundation.sql','migration no schema aditivo');
+must(hardener,'BEGIN ALLAMO VALKIRIA WHATSAPP WEBHOOK','marcador webhook do hardener');
+must(worker,'BEGIN ALLAMO VALKIRIA SERVICE HUB','bloco Service Hub injetado no Worker');
+must(worker,'BEGIN ALLAMO VALKIRIA WHATSAPP WEBHOOK','bloco webhook injetado no Worker');
+const webhookPos=worker.indexOf('BEGIN ALLAMO VALKIRIA WHATSAPP WEBHOOK');
+const authPos=worker.indexOf("if (!user) return json({ error: 'Não autenticado' }, 401);");
+if(webhookPos<0||authPos<0||webhookPos>authPos)throw new Error('Webhook WhatsApp não está antes do gate de autenticação de usuário.');
+
+must(ensure,'migrations/2026-09-01-valkiria-service-hub-foundation.sql','migration base no schema aditivo');
 must(pkg,'harden-service-hub.mjs','Service Hub no build:work');
 must(pkg,'test:service-hub','gate do Service Hub no package');
 
