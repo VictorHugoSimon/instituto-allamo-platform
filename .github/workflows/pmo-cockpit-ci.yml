@@ -8,18 +8,21 @@ on:
       - 'test/pmo-cockpit-v2.test.mjs'
       - 'scripts/harden-pmo-cockpit-v2.mjs'
       - 'scripts/validate-pmo-cockpit-v2.mjs'
+      - 'scripts/harden-sprint-governance.mjs'
       - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
       - 'docs/PMO-SCOPE-GUARDRAIL.md'
       - '.github/workflows/pmo-cockpit-ci.yml'
   push:
     branches:
       - develop
+      - feature/pmo-cockpit-executivo-v2
     paths:
       - 'src/pmo-cockpit-v2.mjs'
       - 'src/pmo-cockpit-api.js'
       - 'test/pmo-cockpit-v2.test.mjs'
       - 'scripts/harden-pmo-cockpit-v2.mjs'
       - 'scripts/validate-pmo-cockpit-v2.mjs'
+      - 'scripts/harden-sprint-governance.mjs'
       - 'docs/PMO-COCKPIT-EXECUTIVO-V2*.md'
       - 'docs/PMO-SCOPE-GUARDRAIL.md'
       - '.github/workflows/pmo-cockpit-ci.yml'
