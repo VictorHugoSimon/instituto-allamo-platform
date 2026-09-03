@@ -8,6 +8,7 @@ const shpId=()=>`aud:${crypto.randomUUID()}`;
 const shpJsonBody=()=>request.json().catch(()=>({}));
 const shpTable=async name=>!!(await DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1").bind(name).first());
 const shpReady=async()=>await shpTable('service_hub_provider_events');
+const shpOneChange=result=>Number(result&&result.meta&&result.meta.changes||0)===1;
 const shpAuthorize=()=>{
   if(!shpHasRealSession)return json({error:'Sessão autenticada obrigatória para revisar a quarentena do WhatsApp',code:'authenticated_session_required'},401);
   if(!shpCanReview)return json({error:'Sem permissão para revisar a quarentena do WhatsApp'},403);
@@ -41,7 +42,8 @@ if(path.startsWith(shpPathPrefix+'/')&&request.method==='POST'){
     const channel=await DB.prepare("SELECT id,tenant_id,project_id,provider,name FROM service_hub_channels WHERE id=? AND active=1 LIMIT 1").bind(channelId).first();
     if(!channel)return json({error:'Canal não encontrado ou inativo'},404);
     if(String(channel.provider)!=='whatsapp')return json({error:'O evento WhatsApp só pode ser associado a canal WhatsApp'},400);
-    await DB.prepare("UPDATE service_hub_provider_events SET status='resolved',channel_id=?,tenant_id=?,project_id=?,error_code=NULL WHERE id=? AND status='unresolved'").bind(channel.id,channel.tenant_id,channel.project_id,eventId).run();
+    const changed=await DB.prepare("UPDATE service_hub_provider_events SET status='resolved',channel_id=?,tenant_id=?,project_id=?,error_code=NULL WHERE id=? AND status='unresolved'").bind(channel.id,channel.tenant_id,channel.project_id,eventId).run();
+    if(!shpOneChange(changed))return json({error:'Evento foi revisado por outro usuário',code:'provider_event_concurrent_review'},409);
     if(await shpTable('service_hub_audit_log')){
       await DB.prepare('INSERT INTO service_hub_audit_log(id,tenant_id,entity_type,entity_id,action,actor_type,actor_ref,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(shpId(),channel.tenant_id,'provider_event',eventId,'resolve','user',actor,JSON.stringify({channelId:channel.id,projectId:channel.project_id,provider:'whatsapp'}),now).run();
     }
@@ -51,7 +53,8 @@ if(path.startsWith(shpPathPrefix+'/')&&request.method==='POST'){
 
   const nextStatus=action==='ignore'?'ignored':'rejected';
   const body=await shpJsonBody(),reason=shpClean(body.reason,500);
-  await DB.prepare("UPDATE service_hub_provider_events SET status=?,error_code=? WHERE id=? AND status='unresolved'").bind(nextStatus,reason||action,eventId).run();
+  const changed=await DB.prepare("UPDATE service_hub_provider_events SET status=?,error_code=? WHERE id=? AND status='unresolved'").bind(nextStatus,reason||action,eventId).run();
+  if(!shpOneChange(changed))return json({error:'Evento foi revisado por outro usuário',code:'provider_event_concurrent_review'},409);
   if(event.tenant_id&&await shpTable('service_hub_audit_log')){
     await DB.prepare('INSERT INTO service_hub_audit_log(id,tenant_id,entity_type,entity_id,action,actor_type,actor_ref,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(shpId(),event.tenant_id,'provider_event',eventId,action,'user',actor,JSON.stringify({reason:reason||null}),now).run();
   }
