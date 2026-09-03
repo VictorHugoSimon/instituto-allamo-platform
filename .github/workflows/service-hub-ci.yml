@@ -8,10 +8,12 @@ on:
       - 'src/service-hub-worker-api.js'
       - 'scripts/harden-service-hub.mjs'
       - 'scripts/validate-service-hub-worker.mjs'
+      - 'scripts/smoke-service-hub-stage.mjs'
       - 'scripts/ensure-additive-schema.mjs'
       - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
       - 'package.json'
       - '.github/workflows/service-hub-ci.yml'
+      - '.github/workflows/deploy-stage.yml'
   push:
     branches: [develop, main]
     paths:
@@ -19,10 +21,12 @@ on:
       - 'src/service-hub-worker-api.js'
       - 'scripts/harden-service-hub.mjs'
       - 'scripts/validate-service-hub-worker.mjs'
+      - 'scripts/smoke-service-hub-stage.mjs'
       - 'scripts/ensure-additive-schema.mjs'
       - 'migrations/2026-09-01-valkiria-service-hub-foundation.sql'
       - 'package.json'
       - '.github/workflows/service-hub-ci.yml'
+      - '.github/workflows/deploy-stage.yml'
 
 permissions:
   contents: read
@@ -45,6 +49,7 @@ jobs:
           node --check service-hub/src/intake.mjs
           node --check scripts/harden-service-hub.mjs
           node --check scripts/validate-service-hub-worker.mjs
+          node --check scripts/smoke-service-hub-stage.mjs
           node --check scripts/ensure-additive-schema.mjs
       - name: Unit tests
         working-directory: service-hub
