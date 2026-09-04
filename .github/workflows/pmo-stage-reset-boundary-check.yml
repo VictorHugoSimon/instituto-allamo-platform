@@ -1,0 +1,27 @@
+name: PMO STAGE Reset Boundary Check
+
+on:
+  push:
+    branches:
+      - ops/pmo-stage-reset-zero
+    paths:
+      - 'scripts/check-pmo-reset-protected-boundary.mjs'
+      - '.github/workflows/pmo-stage-reset-boundary-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Checar módulos protegidos sem alterar dados
+        run: node scripts/check-pmo-reset-protected-boundary.mjs
