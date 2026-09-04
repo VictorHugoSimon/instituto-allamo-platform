@@ -7,6 +7,7 @@ const prod=read('.github/workflows/deploy-production.yml');
 const stageWorkflow=read('.github/workflows/deploy-stage.yml');
 const canonicalVerifier=read('scripts/verify-stage-canonical-release.mjs');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+const forbid=(c,n,l)=>{if(c.includes(n))throw new Error(`Proibido: ${l} (${n})`)};
 
 must(hardener,"'    // Health-check público APENAS no hostname de homologação.'",'injeção do schema antes do health');
 must(hardener,'schemaPos>healthPos','gate de ordem schema/health');
@@ -43,11 +44,11 @@ must(stageWorkflow,'Backup obrigatório do D1 Stage','Stage possui backup antes 
 must(stageWorkflow,'ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE','Stage aplica somente schema aditivo');
 must(stageWorkflow,'verify-stage-canonical-release.mjs','Stage confirma fingerprint na URL canônica');
 must(stageWorkflow,'npm run smoke:governance','Stage executa smoke de governança pós-deploy');
-must(stageWorkflow,'smoke-core-tenants.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage','Stage executa smoke dos tenants essenciais');
+must(stageWorkflow,'smoke-stage-data-integrity.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage','Stage valida integridade sem exigir tenants pré-cadastrados');
+forbid(stageWorkflow,'repair-core-tenants-portable.mjs --env=stage --apply','Stage não pode reparar/criar empresas automaticamente');
+forbid(stageWorkflow,'ensure-semeali-tenant.mjs --apply','Stage não pode provisionar empresa automaticamente');
 if(stageWorkflow.includes('--project-name allamo-pmo --branch main'))throw new Error('Workflow de Stage aponta para Produção.');
 
-// O Pages pode devolver temporariamente HTML/artefato antigo logo após o upload.
-// O gate canônico deve RETENTAR a resposta transitória, mas nunca relaxar o SHA exigido.
 must(canonicalVerifier,'async function fetchUntil','verificador canônico possui retry orientado a conteúdo');
 must(canonicalVerifier,'attempts=12','verificador possui janela de propagação');
 must(canonicalVerifier,"cache:'no-store'",'fingerprint ignora cache do browser/CDN');
@@ -58,4 +59,4 @@ must(canonicalVerifier,'fingerprint ainda não é JSON','HTML transitório não 
 must(canonicalVerifier,'/api/companies ainda não é JSON','API live também aguarda propagação de JSON');
 if(/if\(res\.ok\)\s*return\s*\{res,text\}/.test(canonicalVerifier))throw new Error('Verificador canônico voltou a aceitar qualquer HTTP 200 antes de validar conteúdo/SHA.');
 
-console.log('OK: release governado — Stage automático em develop e Produção automática em main, com gates, backup, evolução aditiva, fingerprint canônico estrito com retry e smoke pós-deploy.');
+console.log('OK: release governado — Stage aceita estado zero e não cria dados de negócio automaticamente; Produção permanece governada em main.');
