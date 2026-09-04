@@ -14,10 +14,13 @@ const PROD_DATABASE_ID='361c63ba-b9f8-409d-9a46-9609914da8b7';
 const APPLY=process.argv.includes('--apply');
 const CONFIRM=(process.argv.find(a=>a.startsWith('--confirm='))||'').slice(10);
 const REQUIRED_CONFIRM='RESET-PMO-STAGE';
+const PROTECTED_TABLE_PREFIXES=['service_hub_','commercial_'];
+const PROTECTED_TABLES=new Set(['access_invitations']);
 
 const q=v=>`'${String(v).replace(/'/g,"''")}'`;
 const qi=v=>`"${String(v).replace(/"/g,'""')}"`;
 const normalizeOutput=v=>String(v||'').replace(/\u001b\[[0-9;?]*[ -\/]*[@-~]/g,'').trim();
+const isProtected=table=>PROTECTED_TABLES.has(table)||PROTECTED_TABLE_PREFIXES.some(prefix=>table.startsWith(prefix));
 
 function fail(message,code=1){
   console.error(`\n[ABORTADO] ${message}`);
@@ -125,8 +128,6 @@ function buildPredicates(meta,companyIds,projectIds){
     if(parts.length){predicates.set(table,`(${parts.join(' OR ')})`);depths.set(table,0)}
   }
 
-  // Propaga o vínculo por FKs: um filho sem company_id/project_id pode ser removido
-  // pela chave que referencia um pai já comprovadamente ligado ao tenant/projeto.
   for(let pass=0;pass<meta.size;pass++){
     let changed=false;
     for(const [table,{fks}] of meta){
@@ -149,6 +150,20 @@ function buildPredicates(meta,companyIds,projectIds){
   return {predicates,depths};
 }
 
+function findProtectedBlockers(predicates){
+  const blockers=[];
+  const protectedTables=[...predicates.keys()].filter(isProtected).sort();
+  console.log(`\nMódulos fora do escopo protegidos encontrados no schema: ${protectedTables.length}`);
+  for(const table of protectedTables){
+    const predicate=predicates.get(table);
+    const rows=query(`SELECT COUNT(*) AS n FROM ${qi(table)} WHERE ${predicate};`);
+    const n=Number(rows[0]?.n||0);
+    console.log(`- ${table}: ${n} registro(s) vinculado(s)`);
+    if(n>0)blockers.push({table,n});
+  }
+  return blockers;
+}
+
 function backup(){
   fs.mkdirSync(path.resolve(ROOT,'backups'),{recursive:true});
   const stamp=new Date().toISOString().replace(/[:.]/g,'-');
@@ -169,7 +184,7 @@ function validateZero(meta,deletedCompanyIds,deletedProjectIds){
   const companySql=idsSql(deletedCompanyIds);
   const projectSql=idsSql(deletedProjectIds);
   for(const [table,{cols}] of meta){
-    if(['companies','projects'].includes(table))continue;
+    if(['companies','projects'].includes(table)||isProtected(table))continue;
     const parts=[];
     if(deletedCompanyIds.length&&cols.includes('company_id'))parts.push(`${qi('company_id')} IN (${companySql})`);
     if(deletedProjectIds.length&&cols.includes('project_id'))parts.push(`${qi('project_id')} IN (${projectSql})`);
@@ -178,8 +193,8 @@ function validateZero(meta,deletedCompanyIds,deletedProjectIds){
     const n=Number(rows[0]?.n||0);
     if(n>0)residual.push(`${table}:${n}`);
   }
-  if(residual.length)fail(`Pós-validação encontrou referências remanescentes: ${residual.join(', ')}.`);
-  console.log('\n[OK] Estado zero validado: 0 empresas, 0 projetos e nenhuma referência company_id/project_id aos IDs removidos.');
+  if(residual.length)fail(`Pós-validação encontrou referências PMO remanescentes: ${residual.join(', ')}.`);
+  console.log('\n[OK] Estado zero PMO validado: 0 empresas, 0 projetos e nenhuma referência PMO company_id/project_id aos IDs removidos.');
 }
 
 function main(){
@@ -200,9 +215,18 @@ function main(){
 
   const meta=listMetadata();
   const {predicates,depths}=buildPredicates(meta,companyIds,projectIds);
-  const affected=[...predicates.keys()].filter(t=>!['companies','projects'].includes(t));
-  console.log(`Tabelas dependentes identificadas: ${affected.length}`);
+  const allAffected=[...predicates.keys()].filter(t=>!['companies','projects'].includes(t));
+  const protectedBlockers=findProtectedBlockers(predicates);
+  const affected=allAffected.filter(t=>!isProtected(t));
+
+  console.log(`\nTabelas PMO elegíveis para limpeza: ${affected.length}`);
   affected.sort().forEach(t=>console.log(`- ${t}`));
+
+  if(protectedBlockers.length){
+    console.error('\n[BLOQUEIO DE ESCOPO] Existem dados vinculados em módulos que esta operação não tem autorização para alterar:');
+    protectedBlockers.forEach(x=>console.error(`- ${x.table}: ${x.n} registro(s)`));
+    fail('Reset PMO cancelado. É necessário desacoplar/preservar essas dependências antes de remover as empresas.',4);
+  }
 
   if(!companies.length&&!projects.length){
     console.log('\nStage já está em estado zero. Nenhuma alteração necessária.');
@@ -211,7 +235,7 @@ function main(){
   }
 
   if(!APPLY){
-    console.log('\nDRY-RUN concluído. Nenhum dado foi alterado.');
+    console.log('\nDRY-RUN SEGURO concluído. Nenhum dado foi alterado e nenhum módulo protegido possui registros vinculados.');
     console.log(`Para aplicar somente no STAGE após validar a release: node scripts/reset-stage-pmo-data.mjs --apply --confirm=${REQUIRED_CONFIRM}`);
     return;
   }
@@ -225,14 +249,13 @@ function main(){
   }
   if(projectIds.length)statements.push(`DELETE FROM ${qi('projects')} WHERE id IN (${idsSql(projectIds)});`);
   if(companyIds.length)statements.push(`DELETE FROM ${qi('companies')} WHERE id IN (${idsSql(companyIds)});`);
-  // Remove apenas sessões que ficaram órfãs; sessões de usuários PMO globais permanecem.
   if(meta.has('sessions')&&meta.has('users'))statements.push(`DELETE FROM ${qi('sessions')} WHERE user_id NOT IN (SELECT id FROM ${qi('users')});`);
   statements.push('PRAGMA foreign_keys=ON;');
 
   const temp=path.join(os.tmpdir(),`allamo-pmo-stage-reset-${Date.now()}.sql`);
   fs.writeFileSync(temp,statements.join('\n')+'\n','utf8');
   try{
-    console.log(`\nAplicando reset controlado: ${companies.length} empresa(s), ${projects.length} projeto(s), ${ordered.length} tabela(s) dependente(s)...`);
+    console.log(`\nAplicando reset controlado: ${companies.length} empresa(s), ${projects.length} projeto(s), ${ordered.length} tabela(s) PMO dependente(s)...`);
     runWrangler(['d1','execute',DB,'--remote','--config',CONFIG,'--file',temp],{capture:false});
   }finally{
     try{fs.unlinkSync(temp)}catch{}
@@ -240,7 +263,7 @@ function main(){
 
   validateZero(meta,companyIds,projectIds);
   console.log(`Backup preservado em: ${backupFile}`);
-  console.log('Produção não foi consultada nem alterada por esta rotina.');
+  console.log('Produção e módulos protegidos não foram alterados por esta rotina.');
 }
 
 try{main()}catch(e){fail(e?.message||String(e))}
