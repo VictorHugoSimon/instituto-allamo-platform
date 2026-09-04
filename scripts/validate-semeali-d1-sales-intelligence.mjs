@@ -50,7 +50,7 @@ if(validatePos<0||routeInsertPos<0||validatePos>routeInsertPos)throw new Error('
 must(ui,'Semeali · Sales Intelligence','UI white-label Semeali');
 must(ui,"api('commercial-summary?'",'UI consome resumo real');
 must(ui,"api('commercial-accounts?'",'UI consome carteira real');
-must(ui,"api('commercial-opportunities?'",'UI consome oportunidades reais');
+must(ui,"api('commercial-opportunities?'",'UI consome oportunidades real');
 must(ui,"api('commercial-approvals?'",'UI consome aprovações reais');
 must(ui,"api('commercial-routes?'",'UI consome rotas reais');
 
@@ -85,6 +85,6 @@ must(additive,"migrations/2026-09-03-commercial-tenant-guards.sql",'Gate aplica 
 must(additive,"migrations/2026-09-03-access-invitations.sql",'Gate aplica schema de convites');
 must(stageTenant,"confirm!=='ENSURE-SEMEALI-STAGE'",'Provisionamento Semeali exige confirmação própria');
 must(stageTenant,"const CONFIG='wrangler.stage.toml'",'Provisionamento Semeali é exclusivo de stage');
-must(stageWorkflow,'node scripts/ensure-semeali-tenant.mjs --apply --confirm=ENSURE-SEMEALI-STAGE','Release stage provisiona Semeali explicitamente');
+forbid(stageWorkflow,/ensure-semeali-tenant\.mjs\s+--apply/,'release automática do Stage não pode provisionar Semeali');
 
-console.log('OK: Semeali integrado ao core D1 canônico com Sales Intelligence, isolamento multiempresa, schema aditivo, rota pré-validada e convite seguro de acesso.');
+console.log('OK: Semeali permanece disponível como módulo e provisionamento manual explícito; release automática do STAGE não cria empresa.');
