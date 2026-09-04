@@ -49,7 +49,6 @@ must(previewEnv,'database_name = "allamo-pmo-stage"','preview usa D1 não produt
 must(previewEnv,`database_id = "${STAGE_ID}"`,'preview aponta para D1 não produtivo');
 forbid(previewEnv,PROD_ID,'preview do projeto de Produção nunca pode usar D1 produtivo');
 
-// Stage Pages: a branch git develop é também a production_branch do projeto Pages de homologação.
 must(stageBranchGuard,"const project='allamo-pmo-stage'",'guard usa somente o projeto Stage');
 must(stageBranchGuard,"const desiredBranch='develop'",'guard fixa develop como production branch do Stage');
 must(stageBranchGuard,"pages/projects/${encodeURIComponent(project)}",'guard consulta o projeto Pages via API oficial');
@@ -74,7 +73,9 @@ forbid(stageWorkflow,'wrangler.production.toml','Stage Actions nunca materializa
 must(stageWorkflow,'Backup obrigatório do D1 Stage','workflow Stage faz backup antes de evolução remota');
 must(stageWorkflow,'secure-d1-export.mjs --config wrangler.stage.toml','workflow Stage exporta o D1 de homologação via wrapper seguro');
 must(stageWorkflow,'ensure-additive-schema.mjs --env=stage','workflow Stage usa schema com config D1 dedicada');
-must(stageWorkflow,'repair-core-tenants-portable.mjs --env=stage --apply --confirm=REPAIR-STAGE','workflow Stage repara tenants essenciais de modo idempotente');
+must(stageWorkflow,'smoke-stage-data-integrity.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage','workflow Stage valida integridade sem exigir tenants fixos');
+forbid(stageWorkflow,'repair-core-tenants-portable.mjs --env=stage --apply','release Stage não pode criar/reparar empresas automaticamente');
+forbid(stageWorkflow,'ensure-semeali-tenant.mjs --apply','release Stage não pode provisionar Semeali automaticamente');
 
 must(prodCmd,'DEPLOY-PRODUCTION','produção local exige confirmação explícita');
 must(prodCmd,'if /I not "%BRANCH%"=="main"','produção local exige branch main');
@@ -97,8 +98,6 @@ must(prodWorkflow,'--project-name allamo-pmo --branch main','workflow produção
 forbid(prodWorkflow,'pages deploy public --config','workflow Pages Produção não usa --config customizado');
 forbid(prodWorkflow,'cp wrangler.stage.toml wrangler.toml','workflow produção nunca materializa config Stage');
 
-// O wrapper é parte da fronteira de segurança: deve exportar DB remoto, respeitar o config explícito
-// e redigir URLs temporárias sem alterar o arquivo de backup nem mascarar falhas do Wrangler.
 must(secureExport,"'d1', 'export', 'DB', '--remote', '--config', config",'wrapper executa export D1 remoto com config explícito');
 must(secureExport,"`--output=${output}`",'wrapper preserva caminho do backup solicitado');
 must(secureExport,"replace(/https?:\\/\\/\\S+/g, '[redacted-temporary-url]')",'wrapper redige URLs temporárias');
@@ -106,4 +105,4 @@ must(secureExport,'if (result.status !== 0) process.exit(result.status ?? 1)','w
 forbid(secureExport,'wrangler.stage.toml','wrapper não fixa Stage internamente');
 forbid(secureExport,'wrangler.production.toml','wrapper não fixa Produção internamente');
 
-console.log('OK: Pages/D1 isolados — backups Stage/Produção usam wrapper seguro com config explícito, Stage fixa develop e Produção permanece governada em main.');
+console.log('OK: Pages/D1 isolados — Stage preserva estado zero e nunca provisiona dados de negócio na release; Produção permanece governada em main.');
