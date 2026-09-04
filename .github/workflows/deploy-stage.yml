@@ -70,33 +70,19 @@ jobs:
           path: backup-stage-${{ github.sha }}.sql
           if-no-files-found: error
           retention-days: 14
-      - name: Dry-run do schema e dos tenants essenciais
+      - name: Dry-run do schema aditivo no Stage
         timeout-minutes: 10
-        run: |
-          node scripts/ensure-additive-schema.mjs --env=stage
-          node scripts/repair-core-tenants-portable.mjs --env=stage
-          node scripts/ensure-semeali-tenant.mjs
+        run: node scripts/ensure-additive-schema.mjs --env=stage
       - name: Aplicar somente schema aditivo no Stage
         timeout-minutes: 10
         run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
-      - name: Reparar tenants essenciais de forma idempotente no Stage
-        timeout-minutes: 10
-        run: node scripts/repair-core-tenants-portable.mjs --env=stage --apply --confirm=REPAIR-STAGE
-      - name: Pós-validar reparo dos tenants essenciais no Stage
-        timeout-minutes: 10
-        run: node scripts/repair-core-tenants-portable.mjs --env=stage
-      - name: Provisionar Semeali somente no Stage
-        timeout-minutes: 10
-        run: |
-          node scripts/ensure-semeali-tenant.mjs --apply --confirm=ENSURE-SEMEALI-STAGE
-          node scripts/ensure-semeali-tenant.mjs
       - name: Materializar configuração exclusiva de Stage
         run: |
           cp wrangler.stage.toml wrangler.toml
           grep -F 'name = "allamo-pmo-stage"' wrangler.toml
       - name: Registrar configuração Stage validada
         env: { GH_TOKEN: "${{ github.token }}" }
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração, backup, schema e tenants de Stage validados'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração, backup e schema de Stage validados; nenhum tenant foi criado automaticamente'
       - name: Publicar exatamente o artefato validado no STAGE canônico
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch develop --commit-hash "$GITHUB_SHA" --commit-dirty=true
       - name: Confirmar que a URL canônica recebeu este commit
@@ -106,8 +92,8 @@ jobs:
         env:
           ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
           ALLAMO_SMOKE_COMPANIES: ${{ vars.ALLAMO_SMOKE_COMPANIES }}
-      - name: Smoke dos tenants essenciais pós-deploy
-        run: node scripts/smoke-core-tenants.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage
+      - name: Smoke de integridade dos dados PMO pós-deploy
+        run: node scripts/smoke-stage-data-integrity.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage
       - name: Smoke CRUD real Valkíria Service Hub
         run: node scripts/smoke-service-hub-stage.mjs
         env:
@@ -142,7 +128,7 @@ jobs:
           echo "- Fingerprint pós-deploy: obrigatório" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório e retido por 14 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação, cada etapa com timeout dedicado" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Semeali: dry-run + provisionamento idempotente exclusivo de Stage; nenhum usuário/senha automático" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Smokes: governança multitenant + tenants + Valkíria Service Hub + POP OPR + OPR Governance Platform v2" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dados de negócio: nunca criados/reparados automaticamente pela release" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Estado zero: válido quando companies e projects estão vazios" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smokes: governança + integridade genérica PMO + Valkíria Service Hub + POP OPR + OPR Governance Platform v2" >> "$GITHUB_STEP_SUMMARY"
           echo "- Reuniões OPR: sincronização idempotente para Plano de Ação + Cadência" >> "$GITHUB_STEP_SUMMARY"
