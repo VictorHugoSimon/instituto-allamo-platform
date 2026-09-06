@@ -23,3 +23,4 @@ console.log('OK: API de Governança de Sprint (DoR/DoD) injetada no Worker.');
 // a Governança de Sprint para permanecer no build existente sem tocar em
 // módulos externos ao Painel PMO.
 await import('./harden-pmo-cockpit-v2.mjs');
+await import('./harden-pmo-cockpit-navigation.mjs');
