@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'public/semeali/**'
+      - 'src/semeali-live-public-api.js'
       - 'scripts/validate-semeali-platform-portal.mjs'
       - 'scripts/build-semeali-dedicated-stage.mjs'
       - 'wrangler.semeali-stage.toml'
@@ -14,6 +15,7 @@ on:
       - feature/semeali-platform-portal-v2
     paths:
       - 'public/semeali/**'
+      - 'src/semeali-live-public-api.js'
       - 'scripts/validate-semeali-platform-portal.mjs'
       - 'scripts/build-semeali-dedicated-stage.mjs'
       - 'wrangler.semeali-stage.toml'
@@ -33,8 +35,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Validar sintaxe JavaScript
-        run: node --check public/semeali/data.js && node --check public/semeali/app.js
+      - name: Validar sintaxe JavaScript do portal
+        run: |
+          node --check public/semeali/data.js
+          node --check public/semeali/app.js
+          node --check public/semeali/live.js
       - name: Validar isolamento e contratos Semeali
         run: node scripts/validate-semeali-platform-portal.mjs
       - name: Validar build dedicado da Semeali
@@ -44,8 +49,17 @@ jobs:
           node scripts/build-semeali-dedicated-stage.mjs
           test -f semeali-dist/index.html
           test -f semeali-dist/_worker.js
+          test -f semeali-dist/live.js
+          test -f semeali-dist/live.css
+          node --check semeali-dist/_worker.js
           grep -F 'SEMEALI' semeali-dist/index.html
           grep -F 'Portal Comercial' semeali-dist/index.html
+          grep -F 'data-semeali-live' semeali-dist/index.html
+          grep -F 'Área do Vendedor' semeali-dist/live.js
+          grep -F 'Clima Agrícola' semeali-dist/live.js
+          grep -F 'Mercado agora' semeali-dist/live.js
+          grep -F "path==='semeali-live-market'" semeali-dist/_worker.js
+          grep -F "path==='semeali-weather'" semeali-dist/_worker.js
           grep -F 'ci-semeali' semeali-dist/index.html
           if grep -Eqi 'allamo-pmo|Painel PMO|Sementes Boa Safra|SBS' semeali-dist/index.html; then exit 1; fi
       - name: Validar projeto Pages dedicado
