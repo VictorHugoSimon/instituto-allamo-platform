@@ -18,3 +18,8 @@ if(worker.includes(start)){
 }
 fs.writeFileSync(workerFile,worker);
 console.log('OK: API de Governança de Sprint (DoR/DoD) injetada no Worker.');
+
+// O Cockpit Executivo pertence ao mesmo domínio PMO e é injetado logo após
+// a Governança de Sprint para permanecer no build existente sem tocar em
+// módulos externos ao Painel PMO.
+await import('./harden-pmo-cockpit-v2.mjs');
