@@ -59,6 +59,12 @@ must(reviewApi,"provider_event_concurrent_review",'conflito de revisão concorre
 must(reviewApi,"String(channel.provider)!=='whatsapp'",'resolução apenas para canal WhatsApp');
 must(reviewApi,"SET status='resolved',channel_id=?,tenant_id=?,project_id=?",'resolução atribui tenant/projeto pelo canal');
 must(reviewApi,'safeProviderMetadata','metadata filtrada');
+must(reviewApi,"shpReadinessPath='service-hub/providers/whatsapp/readiness'",'endpoint autenticado de readiness WhatsApp');
+must(reviewApi,'inboundReady:verifyTokenConfigured&&appSecretConfigured','readiness inbound exige verify token + app secret');
+must(reviewApi,'outboundReady:accessTokenConfigured&&graphVersionConfigured&&phoneNumberIdConfigured','readiness outbound exige token + versão + phone number id');
+must(reviewApi,'wabaSubscriptionReady:accessTokenConfigured&&graphVersionConfigured&&wabaIdConfigured','readiness de assinatura WABA');
+must(reviewApi,"groups:{status:'external_validation_required'}",'grupos dependem de validação externa real');
+must(reviewApi,'secretsExposed:false','readiness não expõe segredos');
 if(reviewApi.includes('sender_ref_hash'))throw new Error('Fila administrativa não pode expor sender_ref_hash.');
 if(reviewApi.includes('INSERT INTO service_hub_tickets'))throw new Error('Resolver quarentena não pode abrir chamado automaticamente.');
 if(reviewApi.includes('INSERT INTO service_hub_messages'))throw new Error('Resolver quarentena não pode promover mensagem automaticamente.');
