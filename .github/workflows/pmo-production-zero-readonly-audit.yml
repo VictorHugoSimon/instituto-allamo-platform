@@ -1,0 +1,27 @@
+name: PMO Production Zero Read-Only Audit
+
+on:
+  push:
+    branches:
+      - ops/pmo-stage-reset-zero
+    paths:
+      - 'scripts/audit-production-pmo-zero-readonly.mjs'
+      - '.github/workflows/pmo-production-zero-readonly-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit-production-zero:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Auditar Produção PMO somente leitura
+        run: node scripts/audit-production-pmo-zero-readonly.mjs
