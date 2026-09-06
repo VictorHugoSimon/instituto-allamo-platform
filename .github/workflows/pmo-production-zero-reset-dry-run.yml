@@ -1,0 +1,29 @@
+name: PMO PRODUCTION Zero Reset Dry Run
+
+on:
+  push:
+    branches:
+      - ops/pmo-production-reset-zero
+    paths:
+      - 'scripts/reset-production-pmo-data-v2.mjs'
+      - '.github/workflows/pmo-production-zero-reset-dry-run.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validar acesso read-only ao D1 oficial de Produção
+        run: npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "SELECT 1 AS ok;"
+      - name: Executar somente dry-run PROD V2
+        run: node scripts/reset-production-pmo-data-v2.mjs
