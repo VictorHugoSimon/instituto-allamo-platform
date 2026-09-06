@@ -2,7 +2,7 @@ import fs from 'node:fs';
 const read=path=>fs.readFileSync(path,'utf8');
 const nav=read('src/pmo-cockpit-navigation.js');
 const hardener=read('scripts/harden-pmo-cockpit-navigation.mjs');
-const pkg=JSON.parse(read('package.json'));
+const sprintHardener=read('scripts/harden-sprint-governance.mjs');
 const html=read('public/index.html');
 const must=(text,needle,label)=>{if(!text.includes(needle))throw new Error(`Ausente: ${label} (${needle})`)};
 
@@ -20,9 +20,7 @@ must(hardener,start,'marcador inicial idempotente');
 must(hardener,end,'marcador final idempotente');
 must(hardener,"fs.readFileSync(source,'utf8')",'hardener lê a fonte versionada');
 must(hardener,"html.replace('</body>',block+'\\n</body>')",'injeção antes do fechamento do body');
-
-const build=String(pkg.scripts?.['build:work']||'');
-must(build,'node scripts/harden-pmo-cockpit-navigation.mjs','pipeline principal executa hardening PMO');
+must(sprintHardener,"await import('./harden-pmo-cockpit-navigation.mjs')",'pipeline PMO executa hardening da navegação');
 
 must(html,start,'artefato contém marcador inicial da navegação');
 must(html,end,'artefato contém marcador final da navegação');
