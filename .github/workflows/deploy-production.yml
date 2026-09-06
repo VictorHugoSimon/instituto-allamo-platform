@@ -83,22 +83,16 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Dry-run do schema base, aditivo e tenants essenciais em Produção
+      - name: Dry-run do schema base e aditivo em Produção
         run: |
           node scripts/ensure-work-management-schema.mjs --env=production
           node scripts/ensure-additive-schema.mjs --env=production
-          node scripts/repair-core-tenants-portable.mjs --env=production
 
       - name: Garantir schema base de Work Management em Produção
         run: node scripts/ensure-work-management-schema.mjs --env=production --apply --confirm=APPLY-WORK-SCHEMA-PRODUCTION
 
       - name: Aplicar somente schema aditivo em Produção
         run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
-
-      - name: Reparar tenants essenciais de forma idempotente em Produção
-        run: |
-          node scripts/repair-core-tenants-portable.mjs --env=production --apply --confirm=REPAIR-PRODUCTION
-          node scripts/repair-core-tenants-portable.mjs --env=production
 
       - name: Gate final antes do deploy produtivo
         run: npm run test:release
@@ -111,11 +105,22 @@ jobs:
       - name: Publicar exatamente o artefato validado em PRODUÇÃO
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo --branch main --commit-dirty=true
 
-      - name: Smoke dos tenants essenciais em Produção
-        run: node scripts/smoke-core-tenants.mjs --base=https://allamo-pmo.pages.dev --env=production
+      - name: Smoke de integridade dos dados PMO em Produção
+        run: |
+          npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "SELECT (SELECT COUNT(*) FROM projects p LEFT JOIN companies c ON c.id=p.company_id WHERE p.company_id IS NOT NULL AND c.id IS NULL) AS orphan_projects, (SELECT COUNT(*) FROM (SELECT id FROM companies GROUP BY id HAVING COUNT(*) > 1)) AS duplicate_company_ids;" --json > /tmp/pmo-production-integrity.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('/tmp/pmo-production-integrity.json','utf8');
+          const a=raw.indexOf('['),b=raw.lastIndexOf(']');
+          if(a<0||b<a)throw new Error('Resposta D1 sem JSON reconhecível');
+          const row=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[])[0]||{};
+          if(Number(row.orphan_projects)!==0)throw new Error(`Projetos órfãos em Produção: ${row.orphan_projects}`);
+          if(Number(row.duplicate_company_ids)!==0)throw new Error(`IDs de empresa duplicados em Produção: ${row.duplicate_company_ids}`);
+          console.log('[OK] Integridade PMO produtiva válida; estado zero também é aceito.');
+          NODE
 
-      - name: Smoke de governança multitenant em Produção
-        run: node scripts/smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production
+      - name: Smoke de governança multitenant / estado zero em Produção
+        run: node scripts/smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production --allow-zero=true
 
       - name: Registrar sucesso do deploy produtivo
         if: success()
@@ -138,8 +143,9 @@ jobs:
           echo "- Deploy automático por push/merge em main: ATIVO" >> "$GITHUB_STEP_SUMMARY"
           echo "- Workflow manual: disponível como fallback" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório e retido por 30 dias" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Schema base Work Management: dry-run + aplicação idempotente antes do schema OPR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Schema base Work Management: dry-run + aplicação idempotente" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema aditivo: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Tenants essenciais: dry-run + reparo idempotente + pós-validação" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dados de negócio: deploy NÃO cria nem repara empresas/projetos automaticamente" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Recuperação de tenants: somente operação manual, explícita e confirmada" >> "$GITHUB_STEP_SUMMARY"
           echo "- Autenticação: API Token com fallback para Global API Key + e-mail quando disponível" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Smokes: Dual Clima/Madrid/OPR + governança multitenant" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smokes: integridade PMO + governança multitenant/estado zero" >> "$GITHUB_STEP_SUMMARY"
