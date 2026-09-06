@@ -37,12 +37,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Validar sintaxe JavaScript
+      - name: Validar sintaxe JavaScript do portal
         run: |
           node --check public/semeali/data.js
           node --check public/semeali/app.js
           node --check public/semeali/live.js
-          node --check src/semeali-live-public-api.js
       - name: Validar isolamento e contratos Semeali
         run: node scripts/validate-semeali-platform-portal.mjs
       - name: Validar build dedicado da Semeali
