@@ -1,0 +1,136 @@
+name: Semeali Dedicated STAGE
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'public/semeali/**'
+      - 'src/commercial-sales-intelligence-api.js'
+      - 'src/commercial-sales-intelligence-route-guard.js'
+      - 'src/access-invitation-api.js'
+      - 'src/access-invitation-public-api.js'
+      - 'scripts/harden-commercial-sales-intelligence.mjs'
+      - 'scripts/build-semeali-dedicated-stage.mjs'
+      - 'scripts/validate-semeali-platform-portal.mjs'
+      - 'scripts/validate-semeali-d1-sales-intelligence.mjs'
+      - 'wrangler.semeali-stage.toml'
+      - '.github/workflows/deploy-semeali-stage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: semeali-dedicated-stage-release
+  cancel-in-progress: false
+
+env:
+  SEMEALI_PAGES_PROJECT: semeali-intelligence-stage
+  SEMEALI_STAGE_URL: https://semeali-intelligence-stage.pages.dev
+
+jobs:
+  release-semeali-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Marcar release Semeali em andamento
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=pending -f context=semeali/stage-deploy -f description='Publicação do Stage dedicado Semeali em andamento'
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar runtime canônico
+        run: npm run build:work
+
+      - name: Validar contratos Semeali
+        run: |
+          node scripts/validate-semeali-platform-portal.mjs
+          node scripts/validate-semeali-d1-sales-intelligence.mjs
+
+      - name: Gerar artefato dedicado Semeali
+        env:
+          SEMEALI_RELEASE_SHA: ${{ github.sha }}
+        run: node scripts/build-semeali-dedicated-stage.mjs
+
+      - name: Confirmar isolamento do artefato
+        run: |
+          test -f semeali-dist/index.html
+          test -f semeali-dist/app.js
+          test -f semeali-dist/data.js
+          test -f semeali-dist/_worker.js
+          grep -F 'SEMEALI' semeali-dist/index.html
+          grep -F 'Portal Comercial' semeali-dist/index.html
+          grep -F "${GITHUB_SHA}" semeali-dist/index.html
+          if grep -Eqi 'allamo-pmo|Painel PMO|Sementes Boa Safra|SBS' semeali-dist/index.html; then echo 'Marca ou experiência indevida no portal Semeali'; exit 1; fi
+
+      - name: Registrar gates Semeali aprovados
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=semeali/stage-gates -f description='Portal dedicado e contratos Semeali aprovados'
+
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Validar Cloudflare
+        run: npx wrangler@4.124.0 whoami
+
+      - name: Garantir projeto Pages exclusivo da Semeali
+        shell: bash
+        run: |
+          npx wrangler@4.124.0 pages project list --json > /tmp/pages-projects.json
+          if node -e "const p=require('/tmp/pages-projects.json'); process.exit(p.some(x=>x.name===process.env.SEMEALI_PAGES_PROJECT)?0:1)"; then
+            echo "Projeto Pages ${SEMEALI_PAGES_PROJECT} já existe."
+          else
+            npx wrangler@4.124.0 pages project create "${SEMEALI_PAGES_PROJECT}" --production-branch develop
+          fi
+
+      - name: Publicar portal Semeali na URL dedicada
+        run: npx wrangler@4.124.0 pages deploy semeali-dist --project-name "${SEMEALI_PAGES_PROJECT}" --branch develop --commit-hash "$GITHUB_SHA" --commit-dirty=true --config wrangler.semeali-stage.toml
+
+      - name: Confirmar portal na raiz do novo domínio
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 20 "${SEMEALI_STAGE_URL}/?release=${GITHUB_SHA}" -o /tmp/semeali.html; then
+              if grep -Fq 'SEMEALI' /tmp/semeali.html && grep -Fq 'Portal Comercial' /tmp/semeali.html && grep -Fq "${GITHUB_SHA}" /tmp/semeali.html; then
+                echo "Portal Semeali confirmado em ${SEMEALI_STAGE_URL}"
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo 'URL dedicada ainda não recebeu o release esperado.'
+          exit 1
+
+      - name: Registrar sucesso do Stage Semeali
+        if: success()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=semeali/stage-deploy -f description='Stage dedicado Semeali publicado e verificado'
+
+      - name: Registrar falha do Stage Semeali
+        if: failure()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=semeali/stage-deploy -f description='Falha na publicação do Stage dedicado Semeali'
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### Semeali Dedicated STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${SEMEALI_STAGE_URL}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Projeto Pages: ${SEMEALI_PAGES_PROJECT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Entrada: raiz /" >> "$GITHUB_STEP_SUMMARY"
+          echo "- PMO não é publicado no artefato dedicado" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Produção principal: não alterada" >> "$GITHUB_STEP_SUMMARY"

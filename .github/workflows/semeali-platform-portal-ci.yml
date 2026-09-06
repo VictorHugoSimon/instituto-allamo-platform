@@ -5,6 +5,9 @@ on:
     paths:
       - 'public/semeali/**'
       - 'scripts/validate-semeali-platform-portal.mjs'
+      - 'scripts/build-semeali-dedicated-stage.mjs'
+      - 'wrangler.semeali-stage.toml'
+      - '.github/workflows/deploy-semeali-stage.yml'
       - '.github/workflows/semeali-platform-portal-ci.yml'
   push:
     branches:
@@ -12,6 +15,9 @@ on:
     paths:
       - 'public/semeali/**'
       - 'scripts/validate-semeali-platform-portal.mjs'
+      - 'scripts/build-semeali-dedicated-stage.mjs'
+      - 'wrangler.semeali-stage.toml'
+      - '.github/workflows/deploy-semeali-stage.yml'
       - '.github/workflows/semeali-platform-portal-ci.yml'
   workflow_dispatch:
 
@@ -31,3 +37,18 @@ jobs:
         run: node --check public/semeali/data.js && node --check public/semeali/app.js
       - name: Validar isolamento e contratos Semeali
         run: node scripts/validate-semeali-platform-portal.mjs
+      - name: Validar build dedicado da Semeali
+        env:
+          SEMEALI_RELEASE_SHA: ci-semeali
+        run: |
+          node scripts/build-semeali-dedicated-stage.mjs
+          test -f semeali-dist/index.html
+          test -f semeali-dist/_worker.js
+          grep -F 'SEMEALI' semeali-dist/index.html
+          grep -F 'Portal Comercial' semeali-dist/index.html
+          grep -F 'ci-semeali' semeali-dist/index.html
+          if grep -Eqi 'allamo-pmo|Painel PMO|Sementes Boa Safra|SBS' semeali-dist/index.html; then exit 1; fi
+      - name: Validar projeto Pages dedicado
+        run: |
+          grep -F 'name = "semeali-intelligence-stage"' wrangler.semeali-stage.toml
+          grep -F 'pages_build_output_dir = "semeali-dist"' wrangler.semeali-stage.toml
