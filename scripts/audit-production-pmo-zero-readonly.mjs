@@ -18,9 +18,13 @@ function abort(m){console.error('[ABORTADO] '+m);process.exit(2)}
 function verify(){
   if(!fs.existsSync(CONFIG)) abort(`${CONFIG} ausente`);
   const cfg=fs.readFileSync(CONFIG,'utf8');
-  if(!cfg.includes(`database_name = "${EXPECTED_NAME}"`)) abort('Config não aponta para o D1 oficial de Produção.');
-  if(!cfg.includes(`database_id = "${EXPECTED_ID}"`)) abort('UUID de Produção divergente.');
-  if(cfg.includes(STAGE_ID)) abort('UUID do STAGE encontrado no config de Produção.');
+  const root=cfg.split(/^\[env\./m)[0];
+  if(!root.includes(`database_name = "${EXPECTED_NAME}"`)) abort('Binding raiz não aponta para o D1 oficial de Produção.');
+  if(!root.includes(`database_id = "${EXPECTED_ID}"`)) abort('UUID do binding raiz de Produção divergente.');
+  if(root.includes(STAGE_ID)) abort('UUID do STAGE encontrado no binding raiz de Produção.');
+  const prodBlock=(cfg.match(/\[env\.production\][\s\S]*?(?=\n\[env\.|$)/)||[])[0]||'';
+  if(prodBlock&&!prodBlock.includes(EXPECTED_ID)) abort('[env.production] não aponta para o UUID oficial de Produção.');
+  console.log('[OK] Guard de configuração: binding raiz/produção corretos; [env.preview] pode usar STAGE deliberadamente.');
 }
 function run(sql){
   let last='';
