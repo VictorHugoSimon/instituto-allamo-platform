@@ -91,7 +91,7 @@ jobs:
         shell: bash
         run: |
           npx wrangler@4.124.0 pages project list --json > /tmp/pages-projects.json
-          if node -e "const p=require('/tmp/pages-projects.json'); process.exit(p.some(x=>x.name===process.env.SEMEALI_PAGES_PROJECT)?0:1)"; then
+          if grep -Fq "${SEMEALI_PAGES_PROJECT}" /tmp/pages-projects.json; then
             echo "Projeto Pages ${SEMEALI_PAGES_PROJECT} já existe."
           else
             npx wrangler@4.124.0 pages project create "${SEMEALI_PAGES_PROJECT}" --production-branch develop
