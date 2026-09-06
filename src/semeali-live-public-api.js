@@ -23,7 +23,7 @@ if(path==='semeali-live-market'&&request.method==='GET'){
   const assets=[
     {id:'soy',symbol:'ZS=F',label:'Soja CBOT',crop:'SOJA',unit:'¢/bushel'},
     {id:'corn',symbol:'ZC=F',label:'Milho CBOT',crop:'MILHO',unit:'¢/bushel'},
-    {id:'usdbrl',symbol:'USDBRL=X',label:'Dólar / Real',crop:'MACRO',unit:'R$/US$'}
+    {id:'usdbrl',symbol:'USDBRL=X',label:'Dólar / Real',crop:'MACRO',unit:'BRL por USD'}
   ];
   const quote=async asset=>{
     try{
