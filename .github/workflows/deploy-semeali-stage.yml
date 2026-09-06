@@ -55,7 +55,7 @@ jobs:
       - name: Validar contratos Semeali
         run: |
           node --check public/semeali/live.js
-          node --check src/semeali-live-public-api.js
+          node --check public/_worker.js
           node scripts/validate-semeali-platform-portal.mjs
           node scripts/validate-semeali-d1-sales-intelligence.mjs
 
