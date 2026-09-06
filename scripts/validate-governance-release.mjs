@@ -22,26 +22,31 @@ must(prod,"github.ref == 'refs/heads/main'",'Produção bloqueia branch diferent
 must(prod,"inputs.confirm == 'DEPLOY-PRODUCTION'",'Fallback manual exige confirmação explícita');
 must(prod,'prepare-cloudflare-auth.mjs','Produção usa preparação/verificação de autenticação Cloudflare');
 must(prod,'Backup obrigatório do D1 produtivo','Backup obrigatório');
-must(prod,'Dry-run do schema base, aditivo e tenants essenciais em Produção','Dry-run antes de mudanças');
+must(prod,'Dry-run do schema base e aditivo em Produção','Dry-run antes de mudanças');
 must(prod,'ensure-work-management-schema.mjs --env=production','Dry-run valida Work Management antes da alteração');
 must(prod,'ensure-work-management-schema.mjs --env=production --apply --confirm=APPLY-WORK-SCHEMA-PRODUCTION','Work Management produtivo idempotente e confirmado');
 must(prod,'ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION','Schema produtivo somente aditivo e confirmado');
-must(prod,'repair-core-tenants-portable.mjs --env=production --apply --confirm=REPAIR-PRODUCTION','Reparo idempotente de tenants essenciais');
+if(prod.includes('repair-core-tenants-portable.mjs --env=production'))throw new Error('Release PROD não pode reparar/provisionar tenants automaticamente.');
+if(prod.includes('REPAIR-PRODUCTION'))throw new Error('Release PROD não pode conter confirmação de reparo automático de tenants.');
 must(prod,'Gate final antes do deploy produtivo','Gate reexecutado depois da preparação do D1');
 must(prod,'Publicar exatamente o artefato validado em PRODUÇÃO','Deploy produtivo');
-must(prod,'smoke-core-tenants.mjs --base=https://allamo-pmo.pages.dev --env=production','Smoke dos tenants em Produção');
-must(prod,'smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production','Smoke de governança em Produção');
+must(prod,'Smoke de integridade dos dados PMO em Produção','Smoke de integridade PMO em Produção');
+must(prod,'orphan_projects','Smoke verifica projetos órfãos');
+must(prod,'duplicate_company_ids','Smoke verifica IDs de empresa duplicados');
+must(prod,'smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production --allow-zero=true','Smoke de governança produtivo aceita estado zero explicitamente');
+if(prod.includes('smoke-core-tenants.mjs --base=https://allamo-pmo.pages.dev'))throw new Error('Release PROD não pode exigir tenants fixos no smoke pós-deploy.');
 for(const table of ['work_items','work_sprints','work_comments','work_checklist','work_links','work_events'])must(workSchema,`'${table}'`,`guard contempla ${table}`);
 must(workSchema,'migrations/2026-08-21-work-management.sql','guard usa migration base idempotente');
 if(/\b(?:DELETE\s+FROM|DROP\s+TABLE|TRUNCATE|DROP\s+DATABASE)\b/i.test(workSchema))throw new Error('Guard de Work Management contém operação destrutiva.');
 const backup=prod.indexOf('Backup obrigatório do D1 produtivo');
-const dryRun=prod.indexOf('Dry-run do schema base, aditivo e tenants essenciais em Produção');
+const dryRun=prod.indexOf('Dry-run do schema base e aditivo em Produção');
 const workApply=prod.indexOf('Garantir schema base de Work Management em Produção');
 const schemaApply=prod.indexOf('Aplicar somente schema aditivo em Produção');
 const finalGate=prod.indexOf('Gate final antes do deploy produtivo');
 const deploy=prod.indexOf('Publicar exatamente o artefato validado em PRODUÇÃO');
-const smoke=prod.indexOf('Smoke dos tenants essenciais em Produção');
-if(!(backup>=0&&backup<dryRun&&dryRun<workApply&&workApply<schemaApply&&schemaApply<finalGate&&finalGate<deploy&&deploy<smoke))throw new Error('Ordem segura de Produção inválida: backup → dry-run → Work Management → schema aditivo → gate → deploy → smoke.');
+const integritySmoke=prod.indexOf('Smoke de integridade dos dados PMO em Produção');
+const governanceSmoke=prod.indexOf('Smoke de governança multitenant / estado zero em Produção');
+if(!(backup>=0&&backup<dryRun&&dryRun<workApply&&workApply<schemaApply&&schemaApply<finalGate&&finalGate<deploy&&deploy<integritySmoke&&integritySmoke<governanceSmoke))throw new Error('Ordem segura de Produção inválida: backup → dry-run → Work Management → schema aditivo → gate → deploy → integridade PMO → governança/estado zero.');
 
 must(stageWorkflow,'push:','Stage deve publicar automaticamente após develop');
 must(stageWorkflow,'branches: [develop]','Auto deploy Stage somente em develop');
@@ -65,4 +70,4 @@ must(canonicalVerifier,'fingerprint ainda não é JSON','HTML transitório não 
 must(canonicalVerifier,'/api/companies ainda não é JSON','API live também aguarda propagação de JSON');
 if(/if\(res\.ok\)\s*return\s*\{res,text\}/.test(canonicalVerifier))throw new Error('Verificador canônico voltou a aceitar qualquer HTTP 200 antes de validar conteúdo/SHA.');
 
-console.log('OK: release governado — Stage automático em develop e Produção automática em main, com backup, Work Management base, evolução aditiva, gates, fingerprint canônico estrito com retry e smoke pós-deploy.');
+console.log('OK: release governado — Produção automática em main com backup, evolução somente aditiva, sem criação/reparo automático de tenants e com smokes compatíveis com estado zero; Stage mantém seus gates próprios.');
