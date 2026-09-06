@@ -24,11 +24,24 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Confirmar estado pré-reset 4 empresas / 3 projetos
+        run: |
+          npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT (SELECT COUNT(*) FROM companies) AS companies, (SELECT COUNT(*) FROM projects) AS projects;" --json | tee /tmp/pre-reset.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('/tmp/pre-reset.json','utf8');
+          const a=raw.indexOf('['), b=raw.lastIndexOf(']');
+          if(a<0||b<a) throw new Error('Resposta D1 sem JSON reconhecível');
+          const row=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[])[0]||{};
+          if(Number(row.companies)!==4||Number(row.projects)!==3) throw new Error(`Pré-condição divergente: companies=${row.companies}, projects=${row.projects}`);
+          console.log('[OK] Pré-condição 4/3 confirmada.');
+          NODE
+
       - name: Gate de fronteira — módulos fora do PMO
         run: node scripts/check-pmo-reset-protected-boundary.mjs
 
-      - name: Executar reset PMO controlado somente no D1 STAGE
-        run: node scripts/reset-stage-pmo-data.mjs --apply --confirm=RESET-PMO-STAGE
+      - name: Executar reset PMO V2 controlado somente no D1 STAGE
+        run: node scripts/reset-stage-pmo-data-v2.mjs --apply --confirm=RESET-PMO-STAGE
 
       - name: Validar estado zero diretamente no D1 STAGE
         run: |
@@ -39,11 +52,8 @@ jobs:
           const a=raw.indexOf('['), b=raw.lastIndexOf(']');
           if(a<0||b<a) throw new Error('Resposta D1 sem JSON reconhecível');
           const payload=JSON.parse(raw.slice(a,b+1));
-          const rows=payload.flatMap(x=>x?.results||[]);
-          const row=rows[0]||{};
-          if(Number(row.companies)!==0||Number(row.projects)!==0){
-            throw new Error(`Estado zero não confirmado: companies=${row.companies}, projects=${row.projects}`);
-          }
+          const row=payload.flatMap(x=>x?.results||[])[0]||{};
+          if(Number(row.companies)!==0||Number(row.projects)!==0) throw new Error(`Estado zero não confirmado: companies=${row.companies}, projects=${row.projects}`);
           console.log('[OK] D1 STAGE confirmado com 0 empresas e 0 projetos.');
           NODE
 
