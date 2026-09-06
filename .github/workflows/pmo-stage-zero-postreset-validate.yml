@@ -13,7 +13,7 @@ permissions:
 jobs:
   validate-zero:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -55,20 +55,56 @@ jobs:
           fi
           echo "[OK] D1 STAGE confirmado com 0 empresas e 0 projetos."
 
-      - name: Confirmar ausência de referências diretas aos tenants removidos nos módulos protegidos
+      - name: Confirmar módulos protegidos sem vínculos aos tenants removidos
         run: |
-          npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT (SELECT COUNT(*) FROM access_invitations WHERE company_id IN ('dualclima','madri','opr','semeali')) AS access_invitations, (SELECT COUNT(*) FROM commercial_accounts WHERE company_id IN ('dualclima','madri','opr','semeali')) AS commercial_accounts, (SELECT COUNT(*) FROM commercial_approvals WHERE company_id IN ('dualclima','madri','opr','semeali')) AS commercial_approvals, (SELECT COUNT(*) FROM commercial_campaigns WHERE company_id IN ('dualclima','madri','opr','semeali')) AS commercial_campaigns, (SELECT COUNT(*) FROM commercial_interactions WHERE company_id IN ('dualclima','madri','opr','semeali')) AS commercial_interactions, (SELECT COUNT(*) FROM commercial_opportunities WHERE company_id IN ('dualclima','madri','opr','semeali')) AS commercial_opportunities, (SELECT COUNT(*) FROM commercial_route_stops WHERE company_id IN ('dualclima','madri','opr','semeali')) AS commercial_route_stops, (SELECT COUNT(*) FROM commercial_routes WHERE company_id IN ('dualclima','madri','opr','semeali')) AS commercial_routes, (SELECT COUNT(*) FROM service_hub_channels WHERE company_id IN ('dualclima','madri','opr','semeali')) AS service_hub_channels, (SELECT COUNT(*) FROM service_hub_messages WHERE company_id IN ('dualclima','madri','opr','semeali')) AS service_hub_messages, (SELECT COUNT(*) FROM service_hub_provider_events WHERE company_id IN ('dualclima','madri','opr','semeali')) AS service_hub_provider_events, (SELECT COUNT(*) FROM service_hub_sla_policies WHERE company_id IN ('dualclima','madri','opr','semeali')) AS service_hub_sla_policies, (SELECT COUNT(*) FROM service_hub_systems WHERE company_id IN ('dualclima','madri','opr','semeali')) AS service_hub_systems, (SELECT COUNT(*) FROM service_hub_tickets WHERE company_id IN ('dualclima','madri','opr','semeali')) AS service_hub_tickets;" --json > /tmp/protected-zero.json
-          node --input-type=module - <<'NODE'
+          set -euo pipefail
+          tables=(
+            access_invitations
+            commercial_accounts
+            commercial_approvals
+            commercial_campaigns
+            commercial_interactions
+            commercial_opportunities
+            commercial_route_stops
+            commercial_routes
+            service_hub_channels
+            service_hub_messages
+            service_hub_provider_events
+            service_hub_sla_policies
+            service_hub_systems
+            service_hub_tickets
+          )
+          for table in "${tables[@]}"; do
+            ok=0
+            for attempt in 1 2 3; do
+              echo "${table}: tentativa ${attempt}/3"
+              if npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT COUNT(*) AS n FROM ${table} WHERE company_id IN ('dualclima','madri','opr','semeali');" --json > "/tmp/${table}.json" 2>"/tmp/${table}.err"; then
+                if TABLE="$table" node --input-type=module - <<'NODE'
           import fs from 'node:fs';
-          const raw=fs.readFileSync('/tmp/protected-zero.json','utf8');
+          const table=process.env.TABLE;
+          const raw=fs.readFileSync(`/tmp/${table}.json`,'utf8');
           const a=raw.indexOf('['), b=raw.lastIndexOf(']');
-          if(a<0||b<a) throw new Error('Resposta protegida sem JSON reconhecível');
+          if(a<0||b<a) process.exit(2);
           const row=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[])[0]||{};
-          const nonzero=Object.entries(row).filter(([,v])=>Number(v)!==0);
-          console.log('Módulos protegidos:',row);
-          if(nonzero.length) throw new Error('Referências protegidas remanescentes: '+JSON.stringify(nonzero));
-          console.log('[OK] Módulos protegidos continuam sem vínculos aos tenants removidos.');
+          const n=Number(row.n);
+          console.log(`${table}: linked_rows=${n}`);
+          if(n!==0) process.exit(3);
           NODE
+                then
+                  ok=1
+                  break
+                fi
+              else
+                cat "/tmp/${table}.err" || true
+              fi
+              sleep $((attempt * 2))
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "[ERRO] Não foi possível confirmar ${table}=0."
+              exit 1
+            fi
+          done
+          echo "[OK] Todos os módulos protegidos continuam sem vínculos aos tenants removidos."
 
       - name: Criar sessão efêmera PMO para smoke autenticado
         run: node scripts/prepare-stage-smoke-session.mjs
