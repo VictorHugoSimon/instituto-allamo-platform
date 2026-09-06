@@ -1,0 +1,101 @@
+name: OPR STAGE - Restore Isolado do Backup Validado
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/opr-stage-restore-once.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: allamo-pmo-stage-release
+  cancel-in-progress: false
+
+jobs:
+  restore-opr-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - name: Dependências
+        run: npm ci
+      - name: Validar autenticação Cloudflare
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Backup obrigatório do D1 antes do restore OPR
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output backup-stage-before-opr-restore.sql
+      - name: Guardar backup pré-restore
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-before-opr-restore-${{ github.sha }}
+          path: backup-stage-before-opr-restore.sql
+          if-no-files-found: error
+          retention-days: 14
+      - name: Baixar backup validado de 03/09
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/9910267868/zip" \
+            -o /tmp/opr-source.zip
+          test -s /tmp/opr-source.zip
+          mkdir -p /tmp/opr-source
+          unzip -q /tmp/opr-source.zip -d /tmp/opr-source
+          test -f /tmp/opr-source/backup-stage-828ac5342c699cbb9596c35371ffb1e624dae8b8.sql
+      - name: Gerar restore exclusivamente OPR
+        run: |
+          python3 scripts/build-opr-only-restore.py \
+            --input /tmp/opr-source/backup-stage-828ac5342c699cbb9596c35371ffb1e624dae8b8.sql \
+            --output /tmp/opr-only-restore.sql
+          test -s /tmp/opr-only-restore.sql
+          grep -F "OPR_RESTORE_OK" /tmp/opr-only-restore.sql
+      - name: Aplicar somente registros OPR
+        run: npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --file /tmp/opr-only-restore.sql
+      - name: Pós-validar tenant, projeto e Plano OPR
+        run: |
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT id,name FROM companies WHERE lower(CAST(id AS TEXT))='opr';" --json > /tmp/company.json
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT id,company_id,name FROM projects WHERE lower(CAST(company_id AS TEXT))='opr';" --json > /tmp/project.json
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT COUNT(*) AS total FROM work_items WHERE lower(CAST(company_id AS TEXT))='opr';" --json > /tmp/actions.json
+          python3 - <<'PY'
+          import json
+          def rows(p):
+              x=json.load(open(p,encoding='utf-8'))
+              def walk(v):
+                  if isinstance(v,list):
+                      for a in v:
+                          r=walk(a)
+                          if r is not None:return r
+                  if isinstance(v,dict):
+                      if isinstance(v.get('results'),list):return v['results']
+                      for a in v.values():
+                          r=walk(a)
+                          if r is not None:return r
+              return walk(x) or []
+          c,p,a=rows('/tmp/company.json'),rows('/tmp/project.json'),rows('/tmp/actions.json')
+          assert len(c)==1 and str(c[0].get('id')).lower()=='opr',f'OPR company inválida: {c}'
+          assert len(p)==1 and str(p[0].get('company_id')).lower()=='opr',f'Projeto OPR inválido: {p}'
+          assert int(a[0].get('total',0))>=1,f'Plano OPR não restaurado: {a}'
+          print(f"OK: OPR restaurada isoladamente; projeto={p[0].get('id')}; ações={a[0].get('total')}")
+          PY
+      - name: Smoke real OPR após restore
+        run: |
+          npm run smoke:opr-pop
+          npm run smoke:opr-platform
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### Restore OPR STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fonte: backup D1 validado do release 2026-09-03 / commit 828ac534" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Escopo: somente id/company_id=opr" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Estratégia: INSERT OR IGNORE, sem DELETE e sem UPDATE de MADRI/Dual/Semeali" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup do estado imediatamente anterior: obrigatório" >> "$GITHUB_STEP_SUMMARY"
