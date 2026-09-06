@@ -14,3 +14,5 @@ if(html.includes(start)){
 if(!html.includes('__allamoVisualMatricesLoaded'))throw new Error('Runtime visual não entrou no artefato.');
 fs.writeFileSync(file,html);
 console.log('OK: heatmap de riscos e visual RACI adicionados fora do JSON do bundler, sem corromper o template.');
+
+await import('./harden-pmo-header-privacy.mjs');
