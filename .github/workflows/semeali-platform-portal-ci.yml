@@ -5,7 +5,6 @@ on:
     paths:
       - 'public/semeali/**'
       - 'src/semeali-live-public-api.js'
-      - 'scripts/harden-commercial-sales-intelligence.mjs'
       - 'scripts/validate-semeali-platform-portal.mjs'
       - 'scripts/build-semeali-dedicated-stage.mjs'
       - 'wrangler.semeali-stage.toml'
@@ -17,7 +16,6 @@ on:
     paths:
       - 'public/semeali/**'
       - 'src/semeali-live-public-api.js'
-      - 'scripts/harden-commercial-sales-intelligence.mjs'
       - 'scripts/validate-semeali-platform-portal.mjs'
       - 'scripts/build-semeali-dedicated-stage.mjs'
       - 'wrangler.semeali-stage.toml'
@@ -53,12 +51,15 @@ jobs:
           test -f semeali-dist/_worker.js
           test -f semeali-dist/live.js
           test -f semeali-dist/live.css
+          node --check semeali-dist/_worker.js
           grep -F 'SEMEALI' semeali-dist/index.html
           grep -F 'Portal Comercial' semeali-dist/index.html
           grep -F 'data-semeali-live' semeali-dist/index.html
           grep -F 'Área do Vendedor' semeali-dist/live.js
           grep -F 'Clima Agrícola' semeali-dist/live.js
           grep -F 'Mercado agora' semeali-dist/live.js
+          grep -F "path==='semeali-live-market'" semeali-dist/_worker.js
+          grep -F "path==='semeali-weather'" semeali-dist/_worker.js
           grep -F 'ci-semeali' semeali-dist/index.html
           if grep -Eqi 'allamo-pmo|Painel PMO|Sementes Boa Safra|SBS' semeali-dist/index.html; then exit 1; fi
       - name: Validar projeto Pages dedicado
