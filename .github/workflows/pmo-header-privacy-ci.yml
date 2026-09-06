@@ -1,0 +1,43 @@
+name: PMO Header Privacy CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/pmo-header-privacy-runtime.js'
+      - 'scripts/harden-pmo-header-privacy.mjs'
+      - 'scripts/harden-visual-matrices.mjs'
+      - 'scripts/validate-pmo-header-privacy.mjs'
+      - '.github/workflows/pmo-header-privacy-ci.yml'
+  push:
+    branches:
+      - hotfix/pmo-hide-user-name-header
+      - main
+    paths:
+      - 'src/pmo-header-privacy-runtime.js'
+      - 'scripts/harden-pmo-header-privacy.mjs'
+      - 'scripts/harden-visual-matrices.mjs'
+      - 'scripts/validate-pmo-header-privacy.mjs'
+      - '.github/workflows/pmo-header-privacy-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  header-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Instalar dependências travadas
+        run: npm ci
+      - name: Gerar artefato real do Painel PMO
+        run: npm run build:work
+      - name: Validar remoção de nome/cargo no header
+        run: node scripts/validate-pmo-header-privacy.mjs
+      - name: Validar integridade do bundle
+        run: node scripts/validate-bundle-json.mjs
