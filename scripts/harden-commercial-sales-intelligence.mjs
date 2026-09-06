@@ -14,6 +14,7 @@ const ui=fs.readFileSync('src/commercial-sales-intelligence-ui.js','utf8');
 const accessPublicApi=fs.readFileSync('src/access-invitation-public-api.js','utf8');
 const accessApi=fs.readFileSync('src/access-invitation-api.js','utf8');
 const accessUi=fs.readFileSync('src/access-invitation-ui.js','utf8');
+const semealiPublicApi=fs.readFileSync('src/semeali-live-public-api.js','utf8');
 
 function sync(text,start,end,content,needle,indent=''){
   const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
@@ -32,6 +33,14 @@ w=sync(
   '    // BEGIN ALLAMO ACCESS INVITATION PUBLIC API',
   '    // END ALLAMO ACCESS INVITATION PUBLIC API',
   accessPublicApi,
+  "    if (path === 'login' && request.method === 'POST') {",
+  '    '
+);
+w=sync(
+  w,
+  '    // BEGIN SEMEALI LIVE PUBLIC API',
+  '    // END SEMEALI LIVE PUBLIC API',
+  semealiPublicApi,
   "    if (path === 'login' && request.method === 'POST') {",
   '    '
 );
@@ -94,6 +103,9 @@ for(const marker of [
   'Semeali · Sales Intelligence',
   'BEGIN ALLAMO ACCESS INVITATION PUBLIC API',
   "path==='access-invite-accept'",
+  'BEGIN SEMEALI LIVE PUBLIC API',
+  "path==='semeali-live-market'",
+  "path==='semeali-weather'",
   'BEGIN ALLAMO ACCESS INVITATION API',
   "path==='access-invitations'",
   'data-allamo-access-invitation',
@@ -101,4 +113,4 @@ for(const marker of [
 ]){
   if(!combined.includes(marker))throw new Error('Sales Intelligence/Acessos incompleto no artefato: '+marker);
 }
-console.log('OK: Sales Intelligence D1 e convite seguro de acesso sincronizados no Worker e portal canônicos.');
+console.log('OK: Sales Intelligence D1, mercado/clima Semeali e convite seguro de acesso sincronizados no Worker e portal canônicos.');
