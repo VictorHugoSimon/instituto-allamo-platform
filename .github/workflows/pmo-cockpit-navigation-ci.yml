@@ -1,0 +1,43 @@
+name: PMO Cockpit Navigation CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/pmo-cockpit-navigation.js'
+      - 'scripts/harden-pmo-cockpit-navigation.mjs'
+      - 'scripts/validate-pmo-cockpit-navigation.mjs'
+      - 'scripts/harden-sprint-governance.mjs'
+      - '.github/workflows/pmo-cockpit-navigation-ci.yml'
+  push:
+    branches:
+      - main
+      - release/pmo-cockpit-navigation-main
+    paths:
+      - 'src/pmo-cockpit-navigation.js'
+      - 'scripts/harden-pmo-cockpit-navigation.mjs'
+      - 'scripts/validate-pmo-cockpit-navigation.mjs'
+      - 'scripts/harden-sprint-governance.mjs'
+      - '.github/workflows/pmo-cockpit-navigation-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  navigation-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Instalar dependências travadas
+        run: npm ci
+      - name: Testar domínio do Cockpit PMO
+        run: node --test test/pmo-cockpit-v2.test.mjs
+      - name: Gerar artefato real do portal
+        run: npm run build:work
+      - name: Validar Cockpit após build
+        run: node scripts/validate-pmo-cockpit-v2.mjs
+      - name: Validar navegação materializada
+        run: node scripts/validate-pmo-cockpit-navigation.mjs
