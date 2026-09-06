@@ -5,6 +5,7 @@ on:
     branches: [develop]
     paths:
       - 'public/semeali/**'
+      - 'src/semeali-live-public-api.js'
       - 'src/commercial-sales-intelligence-api.js'
       - 'src/commercial-sales-intelligence-route-guard.js'
       - 'src/access-invitation-api.js'
@@ -53,6 +54,8 @@ jobs:
 
       - name: Validar contratos Semeali
         run: |
+          node --check public/semeali/live.js
+          node --check src/semeali-live-public-api.js
           node scripts/validate-semeali-platform-portal.mjs
           node scripts/validate-semeali-d1-sales-intelligence.mjs
 
@@ -66,10 +69,18 @@ jobs:
           test -f semeali-dist/index.html
           test -f semeali-dist/app.js
           test -f semeali-dist/data.js
+          test -f semeali-dist/live.js
+          test -f semeali-dist/live.css
           test -f semeali-dist/_worker.js
           grep -F 'SEMEALI' semeali-dist/index.html
           grep -F 'Portal Comercial' semeali-dist/index.html
+          grep -F 'data-semeali-live' semeali-dist/index.html
+          grep -F 'Área do Vendedor' semeali-dist/live.js
+          grep -F 'Clima Agrícola' semeali-dist/live.js
+          grep -F 'Mercado agora' semeali-dist/live.js
           grep -F "${GITHUB_SHA}" semeali-dist/index.html
+          grep -F "path==='semeali-live-market'" semeali-dist/_worker.js
+          grep -F "path==='semeali-weather'" semeali-dist/_worker.js
           if grep -Eqi 'allamo-pmo|Painel PMO|Sementes Boa Safra|SBS' semeali-dist/index.html; then echo 'Marca ou experiência indevida no portal Semeali'; exit 1; fi
 
       - name: Registrar gates Semeali aprovados
@@ -112,7 +123,9 @@ jobs:
         run: |
           for i in 1 2 3 4 5 6; do
             if curl -fsS --max-time 20 "${SEMEALI_STAGE_URL}/?release=${GITHUB_SHA}" -o /tmp/semeali.html; then
-              if grep -Fq 'SEMEALI' /tmp/semeali.html && grep -Fq 'Portal Comercial' /tmp/semeali.html && grep -Fq "${GITHUB_SHA}" /tmp/semeali.html; then
+              if grep -Fq 'SEMEALI' /tmp/semeali.html && grep -Fq 'Portal Comercial' /tmp/semeali.html && grep -Fq 'data-semeali-live' /tmp/semeali.html && grep -Fq "${GITHUB_SHA}" /tmp/semeali.html; then
+                curl -fsS --max-time 20 "${SEMEALI_STAGE_URL}/api/semeali-weather?city=Aracatuba&state=SP" -o /tmp/weather.json
+                grep -Fq 'Open-Meteo' /tmp/weather.json
                 echo "Portal Semeali confirmado em ${SEMEALI_STAGE_URL}"
                 exit 0
               fi
@@ -139,5 +152,8 @@ jobs:
           echo "- URL: ${SEMEALI_STAGE_URL}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Projeto Pages: ${SEMEALI_PAGES_PROJECT}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Entrada: raiz /" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Mercado: soja/milho CBOT + USD/BRL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Clima: Open-Meteo 7 dias" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Área do vendedor: carteira, oportunidades, visitas e rotas" >> "$GITHUB_STEP_SUMMARY"
           echo "- PMO não é publicado no artefato dedicado" >> "$GITHUB_STEP_SUMMARY"
           echo "- Produção principal: não alterada" >> "$GITHUB_STEP_SUMMARY"
