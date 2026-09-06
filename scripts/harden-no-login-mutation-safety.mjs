@@ -9,10 +9,15 @@ if(worker.includes(deleteGuard)){
 }
 
 const handleMarker='async function handleApi(request, env, url) {';
+const userNeedle='    const user = await currentUser(request, env);';
 const authNeedle="    if (!user) return json({ error: 'Não autenticado' }, 401);";
-const occurrences=worker.split(authNeedle).length-1;
-if(!worker.includes(handleMarker) || occurrences!==1){
-  throw new Error(`Contrato de autorização inesperado (handle=${worker.includes(handleMarker)}, ocorrencias_auth=${occurrences}); build interrompido para evitar patch inseguro.`);
+const authAnchor=`${userNeedle}\n${authNeedle}`;
+const handleStart=worker.indexOf(handleMarker);
+const handleEnd=handleStart>=0?worker.indexOf('\nasync function ',handleStart+handleMarker.length):-1;
+const handleBlock=handleStart>=0?worker.slice(handleStart,handleEnd>=0?handleEnd:worker.length):'';
+const anchorOccurrences=handleBlock.split(authAnchor).length-1;
+if(handleStart<0 || anchorOccurrences!==1){
+  throw new Error(`Contrato de autorização inesperado no handleApi (handle=${handleStart>=0}, ocorrencias_anchor=${anchorOccurrences}); build interrompido para evitar patch inseguro.`);
 }
 
 const guard=`${authNeedle}
@@ -24,6 +29,8 @@ const guard=`${authNeedle}
       },403);
     }`;
 
-worker=worker.replace(authNeedle,guard);
+const protectedAnchor=`${userNeedle}\n${guard}`;
+worker=worker.replace(authAnchor,protectedAnchor);
+if(!worker.includes(deleteGuard))throw new Error('Proteção de DELETE não foi aplicada ao guard autenticado principal.');
 fs.writeFileSync(file,worker);
-console.log('OK: DELETE destrutivo bloqueado para identidade PMO sintética; soft archive DoR/DoD permanece permitido.');
+console.log('OK: DELETE destrutivo bloqueado no guard autenticado principal; APIs públicas adicionais não alteram a proteção.');
