@@ -5,7 +5,7 @@ on:
     branches:
       - ops/pmo-stage-reset-zero
     paths:
-      - 'scripts/reset-stage-pmo-data.mjs'
+      - 'scripts/reset-stage-pmo-data-v2.mjs'
       - '.github/workflows/pmo-stage-zero-reset-dry-run.yml'
 
 permissions:
@@ -25,5 +25,5 @@ jobs:
           node-version: 22
       - name: Validar acesso ao D1 STAGE exato
         run: npx wrangler@4.124.0 d1 execute allamo-pmo-stage --remote --config wrangler.stage.toml --command "SELECT 1 AS ok;"
-      - name: Executar somente dry-run do reset PMO
-        run: node scripts/reset-stage-pmo-data.mjs
+      - name: Executar somente dry-run V2 do reset PMO
+        run: node scripts/reset-stage-pmo-data-v2.mjs
