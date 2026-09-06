@@ -1,0 +1,33 @@
+name: Semeali Platform Portal CI
+
+on:
+  pull_request:
+    paths:
+      - 'public/semeali/**'
+      - 'scripts/validate-semeali-platform-portal.mjs'
+      - '.github/workflows/semeali-platform-portal-ci.yml'
+  push:
+    branches:
+      - feature/semeali-platform-portal-v2
+    paths:
+      - 'public/semeali/**'
+      - 'scripts/validate-semeali-platform-portal.mjs'
+      - '.github/workflows/semeali-platform-portal-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validar sintaxe JavaScript
+        run: node --check public/semeali/data.js && node --check public/semeali/app.js
+      - name: Validar isolamento e contratos Semeali
+        run: node scripts/validate-semeali-platform-portal.mjs
