@@ -1,7 +1,8 @@
 const arg=name=>{const p=process.argv.find(a=>a.startsWith(`--${name}=`));return p?p.slice(name.length+3):''};
 const base=(arg('base')||'').replace(/\/$/,'');
 const environment=arg('env')||'unknown';
-if(!base){console.error('Uso: node scripts/smoke-governance-environment.mjs --base=https://... --env=stage');process.exit(2)}
+const allowZero=String(arg('allow-zero')||'false').toLowerCase()==='true';
+if(!base){console.error('Uso: node scripts/smoke-governance-environment.mjs --base=https://... --env=stage [--allow-zero=true]');process.exit(2)}
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function get(path){
@@ -20,7 +21,12 @@ async function get(path){
 }
 
 const companies=await get('/api/companies');
-if(!Array.isArray(companies)||!companies.length)throw new Error('Nenhuma empresa disponível para smoke de governança.');
+if(!Array.isArray(companies))throw new Error('/api/companies não retornou array.');
+if(!companies.length){
+  if(!allowZero)throw new Error('Nenhuma empresa disponível para smoke de governança.');
+  console.log(JSON.stringify({ok:true,environment,base,zero_state:true,companies_checked:0,projects_checked:0,governance_events_seen:0},null,2));
+  process.exit(0);
+}
 let projectCount=0,eventCount=0;
 for(const company of companies.slice(0,25)){
   const cid=String(company?.id||'').trim();
@@ -35,4 +41,4 @@ for(const company of companies.slice(0,25)){
     eventCount+=(gov.events||[]).length;
   }
 }
-console.log(JSON.stringify({ok:true,environment,base,companies_checked:Math.min(companies.length,25),projects_checked:projectCount,governance_events_seen:eventCount},null,2));
+console.log(JSON.stringify({ok:true,environment,base,zero_state:false,companies_checked:Math.min(companies.length,25),projects_checked:projectCount,governance_events_seen:eventCount},null,2));
