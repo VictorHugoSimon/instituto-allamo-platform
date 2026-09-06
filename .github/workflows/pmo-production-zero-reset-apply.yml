@@ -1,0 +1,72 @@
+name: PMO PRODUCTION Zero Reset Apply
+
+on:
+  push:
+    branches: [ops/pmo-production-reset-zero]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: allamo-pmo-production-zero-reset
+  cancel-in-progress: false
+
+jobs:
+  reset-production:
+    if: ${{ github.event.head_commit.message == 'ops(PMO): EXECUTAR reset PROD zero-state' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout da branch isolada de reset
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Confirmar D1 oficial de Produção antes do reset
+        run: |
+          npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "SELECT (SELECT COUNT(*) FROM companies) AS companies, (SELECT COUNT(*) FROM projects) AS projects;" --json
+
+      - name: Executar reset PMO produtivo com backup e pós-validação
+        run: node scripts/reset-production-pmo-data-v2.mjs --apply --confirm=RESET-PMO-PRODUCTION
+
+      - name: Preservar backup do reset produtivo
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmo-production-zero-reset-backup-${{ github.sha }}
+          path: backups/production-before-pmo-zero-reset-*.sql
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Confirmar estado zero e integridade diretamente no D1
+        run: |
+          npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "SELECT (SELECT COUNT(*) FROM companies) AS companies, (SELECT COUNT(*) FROM projects) AS projects, (SELECT COUNT(*) FROM projects p LEFT JOIN companies c ON c.id=p.company_id WHERE p.company_id IS NOT NULL AND c.id IS NULL) AS orphan_projects;" --json > /tmp/pmo-zero.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('/tmp/pmo-zero.json','utf8');
+          const a=raw.indexOf('['),b=raw.lastIndexOf(']');
+          if(a<0||b<a)throw new Error('Resposta D1 sem JSON reconhecível');
+          const row=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[])[0]||{};
+          if(Number(row.companies)!==0||Number(row.projects)!==0||Number(row.orphan_projects)!==0){
+            throw new Error(`Estado final inválido: companies=${row.companies}; projects=${row.projects}; orphan_projects=${row.orphan_projects}`);
+          }
+          console.log('[OK] D1 PRODUÇÃO zerado: 0 empresas / 0 projetos / 0 projetos órfãos.');
+          NODE
+
+      - name: Smoke runtime de governança aceitando estado zero
+        run: node scripts/smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production --allow-zero=true
+
+      - name: Resumo do reset
+        if: always()
+        run: |
+          echo "### Reset PMO PRODUÇÃO → zero-state" >> "$GITHUB_STEP_SUMMARY"
+          echo "- D1: allamo-pmo / 361c63ba-b9f8-409d-9a46-9609914da8b7" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup: obrigatório e retido por 30 dias" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Confirmação: RESET-PMO-PRODUCTION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Módulos protegidos: service_hub_*, commercial_* e access_invitations" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Critério de sucesso: companies=0, projects=0, orphan_projects=0 e smoke runtime verde" >> "$GITHUB_STEP_SUMMARY"
