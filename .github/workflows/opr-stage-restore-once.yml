@@ -8,15 +8,18 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
+# Grupo próprio: a restauração espera explicitamente qualquer release STAGE terminar antes
+# de tocar no D1. Isso evita que o próprio push deste workflow cancele o restore pendente.
 concurrency:
-  group: allamo-pmo-stage-release
+  group: opr-stage-restore-isolado
   cancel-in-progress: false
 
 jobs:
   restore-opr-stage:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
@@ -31,6 +34,21 @@ jobs:
         with: { node-version: '24', cache: npm }
       - name: Dependências
         run: npm ci
+      - name: Aguardar releases STAGE terminarem
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 180); do
+            active="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-stage.yml/runs?branch=develop&per_page=30" --jq '[.workflow_runs[] | select(.status=="in_progress" or .status=="queued" or .status=="waiting" or .status=="pending" or .status=="requested")] | length')"
+            echo "Release(s) STAGE ativo(s): ${active}"
+            if [ "${active}" = "0" ]; then
+              sleep 10
+              active2="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-stage.yml/runs?branch=develop&per_page=30" --jq '[.workflow_runs[] | select(.status=="in_progress" or .status=="queued" or .status=="waiting" or .status=="pending" or .status=="requested")] | length')"
+              [ "${active2}" = "0" ] && break
+            fi
+            sleep 20
+            if [ "${i}" = "180" ]; then echo "Timeout aguardando releases STAGE." >&2; exit 1; fi
+          done
       - name: Validar autenticação Cloudflare
         run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
       - name: Backup obrigatório do D1 antes do restore OPR
@@ -84,6 +102,7 @@ jobs:
           c,p,a=rows('/tmp/company.json'),rows('/tmp/project.json'),rows('/tmp/actions.json')
           assert len(c)==1 and str(c[0].get('id')).lower()=='opr',f'OPR company inválida: {c}'
           assert len(p)==1 and str(p[0].get('company_id')).lower()=='opr',f'Projeto OPR inválido: {p}'
+          assert int(p[0].get('id'))==3,f'Projeto OPR inesperado: {p}'
           assert int(a[0].get('total',0))>=1,f'Plano OPR não restaurado: {a}'
           print(f"OK: OPR restaurada isoladamente; projeto={p[0].get('id')}; ações={a[0].get('total')}")
           PY
@@ -91,6 +110,14 @@ jobs:
         run: |
           npm run smoke:opr-pop
           npm run smoke:opr-platform
+      - name: Disparar release STAGE final após restore
+        if: success()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-stage.yml/dispatches" --input - <<'JSON'
+          {"ref":"develop","inputs":{"confirm":"DEPLOY-STAGE","reason":"OPR portal unificado após restore isolado e validado"}}
+          JSON
+          echo "Release STAGE final solicitado."
       - name: Resumo
         if: always()
         run: |
@@ -99,3 +126,4 @@ jobs:
           echo "- Escopo: somente id/company_id=opr" >> "$GITHUB_STEP_SUMMARY"
           echo "- Estratégia: INSERT OR IGNORE, sem DELETE e sem UPDATE de MADRI/Dual/Semeali" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup do estado imediatamente anterior: obrigatório" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release STAGE final: disparada somente após smokes OPR verdes" >> "$GITHUB_STEP_SUMMARY"
