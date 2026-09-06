@@ -23,4 +23,17 @@ if((worker.match(/BEGIN ALLAMO OPR GOVERNANCE PLATFORM/g)||[]).length!==1)throw 
 if((worker.match(/BEGIN ALLAMO OPR PERMANENT REPORT API/g)||[]).length!==1)throw new Error('Bloco Status Report permanente duplicado.');
 if(worker.indexOf(reportStart)>worker.indexOf(start)||worker.indexOf(start)>worker.indexOf(needle))throw new Error('Ordem das APIs OPR inválida.');
 fs.writeFileSync(workerFile,worker);
-console.log('OK: API OPR Governance Platform v2 e Status Report permanente injetados antes da API OPR PMO canônica.');
+
+// Plano e POP possuem submenus próprios. Mantemos esses submenus e adicionamos a navegação
+// global numerada do portal, evitando que o usuário perca contexto ao entrar nesses módulos.
+const bridge='<script src="/opr/assets/legacy-global-nav.js"></script>';
+for(const page of ['public/opr-plano-de-acao/index.html','public/opr-pop/index.html']){
+  if(!fs.existsSync(page))throw new Error('Página OPR ausente para menu global: '+page);
+  let html=fs.readFileSync(page,'utf8');
+  if(!html.includes('/opr/assets/legacy-global-nav.js')){
+    if(!html.includes('</body>'))throw new Error('Fechamento body ausente: '+page);
+    html=html.replace('</body>',bridge+'</body>');
+    fs.writeFileSync(page,html);
+  }
+}
+console.log('OK: API OPR Governance Platform v2, Status Report permanente e menu global Plano/POP preparados.');
