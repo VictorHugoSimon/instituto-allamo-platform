@@ -97,8 +97,15 @@ jobs:
             npx wrangler@4.124.0 pages project create "${SEMEALI_PAGES_PROJECT}" --production-branch develop
           fi
 
+      - name: Materializar configuração padrão do Pages
+        shell: bash
+        run: |
+          cp wrangler.semeali-stage.toml wrangler.toml
+          grep -F 'name = "semeali-intelligence-stage"' wrangler.toml
+          grep -F 'pages_build_output_dir = "semeali-dist"' wrangler.toml
+
       - name: Publicar portal Semeali na URL dedicada
-        run: npx wrangler@4.124.0 pages deploy semeali-dist --project-name "${SEMEALI_PAGES_PROJECT}" --branch develop --commit-hash "$GITHUB_SHA" --commit-dirty=true --config wrangler.semeali-stage.toml
+        run: npx wrangler@4.124.0 pages deploy semeali-dist --project-name "${SEMEALI_PAGES_PROJECT}" --branch develop --commit-hash "$GITHUB_SHA" --commit-dirty=true
 
       - name: Confirmar portal na raiz do novo domínio
         shell: bash
