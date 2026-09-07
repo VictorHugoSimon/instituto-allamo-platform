@@ -8,6 +8,7 @@ on:
       - '.github/workflows/deploy-production.yml'
       - '.github/workflows/operational-health.yml'
       - '.github/workflows/madri-pmo-stage-schema.yml'
+      - '.github/workflows/madri-current-stage-crud-verification.yml'
       - 'scripts/operational-health-check.mjs'
       - 'scripts/validate-operational-health.mjs'
       - 'scripts/smoke-governance-environment.mjs'
@@ -22,6 +23,7 @@ on:
       - '.github/workflows/deploy-production.yml'
       - '.github/workflows/operational-health.yml'
       - '.github/workflows/madri-pmo-stage-schema.yml'
+      - '.github/workflows/madri-current-stage-crud-verification.yml'
       - 'scripts/operational-health-check.mjs'
       - 'scripts/validate-operational-health.mjs'
       - 'scripts/smoke-governance-environment.mjs'
@@ -60,7 +62,8 @@ jobs:
           const stage=fs.readFileSync('.github/workflows/deploy-stage.yml','utf8');
           const prod=fs.readFileSync('.github/workflows/deploy-production.yml','utf8');
           const health=fs.readFileSync('scripts/operational-health-check.mjs','utf8');
-          const madri=fs.readFileSync('.github/workflows/madri-pmo-stage-schema.yml','utf8');
+          const madriSeed=fs.readFileSync('.github/workflows/madri-pmo-stage-schema.yml','utf8');
+          const madriCrud=fs.readFileSync('.github/workflows/madri-current-stage-crud-verification.yml','utf8');
 
           const forbiddenStage=[
             'repair-core-tenants-portable.mjs --env=stage',
@@ -84,11 +87,15 @@ jobs:
           if(health.includes('const requiredTenants')) throw new Error('Operational Health não pode exigir tenants fixos.');
           if(!health.includes('ALLAMO_EXPECTED_PUBLIC_TENANTS')) throw new Error('Validação de tenant do health deve ser opt-in por configuração explícita.');
 
-          if(/\n\s*push:\s*\n/.test(madri)) throw new Error('Seed MADRI não pode disparar automaticamente por push.');
-          if(!/workflow_dispatch:\s*(?:\n|$)/.test(madri)) throw new Error('Seed MADRI deve ser operação manual explícita.');
-          if(!madri.includes('Backup obrigatório do D1 Stage antes do seed MADRI')) throw new Error('Operação manual MADRI deve manter backup obrigatório antes do seed.');
+          if(/\n\s*push:\s*\n/.test(madriSeed)) throw new Error('Seed MADRI não pode disparar automaticamente por push.');
+          if(!/workflow_dispatch:\s*(?:\n|$)/.test(madriSeed)) throw new Error('Seed MADRI deve ser operação manual explícita.');
+          if(!madriSeed.includes('Backup obrigatório do D1 Stage antes do seed MADRI')) throw new Error('Operação manual MADRI deve manter backup obrigatório antes do seed.');
 
-          console.log('[OK] STAGE/PROD preservam baseline zero; tenant-specific seed MADRI é somente manual.');
+          if(!madriCrud.includes("if: ${{ github.event_name == 'workflow_dispatch' }}")) throw new Error('CRUD remoto MADRI deve estar restrito a workflow_dispatch.');
+          if(!madriCrud.includes('Validar build e contrato MADRI sem tocar no Stage')) throw new Error('PR MADRI deve possuir validação estática sem escrita remota.');
+          if(!madriCrud.includes('Backup obrigatório antes do CRUD remoto manual')) throw new Error('CRUD remoto manual MADRI deve ter backup obrigatório.');
+
+          console.log('[OK] STAGE/PROD preservam baseline zero; seed e CRUD remoto MADRI exigem operação manual explícita.');
           NODE
       - name: Teste consolidado de governança
         run: npm run test:governance
