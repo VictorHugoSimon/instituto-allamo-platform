@@ -48,6 +48,7 @@ jobs:
           ALLAMO_PMO_SMOKE_TOKEN="$TOKEN" node scripts/smoke-pmo-onboarding-stage-negative.mjs
 
       - name: Confirmar ausência de escrita de negócio após o smoke
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
