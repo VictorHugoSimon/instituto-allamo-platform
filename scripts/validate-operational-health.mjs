@@ -6,6 +6,9 @@ const script = fs.readFileSync('scripts/operational-health-check.mjs','utf8');
 const must = (text, needle, label) => {
   if (!text.includes(needle)) throw new Error(`Ausente: ${label} (${needle})`);
 };
+const forbid = (text, needle, label) => {
+  if (text.includes(needle)) throw new Error(`Proibido: ${label} (${needle})`);
+};
 
 must(workflow, "cron: '5 */2 * * *'", 'monitoramento periódico');
 must(workflow, 'permissions:', 'permissões explícitas');
@@ -21,13 +24,20 @@ for (const needle of [
   '/api/projects',
   '/api/public-client-projects?company=',
   '/api/stage-health',
+  'ALLAMO_EXPECTED_PUBLIC_TENANTS',
+  'zero_state',
   "method: 'GET'",
-  "reset_disabled",
-  "data_persistence"
+  'reset_disabled',
+  'data_persistence'
 ]) must(script, needle, 'contrato de saúde operacional');
+
+forbid(script, "const requiredTenants", 'health check não pode exigir tenants fixos');
+forbid(script, "['dualclima','Dual Clima']", 'health check não pode exigir Dual Clima');
+forbid(script, "['madrid','Madrid']", 'health check não pode exigir Madrid');
+forbid(script, "['opr','OPR']", 'health check não pode exigir OPR');
 
 if (/method:\s*['\"](?:POST|PUT|PATCH|DELETE)['\"]/i.test(script)) {
   throw new Error('Smoke operacional não pode executar mutações HTTP.');
 }
 
-console.log('OK: monitor operacional é periódico, read-only, valida Stage/Produção e abre um único alerta em caso de falha.');
+console.log('OK: monitor operacional é periódico, read-only, aceita estado zero e só valida tenants públicos quando explicitamente configurados.');
