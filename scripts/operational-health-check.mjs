@@ -4,8 +4,22 @@ const arg = name => {
 };
 const stage = (arg('stage') || process.env.ALLAMO_STAGE_URL || 'https://allamo-pmo-stage.pages.dev').replace(/\/$/, '');
 const production = (arg('production') || process.env.ALLAMO_PRODUCTION_URL || 'https://allamo-pmo.pages.dev').replace(/\/$/, '');
-const requiredTenants = [['dualclima','Dual Clima'],['madrid','Madrid'],['opr','OPR']];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function expectedPublicTenants() {
+  const raw = String(process.env.ALLAMO_EXPECTED_PUBLIC_TENANTS || '').trim();
+  if (!raw) return [];
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error('ALLAMO_EXPECTED_PUBLIC_TENANTS deve ser JSON válido.'); }
+  if (!Array.isArray(parsed)) throw new Error('ALLAMO_EXPECTED_PUBLIC_TENANTS deve ser um array JSON.');
+  return parsed.map((item, index) => {
+    const token = String(item?.token || '').trim();
+    const name = String(item?.name || '').trim();
+    if (!token || !name) throw new Error(`Tenant esperado inválido na posição ${index}. Use {"token":"...","name":"..."}.`);
+    return [token, name];
+  });
+}
 
 async function getJson(base, path, attempts = 5) {
   let last = '';
@@ -45,12 +59,16 @@ async function checkEnvironment(name, base, stageMode = false) {
   const projects = await getJson(base, '/api/projects');
   if (!Array.isArray(projects)) throw new Error(`${name}: /api/projects não retornou array.`);
 
+  if (companies.length === 0 && projects.length > 0) {
+    throw new Error(`${name}: estado inconsistente — existem projetos sem nenhuma empresa cadastrada.`);
+  }
+
   const companyIds = new Set(companies.map(c => String(c.id)));
   const orphan = projects.filter(p => p.company_id && !companyIds.has(String(p.company_id)));
   if (orphan.length) throw new Error(`${name}: ${orphan.length} projeto(s) órfão(s) de empresa.`);
 
   const publicContexts = [];
-  for (const [token, expectedName] of requiredTenants) {
+  for (const [token, expectedName] of expectedPublicTenants()) {
     const data = await getJson(base, '/api/public-client-projects?company=' + encodeURIComponent(token));
     if (!data?.company || String(data.company.name) !== expectedName) {
       throw new Error(`${name}: tenant público ${token} não resolveu para ${expectedName}.`);
@@ -76,6 +94,7 @@ async function checkEnvironment(name, base, stageMode = false) {
     sha: release.sha,
     company_count: companies.length,
     project_count: projects.length,
+    zero_state: companies.length === 0 && projects.length === 0,
     public_contexts: publicContexts,
     stage_persistence: stageHealth ? {
       persistent: stageHealth.data_persistence,
