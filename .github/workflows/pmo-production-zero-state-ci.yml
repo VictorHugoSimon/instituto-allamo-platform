@@ -2,12 +2,12 @@ name: PMO Zero-State Policy CI
 
 on:
   push:
-    branches:
-      - fix/pmo-zero-baseline-stage
+    branches: [main, develop]
     paths:
       - '.github/workflows/deploy-stage.yml'
       - '.github/workflows/deploy-production.yml'
       - '.github/workflows/operational-health.yml'
+      - '.github/workflows/madri-pmo-stage-schema.yml'
       - 'scripts/operational-health-check.mjs'
       - 'scripts/validate-operational-health.mjs'
       - 'scripts/smoke-governance-environment.mjs'
@@ -21,6 +21,7 @@ on:
       - '.github/workflows/deploy-stage.yml'
       - '.github/workflows/deploy-production.yml'
       - '.github/workflows/operational-health.yml'
+      - '.github/workflows/madri-pmo-stage-schema.yml'
       - 'scripts/operational-health-check.mjs'
       - 'scripts/validate-operational-health.mjs'
       - 'scripts/smoke-governance-environment.mjs'
@@ -59,6 +60,7 @@ jobs:
           const stage=fs.readFileSync('.github/workflows/deploy-stage.yml','utf8');
           const prod=fs.readFileSync('.github/workflows/deploy-production.yml','utf8');
           const health=fs.readFileSync('scripts/operational-health-check.mjs','utf8');
+          const madri=fs.readFileSync('.github/workflows/madri-pmo-stage-schema.yml','utf8');
 
           const forbiddenStage=[
             'repair-core-tenants-portable.mjs --env=stage',
@@ -81,7 +83,12 @@ jobs:
           if(!prod.includes('--allow-zero=true')) throw new Error('Release PROD deve validar governança com estado zero explícito.');
           if(health.includes('const requiredTenants')) throw new Error('Operational Health não pode exigir tenants fixos.');
           if(!health.includes('ALLAMO_EXPECTED_PUBLIC_TENANTS')) throw new Error('Validação de tenant do health deve ser opt-in por configuração explícita.');
-          console.log('[OK] STAGE/PROD preservam baseline zero e o release padrão do PMO não depende de tenants específicos.');
+
+          if(/\n\s*push:\s*\n/.test(madri)) throw new Error('Seed MADRI não pode disparar automaticamente por push.');
+          if(!/workflow_dispatch:\s*(?:\n|$)/.test(madri)) throw new Error('Seed MADRI deve ser operação manual explícita.');
+          if(!madri.includes('Backup obrigatório do D1 Stage antes do seed MADRI')) throw new Error('Operação manual MADRI deve manter backup obrigatório antes do seed.');
+
+          console.log('[OK] STAGE/PROD preservam baseline zero; tenant-specific seed MADRI é somente manual.');
           NODE
       - name: Teste consolidado de governança
         run: npm run test:governance
