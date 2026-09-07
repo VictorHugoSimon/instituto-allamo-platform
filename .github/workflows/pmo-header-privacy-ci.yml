@@ -11,7 +11,7 @@ on:
       - '.github/workflows/pmo-header-privacy-ci.yml'
   push:
     branches:
-      - hotfix/pmo-hide-user-name-header
+      - hotfix/pmo-remove-header-user-identity
       - main
     paths:
       - 'src/pmo-header-privacy-runtime.js'
@@ -37,7 +37,7 @@ jobs:
         run: npm ci
       - name: Gerar artefato real do Painel PMO
         run: npm run build:work
-      - name: Validar remoção de nome/cargo no header
+      - name: Validar remoção integral da identidade no header
         run: node scripts/validate-pmo-header-privacy.mjs
       - name: Validar integridade do bundle
         run: node scripts/validate-bundle-json.mjs
