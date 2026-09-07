@@ -1,0 +1,87 @@
+name: PMO Zero-State Policy CI
+
+on:
+  push:
+    branches:
+      - fix/pmo-zero-baseline-stage
+    paths:
+      - '.github/workflows/deploy-stage.yml'
+      - '.github/workflows/deploy-production.yml'
+      - '.github/workflows/operational-health.yml'
+      - 'scripts/operational-health-check.mjs'
+      - 'scripts/validate-operational-health.mjs'
+      - 'scripts/smoke-governance-environment.mjs'
+      - 'scripts/smoke-stage-data-integrity.mjs'
+      - 'scripts/validate-governance-release.mjs'
+      - 'scripts/validate-d1-environment-isolation.mjs'
+      - '.github/workflows/pmo-production-zero-state-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '.github/workflows/deploy-stage.yml'
+      - '.github/workflows/deploy-production.yml'
+      - '.github/workflows/operational-health.yml'
+      - 'scripts/operational-health-check.mjs'
+      - 'scripts/validate-operational-health.mjs'
+      - 'scripts/smoke-governance-environment.mjs'
+      - 'scripts/smoke-stage-data-integrity.mjs'
+      - 'scripts/validate-governance-release.mjs'
+      - 'scripts/validate-d1-environment-isolation.mjs'
+      - '.github/workflows/pmo-production-zero-state-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  policy-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Instalar dependências travadas
+        run: npm ci
+      - name: Gerar artefato pelo build oficial
+        run: npm run build:work
+      - name: Validar governança da release
+        run: node scripts/validate-governance-release.mjs
+      - name: Validar isolamento Stage/Produção
+        run: node scripts/validate-d1-environment-isolation.mjs
+      - name: Validar Operational Health read-only e compatível com estado zero
+        run: node scripts/validate-operational-health.mjs
+      - name: Validar ausência de provisionamento automático de dados de negócio
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const stage=fs.readFileSync('.github/workflows/deploy-stage.yml','utf8');
+          const prod=fs.readFileSync('.github/workflows/deploy-production.yml','utf8');
+          const health=fs.readFileSync('scripts/operational-health-check.mjs','utf8');
+
+          const forbiddenStage=[
+            'repair-core-tenants-portable.mjs --env=stage',
+            'REPAIR-STAGE',
+            'smoke-core-tenants.mjs',
+            'ensure-semeali-tenant.mjs --apply',
+            'smoke-service-hub-stage.mjs',
+            'npm run smoke:opr-pop',
+            'npm run smoke:opr-platform',
+            'apply-opr-meeting-actions.mjs'
+          ];
+          const forbiddenProd=[
+            'repair-core-tenants-portable.mjs --env=production',
+            'REPAIR-PRODUCTION',
+            'smoke-core-tenants.mjs --base=https://allamo-pmo.pages.dev'
+          ];
+          for(const x of forbiddenStage) if(stage.includes(x)) throw new Error(`Provisionamento/mutação fixa proibida na Release STAGE: ${x}`);
+          for(const x of forbiddenProd) if(prod.includes(x)) throw new Error(`Provisionamento fixo proibido na Release PROD: ${x}`);
+          if(!stage.includes('--allow-zero=true')) throw new Error('Release STAGE deve validar governança com estado zero explícito.');
+          if(!prod.includes('--allow-zero=true')) throw new Error('Release PROD deve validar governança com estado zero explícito.');
+          if(health.includes('const requiredTenants')) throw new Error('Operational Health não pode exigir tenants fixos.');
+          if(!health.includes('ALLAMO_EXPECTED_PUBLIC_TENANTS')) throw new Error('Validação de tenant do health deve ser opt-in por configuração explícita.');
+          console.log('[OK] STAGE/PROD preservam baseline zero e o release padrão do PMO não depende de tenants específicos.');
+          NODE
+      - name: Teste consolidado de governança
+        run: npm run test:governance

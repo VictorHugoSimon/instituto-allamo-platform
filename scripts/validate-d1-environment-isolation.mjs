@@ -73,9 +73,16 @@ forbid(stageWorkflow,'wrangler.production.toml','Stage Actions nunca materializa
 must(stageWorkflow,'Backup obrigatório do D1 Stage','workflow Stage faz backup antes de evolução remota');
 must(stageWorkflow,'secure-d1-export.mjs --config wrangler.stage.toml','workflow Stage exporta o D1 de homologação via wrapper seguro');
 must(stageWorkflow,'ensure-additive-schema.mjs --env=stage','workflow Stage usa schema com config D1 dedicada');
-must(stageWorkflow,'smoke-stage-data-integrity.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage','workflow Stage valida integridade sem exigir tenants fixos');
-forbid(stageWorkflow,'repair-core-tenants-portable.mjs --env=stage --apply','release Stage não pode criar/reparar empresas automaticamente');
-forbid(stageWorkflow,'ensure-semeali-tenant.mjs --apply','release Stage não pode provisionar Semeali automaticamente');
+must(stageWorkflow,'smoke-governance-environment.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage --allow-zero=true','workflow Stage aceita baseline zero');
+must(stageWorkflow,'smoke-stage-data-integrity.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage','workflow Stage valida integridade genérica do PMO');
+forbid(stageWorkflow,'repair-core-tenants-portable.mjs --env=stage','workflow Stage não pode reparar tenants automaticamente');
+forbid(stageWorkflow,'REPAIR-STAGE','workflow Stage não pode confirmar reparo automático de tenants');
+forbid(stageWorkflow,'ensure-semeali-tenant.mjs --apply','workflow Stage não pode provisionar Semeali automaticamente');
+forbid(stageWorkflow,'smoke-core-tenants.mjs','workflow Stage não pode exigir tenants fixos');
+forbid(stageWorkflow,'smoke-service-hub-stage.mjs','workflow Stage padrão não depende de Service Hub');
+forbid(stageWorkflow,'npm run smoke:opr-pop','workflow Stage padrão não pode criar dados OPR');
+forbid(stageWorkflow,'npm run smoke:opr-platform','workflow Stage padrão não pode executar CRUD OPR');
+forbid(stageWorkflow,'apply-opr-meeting-actions.mjs','workflow Stage padrão não pode sincronizar dados OPR');
 
 must(prodCmd,'DEPLOY-PRODUCTION','produção local exige confirmação explícita');
 must(prodCmd,'if /I not "%BRANCH%"=="main"','produção local exige branch main');
@@ -94,6 +101,9 @@ must(prodWorkflow,'cp wrangler.production.toml wrangler.toml','workflow produç�
 must(prodWorkflow,'secure-d1-export.mjs --config wrangler.production.toml','workflow produção faz backup no D1 produtivo explícito via wrapper seguro');
 must(prodWorkflow,'actions/upload-artifact@v4','workflow preserva backup como artifact');
 must(prodWorkflow,'ensure-additive-schema.mjs --env=production','workflow produção usa schema com config D1 dedicada');
+must(prodWorkflow,'smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production --allow-zero=true','workflow Produção aceita baseline zero');
+forbid(prodWorkflow,'repair-core-tenants-portable.mjs --env=production','workflow Produção não repara tenants automaticamente');
+forbid(prodWorkflow,'REPAIR-PRODUCTION','workflow Produção não pode confirmar reparo automático de tenants');
 must(prodWorkflow,'--project-name allamo-pmo --branch main','workflow produção publica projeto/branch corretos');
 forbid(prodWorkflow,'pages deploy public --config','workflow Pages Produção não usa --config customizado');
 forbid(prodWorkflow,'cp wrangler.stage.toml wrangler.toml','workflow produção nunca materializa config Stage');
@@ -105,4 +115,4 @@ must(secureExport,'if (result.status !== 0) process.exit(result.status ?? 1)','w
 forbid(secureExport,'wrangler.stage.toml','wrapper não fixa Stage internamente');
 forbid(secureExport,'wrangler.production.toml','wrapper não fixa Produção internamente');
 
-console.log('OK: Pages/D1 isolados — Stage preserva estado zero e nunca provisiona dados de negócio na release; Produção permanece governada em main.');
+console.log('OK: Pages/D1 isolados — Stage e Produção preservam estado zero e releases padrão não provisionam dados de negócio.');
