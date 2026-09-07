@@ -36,10 +36,17 @@ console.log('OK navegação publicada: bloco único do Cockpit Executivo present
 
 const page=await request('/pmo-cockpit/');
 must(/text\/html/i.test(page.response.headers.get('content-type')||''),'Cockpit não retornou HTML.');
-for(const marker of ['Cockpit Executivo 2.0','/api/pmo-cockpit','/api/dash-curve','sem KPI fictício']){
+for(const marker of ['Cockpit Executivo 2.0','/api/pmo-cockpit','/api/dash-curve','sem KPI fictício','/pmo-cockpit/operational-blocks.js']){
   must(page.body.includes(marker),`Página publicada sem marcador obrigatório: ${marker}`);
 }
-console.log('OK página: /pmo-cockpit/ publicada com contratos PMO esperados.');
+console.log('OK página: /pmo-cockpit/ publicada com contratos PMO e extensão operacional.');
+
+const operational=await request('/pmo-cockpit/operational-blocks.js');
+must(/javascript|text\/plain/i.test(operational.response.headers.get('content-type')||''),'Extensão operacional não foi servida como JavaScript/texto.');
+for(const marker of ['Gestão e riscos','Capacidade e horas','Governança','Adoção e telemetria','Riscos críticos estruturados','Utilização por profissional','Mapa de calor','Não disponível']){
+  must(operational.body.includes(marker),`Extensão operacional publicada sem marcador: ${marker}`);
+}
+console.log('OK UI operacional: quatro blocos publicados sem KPI fictício.');
 
 const cockpit=(await request('/api/pmo-cockpit',{json:true,auth:true})).body;
 must(cockpit&&typeof cockpit==='object','API do Cockpit não retornou objeto JSON.');
@@ -47,6 +54,11 @@ must(cockpit.source==='D1','API do Cockpit não está declarando D1 como fonte r
 must(Number.isFinite(Date.parse(cockpit.generated_at)),'generated_at inválido.');
 must(cockpit.portfolio&&typeof cockpit.portfolio==='object','portfolio ausente.');
 must(cockpit.health&&typeof cockpit.health==='object','health ausente.');
+must(cockpit.management&&typeof cockpit.management==='object','management ausente.');
+must(cockpit.capacity&&typeof cockpit.capacity==='object','capacity ausente.');
+must(cockpit.governance&&typeof cockpit.governance==='object','governance ausente.');
+must(cockpit.adoption&&typeof cockpit.adoption==='object','adoption ausente.');
+must(cockpit.sources&&typeof cockpit.sources==='object','sources ausente.');
 must(Array.isArray(cockpit.projects),'projects precisa ser array.');
 
 const portfolioKeys=['companies','projects','active','in_progress','backlog','completed','cancelled','delayed','at_risk'];
@@ -64,10 +76,44 @@ for(const project of cockpit.projects){
   must(typeof project.delayed==='boolean',`Projeto ${project.id} sem delayed booleano.`);
   must(healthKeys.includes(project.health),`Projeto ${project.id} com saúde inválida: ${project.health}`);
 }
+
+const checkMetric=(m,label)=>{
+  must(m&&typeof m==='object',`${label} não é objeto de métrica.`);
+  must(typeof m.available==='boolean',`${label}.available inválido.`);
+  if(m.available)must(m.value!==null&&m.value!==undefined,`${label} disponível sem valor.`);
+  else{
+    must(m.value===null,`${label} indisponível deve preservar value=null.`);
+    must(String(m.reason||'').trim()!=='',`${label} indisponível sem justificativa.`);
+  }
+};
+
+for(const key of ['blocked_items','overdue_actions','dependencies','open_decisions','critical_projects','structured_critical_risks'])checkMetric(cockpit.management[key],`management.${key}`);
+for(const key of ['planned_hours','sprint_capacity_hours','actual_hours','people_with_actual_hours','utilization'])checkMetric(cockpit.capacity[key],`capacity.${key}`);
+for(const key of ['latest_report_at','projects_without_report','report_freshness_policy','dor_documents','dod_documents','critical_pending'])checkMetric(cockpit.governance[key],`governance.${key}`);
+for(const key of ['heatmap','work_management_events','last_work_management_event_at'])checkMetric(cockpit.adoption[key],`adoption.${key}`);
+
+must(cockpit.management.structured_critical_risks.available===false,'Risco estruturado não pode ser marcado disponível sem fonte genérica confiável.');
+must(cockpit.capacity.utilization.available===false,'Utilização não pode ser calculada sem denominador individual confiável.');
+must(String(cockpit.capacity.no_double_count_rule||'').includes('source_entry_hash'),'Regra de deduplicação FCH por source_entry_hash ausente.');
+must(cockpit.governance.report_freshness_policy.available===false,'SLA de Status Report não pode ser inventado sem política configurada.');
+must(cockpit.adoption.heatmap.available===false,'Mapa de calor não pode ser marcado disponível antes da telemetria global.');
+must(cockpit.governance.next_rites&&typeof cockpit.governance.next_rites.available==='boolean','governance.next_rites inválido.');
+if(cockpit.governance.next_rites.available)must(Array.isArray(cockpit.governance.next_rites.items),'governance.next_rites.items precisa ser array.');
+
 if(cockpit.portfolio.projects===0){
+  must(cockpit.portfolio.companies===0,'Baseline STAGE esperado em 0 empresas / 0 projetos.');
   for(const key of ['active','in_progress','backlog','completed','cancelled','delayed','at_risk'])must(cockpit.portfolio[key]===0,`Estado vazio inconsistente em portfolio.${key}.`);
   must(healthKeys.every(key=>cockpit.health[key]===0),'Estado vazio inconsistente na saúde.');
-  console.log('OK estado vazio: Cockpit não fabricou projetos/KPIs.');
+  for(const key of ['blocked_items','overdue_actions','dependencies','open_decisions','critical_projects']){
+    must(cockpit.management[key].available===true&&Number(cockpit.management[key].value)===0,`Baseline vazio inconsistente em management.${key}.`);
+  }
+  for(const key of ['planned_hours','sprint_capacity_hours','actual_hours','people_with_actual_hours']){
+    must(cockpit.capacity[key].available===true&&Number(cockpit.capacity[key].value)===0,`Baseline vazio inconsistente em capacity.${key}.`);
+  }
+  must(cockpit.governance.projects_without_report.available===true&&Number(cockpit.governance.projects_without_report.value)===0,'Baseline vazio inconsistente em governance.projects_without_report.');
+  for(const key of ['dor_documents','dod_documents','critical_pending'])must(cockpit.governance[key].available===true&&Number(cockpit.governance[key].value)===0,`Baseline vazio inconsistente em governance.${key}.`);
+  must(cockpit.adoption.work_management_events.available===true&&Number(cockpit.adoption.work_management_events.value)===0,'Baseline vazio inconsistente em adoption.work_management_events.');
+  console.log('OK estado vazio: Cockpit não fabricou empresas, projetos, horas, governança ou adoção.');
 }
 console.log(`OK API Cockpit: ${cockpit.portfolio.companies} empresa(s), ${cockpit.portfolio.projects} projeto(s), ${cockpit.portfolio.delayed} atrasado(s), ${cockpit.portfolio.at_risk} em risco.`);
 
@@ -82,4 +128,4 @@ for(let i=0;i<curve.months.length;i++){
   must(curve.real[i]===null||Number.isFinite(Number(curve.real[i])),`Curva S realizada inválida no índice ${i}.`);
 }
 console.log(`OK Curva S: ${curve.months.length} período(s) consolidado(s); ausência de realizado é preservada como null.`);
-console.log('OK: smoke runtime do Cockpit Executivo PMO no STAGE concluído.');
+console.log('OK: smoke runtime reforçado do Cockpit Executivo PMO no STAGE concluído.');
