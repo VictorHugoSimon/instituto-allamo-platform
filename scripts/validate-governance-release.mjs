@@ -8,6 +8,7 @@ const stageWorkflow=read('.github/workflows/deploy-stage.yml');
 const canonicalVerifier=read('scripts/verify-stage-canonical-release.mjs');
 const workSchema=read('scripts/ensure-work-management-schema.mjs');
 const must=(c,n,l)=>{if(!c.includes(n))throw new Error(`Ausente: ${l} (${n})`)};
+const forbid=(c,n,l)=>{if(c.includes(n))throw new Error(`Proibido: ${l} (${n})`)};
 
 must(hardener,"'    // Health-check público APENAS no hostname de homologação.'",'injeção do schema antes do health');
 must(hardener,'schemaPos>healthPos','gate de ordem schema/health');
@@ -26,15 +27,15 @@ must(prod,'Dry-run do schema base e aditivo em Produção','Dry-run antes de mud
 must(prod,'ensure-work-management-schema.mjs --env=production','Dry-run valida Work Management antes da alteração');
 must(prod,'ensure-work-management-schema.mjs --env=production --apply --confirm=APPLY-WORK-SCHEMA-PRODUCTION','Work Management produtivo idempotente e confirmado');
 must(prod,'ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION','Schema produtivo somente aditivo e confirmado');
-if(prod.includes('repair-core-tenants-portable.mjs --env=production'))throw new Error('Release PROD não pode reparar/provisionar tenants automaticamente.');
-if(prod.includes('REPAIR-PRODUCTION'))throw new Error('Release PROD não pode conter confirmação de reparo automático de tenants.');
+forbid(prod,'repair-core-tenants-portable.mjs --env=production','Release PROD não pode reparar/provisionar tenants automaticamente');
+forbid(prod,'REPAIR-PRODUCTION','Release PROD não pode conter confirmação de reparo automático de tenants');
 must(prod,'Gate final antes do deploy produtivo','Gate reexecutado depois da preparação do D1');
 must(prod,'Publicar exatamente o artefato validado em PRODUÇÃO','Deploy produtivo');
 must(prod,'Smoke de integridade dos dados PMO em Produção','Smoke de integridade PMO em Produção');
 must(prod,'orphan_projects','Smoke verifica projetos órfãos');
 must(prod,'duplicate_company_ids','Smoke verifica IDs de empresa duplicados');
 must(prod,'smoke-governance-environment.mjs --base=https://allamo-pmo.pages.dev --env=production --allow-zero=true','Smoke de governança produtivo aceita estado zero explicitamente');
-if(prod.includes('smoke-core-tenants.mjs --base=https://allamo-pmo.pages.dev'))throw new Error('Release PROD não pode exigir tenants fixos no smoke pós-deploy.');
+forbid(prod,'smoke-core-tenants.mjs --base=https://allamo-pmo.pages.dev','Release PROD não pode exigir tenants fixos no smoke pós-deploy');
 for(const table of ['work_items','work_sprints','work_comments','work_checklist','work_links','work_events'])must(workSchema,`'${table}'`,`guard contempla ${table}`);
 must(workSchema,'migrations/2026-08-21-work-management.sql','guard usa migration base idempotente');
 if(/\b(?:DELETE\s+FROM|DROP\s+TABLE|TRUNCATE|DROP\s+DATABASE)\b/i.test(workSchema))throw new Error('Guard de Work Management contém operação destrutiva.');
@@ -54,8 +55,12 @@ must(stageWorkflow,'npm run test:release','Stage executa gate consolidado');
 must(stageWorkflow,'Backup obrigatório do D1 Stage','Stage possui backup antes da preparação do schema');
 must(stageWorkflow,'ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE','Stage aplica somente schema aditivo');
 must(stageWorkflow,'verify-stage-canonical-release.mjs','Stage confirma fingerprint na URL canônica');
-must(stageWorkflow,'npm run smoke:governance','Stage executa smoke de governança pós-deploy');
-must(stageWorkflow,'smoke-core-tenants.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage','Stage executa smoke dos tenants essenciais');
+must(stageWorkflow,'smoke-governance-environment.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage --allow-zero=true','Stage executa smoke de governança compatível com estado zero');
+forbid(stageWorkflow,'repair-core-tenants-portable.mjs --env=stage','Release Stage não pode reparar/provisionar tenants automaticamente');
+forbid(stageWorkflow,'smoke-core-tenants.mjs','Release Stage não pode exigir tenants fixos');
+forbid(stageWorkflow,'npm run smoke:opr-pop','Release Stage padrão não pode criar/alterar dados OPR');
+forbid(stageWorkflow,'npm run smoke:opr-platform','Release Stage padrão não pode executar smoke CRUD OPR');
+forbid(stageWorkflow,'apply-opr-meeting-actions.mjs','Release Stage padrão não pode sincronizar ações OPR');
 if(stageWorkflow.includes('--project-name allamo-pmo --branch main'))throw new Error('Workflow de Stage aponta para Produção.');
 
 // O Pages pode devolver temporariamente HTML/artefato antigo logo após o upload.
@@ -70,4 +75,4 @@ must(canonicalVerifier,'fingerprint ainda não é JSON','HTML transitório não 
 must(canonicalVerifier,'/api/companies ainda não é JSON','API live também aguarda propagação de JSON');
 if(/if\(res\.ok\)\s*return\s*\{res,text\}/.test(canonicalVerifier))throw new Error('Verificador canônico voltou a aceitar qualquer HTTP 200 antes de validar conteúdo/SHA.');
 
-console.log('OK: release governado — Produção automática em main com backup, evolução somente aditiva, sem criação/reparo automático de tenants e com smokes compatíveis com estado zero; Stage mantém seus gates próprios.');
+console.log('OK: release governado — Stage e Produção preservam baseline zero, não provisionam dados de negócio automaticamente e mantêm backup/schema/smokes seguros.');
