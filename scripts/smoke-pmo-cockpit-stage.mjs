@@ -22,6 +22,18 @@ async function request(path,{json=false,auth=false}={}){
   throw last||new Error(`Falha desconhecida em ${path}`);
 }
 
+const portal=await request('/');
+must(/text\/html/i.test(portal.response.headers.get('content-type')||''),'Portal principal não retornou HTML.');
+const navStart='<!-- BEGIN ALLAMO PMO COCKPIT NAVIGATION -->';
+const navEnd='<!-- END ALLAMO PMO COCKPIT NAVIGATION -->';
+const navStarts=portal.body.split(navStart).length-1;
+const navEnds=portal.body.split(navEnd).length-1;
+must(navStarts===1&&navEnds===1,`Navegação do Cockpit deveria estar materializada uma única vez no portal publicado; início=${navStarts}, fim=${navEnds}.`);
+must(portal.body.includes("link.href='/pmo-cockpit/'"),'Portal publicado não contém a rota canônica /pmo-cockpit/.');
+must(portal.body.includes('Cockpit Executivo'),'Portal publicado não contém o rótulo Cockpit Executivo.');
+must(portal.body.includes("norm(button.textContent)==='visao executiva'"),'Portal publicado não ancora o Cockpit após Visão Executiva.');
+console.log('OK navegação publicada: bloco único do Cockpit Executivo presente no portal principal do STAGE.');
+
 const page=await request('/pmo-cockpit/');
 must(/text\/html/i.test(page.response.headers.get('content-type')||''),'Cockpit não retornou HTML.');
 for(const marker of ['Cockpit Executivo 2.0','/api/pmo-cockpit','/api/dash-curve','sem KPI fictício']){
