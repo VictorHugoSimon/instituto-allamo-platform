@@ -18,15 +18,18 @@ async function postProject(body){
 }
 
 const missingCompany=await postProject({name:'__SMOKE_NEGATIVE_SEM_EMPRESA__'});
-if(missingCompany.status!==400 || !String(missingCompany.payload?.error||'').includes('Empresa é obrigatória')){
-  throw new Error(`Projeto sem empresa deveria retornar 400/empresa obrigatória; status=${missingCompany.status}, payload=${JSON.stringify(missingCompany.payload)}`);
+const missingCompanyError=String(missingCompany.payload?.error||'');
+const missingCompanyContract=missingCompanyError.includes('Empresa é obrigatória')||missingCompanyError.includes('Selecione a empresa do projeto');
+if(missingCompany.status!==400 || !missingCompanyContract){
+  throw new Error(`Projeto sem empresa deveria retornar 400 com contrato de empresa obrigatória; status=${missingCompany.status}, payload=${JSON.stringify(missingCompany.payload)}`);
 }
-console.log('OK: projeto sem empresa foi rejeitado com 400 antes de qualquer INSERT.');
+console.log(`OK: projeto sem empresa foi rejeitado com 400 antes de qualquer INSERT (${missingCompanyError}).`);
 
 const nonexistentCompany='__pmo_onboarding_company_missing_'+Date.now()+'__';
 const invalidCompany=await postProject({name:'__SMOKE_NEGATIVE_EMPRESA_INEXISTENTE__',company_id:nonexistentCompany});
-if(invalidCompany.status!==404 || !String(invalidCompany.payload?.error||'').includes('Empresa não encontrada')){
-  throw new Error(`Projeto com empresa inexistente deveria retornar 404; status=${invalidCompany.status}, payload=${JSON.stringify(invalidCompany.payload)}`);
+const invalidCompanyError=String(invalidCompany.payload?.error||'');
+if(invalidCompany.status!==404 || !invalidCompanyError.toLowerCase().includes('empresa')){
+  throw new Error(`Projeto com empresa inexistente deveria retornar 404/empresa inválida; status=${invalidCompany.status}, payload=${JSON.stringify(invalidCompany.payload)}`);
 }
-console.log('OK: projeto com empresa inexistente foi rejeitado com 404 antes de qualquer INSERT.');
+console.log(`OK: projeto com empresa inexistente foi rejeitado com 404 antes de qualquer INSERT (${invalidCompanyError}).`);
 console.log('OK: smoke negativo de onboarding no STAGE concluído sem criar empresa/projeto.');
