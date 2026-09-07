@@ -27,48 +27,35 @@ if(!worker.includes(deleteGuard)){
   console.log('OK: proteção de exclusões no modo sem login já aplicada.');
 }
 
+function insertBeforeInRoute({routeNeedle,beforeNeedle,block,label}){
+  const routeStart=worker.indexOf(routeNeedle);
+  if(routeStart<0) throw new Error(`Rota não encontrada para ${label}; build interrompido.`);
+  const before=worker.indexOf(beforeNeedle,routeStart);
+  if(before<0 || before-routeStart>5000) throw new Error(`Âncora não encontrada para ${label}; build interrompido.`);
+  worker=worker.slice(0,before)+block+worker.slice(before);
+  changed=true;
+}
+
 const companyMarker='// [allamo-onboarding-company-integrity]';
 if(!worker.includes(companyMarker)){
-  const companyNeedle=`    // EMPRESAS: criar (rota dedicada)
-    if ((path === 'company-create' || path === 'companies') && request.method === 'POST') {
-      if (!['admin','pmo'].includes(user.role)) return json({ error: 'Sem permissão' }, 403);
-      const b = await request.json();
-      if (!b.name) return json({ error: 'Nome da empresa é obrigatório' }, 400);`;
-  if(worker.split(companyNeedle).length-1!==1) throw new Error('Contrato de criação de empresa inesperado; build interrompido para evitar patch inseguro.');
-  const companyGuard=`${companyNeedle}
-      ${companyMarker}
-      b.name = String(b.name).trim();
-      if (!b.name) return json({ error: 'Nome da empresa é obrigatório' }, 400);
-      const sameCompanyName = await DB.prepare('SELECT id FROM companies WHERE lower(trim(name)) = lower(trim(?)) LIMIT 1').bind(b.name).first();
-      if (sameCompanyName) return json({ error: 'Já existe empresa com esse nome', id: sameCompanyName.id }, 409);`;
-  worker=worker.replace(companyNeedle,companyGuard);
-  changed=true;
+  insertBeforeInRoute({
+    routeNeedle:"if ((path === 'company-create' || path === 'companies') && request.method === 'POST')",
+    beforeNeedle:"      const id = (b.id || b.name)",
+    label:'criação de empresa',
+    block:`      ${companyMarker}\n      b.name = String(b.name).trim();\n      if (!b.name) return json({ error: 'Nome da empresa é obrigatório' }, 400);\n      const sameCompanyName = await DB.prepare('SELECT id FROM companies WHERE lower(trim(name)) = lower(trim(?)) LIMIT 1').bind(b.name).first();\n      if (sameCompanyName) return json({ error: 'Já existe empresa com esse nome', id: sameCompanyName.id }, 409);\n`
+  });
 }else{
   console.log('OK: proteção de duplicidade de empresa já aplicada.');
 }
 
 const projectMarker='// [allamo-onboarding-project-integrity]';
 if(!worker.includes(projectMarker)){
-  const projectNeedle=`    // PROJETOS: criar
-    if (path === 'projects' && request.method === 'POST') {
-      if (!['admin','pmo','gestor'].includes(user.role)) return json({ error: 'Sem permissão' }, 403);
-      const b = await request.json();
-      if (!b.name) return json({ error: 'Nome do projeto é obrigatório' }, 400);
-      if (scope && b.company_id && b.company_id !== scope) return json({ error: 'Fora do escopo' }, 403);
-      if (user.role === 'gestor') b.company_id = scope;`;
-  if(worker.split(projectNeedle).length-1!==1) throw new Error('Contrato de criação de projeto inesperado; build interrompido para evitar patch inseguro.');
-  const projectGuard=`${projectNeedle}
-      ${projectMarker}
-      b.name = String(b.name).trim();
-      if (!b.name) return json({ error: 'Nome do projeto é obrigatório' }, 400);
-      if (scope && !b.company_id) b.company_id = scope;
-      if (!b.company_id) return json({ error: 'Empresa é obrigatória para criar projeto' }, 400);
-      const projectCompany = await DB.prepare('SELECT id FROM companies WHERE id = ? LIMIT 1').bind(b.company_id).first();
-      if (!projectCompany) return json({ error: 'Empresa não encontrada' }, 404);
-      const sameProject = await DB.prepare('SELECT id FROM projects WHERE company_id = ? AND lower(trim(name)) = lower(trim(?)) LIMIT 1').bind(b.company_id,b.name).first();
-      if (sameProject) return json({ error: 'Já existe projeto com esse nome nesta empresa', id: sameProject.id }, 409);`;
-  worker=worker.replace(projectNeedle,projectGuard);
-  changed=true;
+  insertBeforeInRoute({
+    routeNeedle:"if (path === 'projects' && request.method === 'POST')",
+    beforeNeedle:"      const badgeMap = { 'Em andamento':'started'",
+    label:'criação de projeto',
+    block:`      ${projectMarker}\n      b.name = String(b.name).trim();\n      if (!b.name) return json({ error: 'Nome do projeto é obrigatório' }, 400);\n      if (scope && !b.company_id) b.company_id = scope;\n      if (!b.company_id) return json({ error: 'Empresa é obrigatória para criar projeto' }, 400);\n      const projectCompany = await DB.prepare('SELECT id FROM companies WHERE id = ? LIMIT 1').bind(b.company_id).first();\n      if (!projectCompany) return json({ error: 'Empresa não encontrada' }, 404);\n      const sameProject = await DB.prepare('SELECT id FROM projects WHERE company_id = ? AND lower(trim(name)) = lower(trim(?)) LIMIT 1').bind(b.company_id,b.name).first();\n      if (sameProject) return json({ error: 'Já existe projeto com esse nome nesta empresa', id: sameProject.id }, 409);\n`
+  });
 }else{
   console.log('OK: proteção de integridade empresa→projeto já aplicada.');
 }
