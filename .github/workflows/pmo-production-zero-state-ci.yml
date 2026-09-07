@@ -91,9 +91,12 @@ jobs:
           if(!/workflow_dispatch:\s*(?:\n|$)/.test(madriSeed)) throw new Error('Seed MADRI deve ser operação manual explícita.');
           if(!madriSeed.includes('Backup obrigatório do D1 Stage antes do seed MADRI')) throw new Error('Operação manual MADRI deve manter backup obrigatório antes do seed.');
 
-          if(!madriCrud.includes("if: ${{ github.event_name == 'workflow_dispatch' }}")) throw new Error('CRUD remoto MADRI deve estar restrito a workflow_dispatch.');
+          const remoteJobPos=madriCrud.indexOf('verify-current-stage:');
+          if(remoteJobPos<0) throw new Error('Job de CRUD remoto MADRI não encontrado.');
+          const remoteJob=madriCrud.slice(remoteJobPos);
+          if(!remoteJob.includes("github.event_name == 'workflow_dispatch'")) throw new Error('CRUD remoto MADRI deve estar restrito a workflow_dispatch.');
           if(!madriCrud.includes('Validar build e contrato MADRI sem tocar no Stage')) throw new Error('PR MADRI deve possuir validação estática sem escrita remota.');
-          if(!madriCrud.includes('Backup obrigatório antes do CRUD remoto manual')) throw new Error('CRUD remoto manual MADRI deve ter backup obrigatório.');
+          if(!remoteJob.includes('Backup obrigatório antes do CRUD remoto manual')) throw new Error('CRUD remoto manual MADRI deve ter backup obrigatório.');
 
           console.log('[OK] STAGE/PROD preservam baseline zero; seed e CRUD remoto MADRI exigem operação manual explícita.');
           NODE
