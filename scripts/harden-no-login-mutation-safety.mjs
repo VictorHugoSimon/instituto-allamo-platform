@@ -118,3 +118,5 @@ if(changed){
 }else{
   console.log('OK: hardening de mutações/onboarding já estava materializado.');
 }
+
+await import('./harden-onboarding-ui-idempotency.mjs');
