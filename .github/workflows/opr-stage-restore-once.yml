@@ -1,6 +1,7 @@
 name: OPR STAGE - Restore Isolado do Backup Validado
 
 on:
+  workflow_dispatch:
   push:
     branches: [develop]
     paths:
