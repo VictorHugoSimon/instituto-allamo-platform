@@ -2,7 +2,9 @@ import fs from 'node:fs';
 
 const worker=fs.readFileSync('public/_worker.js','utf8');
 const migration=fs.readFileSync('migrations/2026-09-08-pmo-onboarding-idempotency.sql','utf8');
-const schema=fs.readFileSync('scripts/ensure-additive-schema.mjs','utf8');
+const schema=fs.readFileSync('scripts/ensure-onboarding-schema.mjs','utf8');
+const stageWorkflow=fs.readFileSync('.github/workflows/deploy-stage.yml','utf8');
+const prodWorkflow=fs.readFileSync('.github/workflows/deploy-production.yml','utf8');
 const must=(needle,label)=>{if(!worker.includes(needle))throw new Error(`Ausente: ${label}`)};
 
 must("__portal_no_login:true",'identidade sintética do Portal sem login');
@@ -44,8 +46,14 @@ if(!migration.includes('CREATE TABLE IF NOT EXISTS onboarding_requests'))throw n
 if(!migration.includes('request_id TEXT PRIMARY KEY'))throw new Error('request_id não é chave única persistida.');
 if(!migration.includes("status TEXT NOT NULL DEFAULT 'pending'"))throw new Error('Ledger não possui estado pending fail-closed.');
 if(/\b(?:DELETE|DROP|TRUNCATE)\b/i.test(migration.replace(/^--.*$/gm,'')))throw new Error('Migration de onboarding não pode conter operação destrutiva.');
-if(!schema.includes("onboarding_requests"))throw new Error('ensure-additive-schema ainda não garante onboarding_requests.');
-if(!schema.includes('2026-09-08-pmo-onboarding-idempotency.sql'))throw new Error('Migration de onboarding não está conectada ao deploy aditivo.');
+for(const needle of ['onboarding_requests','2026-09-08-pmo-onboarding-idempotency.sql','APPLY-ONBOARDING-SCHEMA-STAGE','APPLY-ONBOARDING-SCHEMA-PRODUCTION']){
+  if(!schema.includes(needle))throw new Error(`Gate de schema de onboarding incompleto: ${needle}`);
+}
+if(/\b(?:DELETE|DROP|TRUNCATE)\b/i.test(schema))throw new Error('Gate de schema de onboarding não pode executar operação destrutiva.');
+for(const [workflow,env,confirm] of [[stageWorkflow,'stage','APPLY-ONBOARDING-SCHEMA-STAGE'],[prodWorkflow,'production','APPLY-ONBOARDING-SCHEMA-PRODUCTION']]){
+  if(!workflow.includes(`node scripts/ensure-onboarding-schema.mjs --env=${env}`))throw new Error(`Release ${env} não faz dry-run do schema de onboarding.`);
+  if(!workflow.includes(`node scripts/ensure-onboarding-schema.mjs --env=${env} --apply --confirm=${confirm}`))throw new Error(`Release ${env} não aplica ledger de onboarding antes do deploy.`);
+}
 
 const companyGuard=worker.indexOf('// [allamo-onboarding-company-request-guard]');
 const companyInsert=worker.indexOf('INSERT INTO companies');
@@ -56,4 +64,4 @@ const projectInsert=worker.indexOf('INSERT INTO projects');
 const projectReserve=worker.indexOf('// [allamo-onboarding-project-request-reserve]');
 if(!(projectGuard>=0&&projectReserve>projectGuard&&projectReserve<projectInsert))throw new Error('Projeto pode ser inserido antes da reserva idempotente.');
 
-console.log('OK: onboarding empresa→projeto exige sessão humana autenticada, request_id persistido, replay idempotente, integridade, auditoria e reserva antes de qualquer INSERT de negócio.');
+console.log('OK: onboarding empresa→projeto exige sessão humana autenticada, request_id persistido, replay idempotente, integridade, auditoria e schema aditivo aplicado antes de qualquer deploy.');
