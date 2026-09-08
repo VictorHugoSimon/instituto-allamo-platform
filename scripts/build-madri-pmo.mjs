@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const worker='public/_worker.js';
 const publicApi=fs.readFileSync('src/madri-pmo-public-api.js','utf8');
 let privateApi=fs.readFileSync('src/madri-pmo-api.js','utf8');
+const governanceApi=fs.readFileSync('src/madri-governance-platform-api.js','utf8');
 
 // Correção defensiva do contrato de criação de ações MADRI.
 // Os INSERTs em work_items possuem 25 colunas: 24 parâmetros + version=1.
@@ -19,6 +20,10 @@ if(normalizedPrivateInserts<2){
 if(badArityPattern().test(privateApi)){
   throw new Error('API MADRI ainda contém INSERT com 26 valores para 25 colunas.');
 }
+
+// API de governança é anexada ao mesmo bloco privado canônico.
+// Isso evita múltiplas injeções com o mesmo anchor e mantém build idempotente.
+const privateBundle=privateApi+'\n\n// MADRI GOVERNANCE PLATFORM API\n'+governanceApi;
 
 const sync=(text,start,end,content,needle,indent='')=>{
   const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
@@ -44,21 +49,22 @@ w=sync(
   w,
   '    // BEGIN MADRI PMO PRIVATE API',
   '    // END MADRI PMO PRIVATE API',
-  privateApi,
+  privateBundle,
   "    if (path === 'projects' && request.method === 'GET')",
   '    '
 );
 
-// Hardening final: também corrige qualquer bloco MADRI legado já presente no Worker
-// e impede publicação com rotas privadas duplicadas ou SQL de aridade inválida.
+// Hardening final: impede publicação com blocos duplicados, API de governança ausente
+// ou SQL de aridade inválida.
 w=normalizeInsertArity(w);
 const privateBlocks=(w.match(/BEGIN MADRI PMO PRIVATE API/g)||[]).length;
 const publicBlocks=(w.match(/BEGIN MADRI PMO PUBLIC API/g)||[]).length;
 if(privateBlocks!==1)throw new Error(`Worker MADRI inválido: ${privateBlocks} blocos privados encontrados.`);
 if(publicBlocks!==1)throw new Error(`Worker MADRI inválido: ${publicBlocks} blocos públicos encontrados.`);
+if(!w.includes("path==='madri-platform/context'"))throw new Error('Worker MADRI não contém API de governança D1.');
 if(badArityPattern().test(w))throw new Error('Worker final ainda contém INSERT MADRI com 26 valores para 25 colunas.');
 const workerGoodInserts=w.split(goodInsert).length-1;
 if(workerGoodInserts<2)throw new Error(`Worker final não contém os dois INSERTs MADRI normalizados; encontrado ${workerGoodInserts}.`);
 
 fs.writeFileSync(worker,w);
-console.log(`OK: APIs MADRI PMO injetadas uma única vez; ${workerGoodInserts} INSERTs de work_items com aridade 25×25 validados.`);
+console.log(`OK: APIs MADRI PMO + Governance injetadas em um único bloco privado; ${workerGoodInserts} INSERTs de work_items validados.`);
