@@ -1,0 +1,66 @@
+name: MADRI Stage - Bootstrap Governance Data
+
+on:
+  push:
+    branches:
+      - ops/madri-stage-bootstrap-governance-2026-09-08
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-stage-bootstrap-governance
+  cancel-in-progress: false
+
+jobs:
+  seed-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout da operação isolada
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Backup obrigatório do D1 Stage antes do bootstrap
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-madri-bootstrap-stage-${GITHUB_SHA}.sql"
+
+      - name: Guardar backup da operação
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-madri-bootstrap-stage-backup-${{ github.sha }}
+          path: backup-madri-bootstrap-stage-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Dry-run do bootstrap MADRI
+        run: node scripts/seed-madri-governance-stage.mjs
+
+      - name: Aplicar bootstrap idempotente de fases e readiness
+        run: node scripts/seed-madri-governance-stage.mjs --apply --confirm=SEED-MADRI-GOV-STAGE
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### MADRI Stage — Bootstrap Governance" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ambiente: STAGE somente" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tenant: resolvido por Madrid/Madri e projeto NUCCI" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dados: 15 fases + 17 critérios de readiness" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Estratégia: INSERT OR IGNORE, sem exclusões e sem sobrescrever registros existentes" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup D1: obrigatório antes da gravação" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Produção: não tocada" >> "$GITHUB_STEP_SUMMARY"
