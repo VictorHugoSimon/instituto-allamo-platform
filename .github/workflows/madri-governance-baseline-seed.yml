@@ -18,19 +18,39 @@ on:
 
 permissions:
   contents: read
+  statuses: read
 
-# Serializa qualquer escrita do baseline com a release canônica de STAGE.
-# Assim backup/schema/deploy e seed nunca disputam o mesmo D1 ao mesmo tempo.
 concurrency:
-  group: allamo-pmo-stage-release
+  group: madri-governance-baseline-stage
   cancel-in-progress: false
 
 jobs:
   seed-stage:
     if: ${{ github.event_name == 'push' || inputs.confirm == 'SEED-MADRI-BASELINE-STAGE' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
+      - name: Aguardar Release STAGE canônica do mesmo commit
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Aguardando allamo/stage-deploy=success para ${GITHUB_SHA}..."
+          for i in $(seq 1 180); do
+            state="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/statuses" --jq '[.[] | select(.context=="allamo/stage-deploy")][0].state // "missing"')"
+            echo "Tentativa ${i}: ${state}"
+            if [ "$state" = "success" ]; then
+              echo "Release STAGE confirmada."
+              exit 0
+            fi
+            if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
+              echo "Release STAGE falhou; seed abortado."
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "Timeout aguardando a Release STAGE; seed não será executado."
+          exit 1
       - name: Checkout develop
         uses: actions/checkout@v4
         with:
@@ -80,6 +100,6 @@ jobs:
           echo "- Bootstrap: 15 fases + 17 itens de readiness" >> "$GITHUB_STEP_SUMMARY"
           echo "- Estratégia: INSERT OR IGNORE; registros existentes não são sobrescritos" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório antes da carga" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Serialização: mesmo concurrency group da Release STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ordem no push: seed somente após allamo/stage-deploy=success no mesmo commit" >> "$GITHUB_STEP_SUMMARY"
           echo "- Disparo: ${{ github.event_name }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Motivo: ${{ inputs.reason || 'Carga inicial governada do baseline MADRI' }}" >> "$GITHUB_STEP_SUMMARY"
