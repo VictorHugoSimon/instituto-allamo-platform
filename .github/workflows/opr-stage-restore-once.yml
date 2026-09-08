@@ -2,23 +2,28 @@ name: OPR STAGE - Restore Isolado do Backup Validado
 
 on:
   workflow_dispatch:
-  push:
-    branches: [develop]
-    paths:
-      - '.github/workflows/opr-stage-restore-once.yml'
+    inputs:
+      confirm:
+        description: 'Digite RESTORE-OPR-STAGE para confirmar a restauração manual isolada'
+        required: true
+        type: string
+      reason:
+        description: 'Motivo operacional da restauração'
+        required: false
+        type: string
 
 permissions:
   contents: read
   actions: write
 
-# Grupo próprio: a restauração espera explicitamente qualquer release STAGE terminar antes
-# de tocar no D1. Isso evita que o próprio push deste workflow cancele o restore pendente.
+# Operação excepcional e manual. Nunca deve ser disparada por push/build/deploy/health/smoke.
 concurrency:
   group: opr-stage-restore-isolado
   cancel-in-progress: false
 
 jobs:
   restore-opr-stage:
+    if: ${{ inputs.confirm == 'RESTORE-OPR-STAGE' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -123,6 +128,8 @@ jobs:
         if: always()
         run: |
           echo "### Restore OPR STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Acionamento: exclusivamente manual com confirmação RESTORE-OPR-STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Motivo: ${{ inputs.reason || 'não informado' }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Fonte: backup D1 validado do release 2026-09-03 / commit 828ac534" >> "$GITHUB_STEP_SUMMARY"
           echo "- Escopo: somente id/company_id=opr" >> "$GITHUB_STEP_SUMMARY"
           echo "- Estratégia: INSERT OR IGNORE, sem DELETE e sem UPDATE de MADRI/Dual/Semeali" >> "$GITHUB_STEP_SUMMARY"

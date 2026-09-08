@@ -9,6 +9,7 @@ on:
       - '.github/workflows/operational-health.yml'
       - '.github/workflows/madri-pmo-stage-schema.yml'
       - '.github/workflows/madri-current-stage-crud-verification.yml'
+      - '.github/workflows/opr-stage-restore-once.yml'
       - 'scripts/operational-health-check.mjs'
       - 'scripts/validate-operational-health.mjs'
       - 'scripts/smoke-governance-environment.mjs'
@@ -24,6 +25,7 @@ on:
       - '.github/workflows/operational-health.yml'
       - '.github/workflows/madri-pmo-stage-schema.yml'
       - '.github/workflows/madri-current-stage-crud-verification.yml'
+      - '.github/workflows/opr-stage-restore-once.yml'
       - 'scripts/operational-health-check.mjs'
       - 'scripts/validate-operational-health.mjs'
       - 'scripts/smoke-governance-environment.mjs'
@@ -64,6 +66,7 @@ jobs:
           const health=fs.readFileSync('scripts/operational-health-check.mjs','utf8');
           const madriSeed=fs.readFileSync('.github/workflows/madri-pmo-stage-schema.yml','utf8');
           const madriCrud=fs.readFileSync('.github/workflows/madri-current-stage-crud-verification.yml','utf8');
+          const oprRestore=fs.readFileSync('.github/workflows/opr-stage-restore-once.yml','utf8');
 
           const forbiddenStage=[
             'repair-core-tenants-portable.mjs --env=stage',
@@ -98,7 +101,12 @@ jobs:
           if(!madriCrud.includes('Validar build e contrato MADRI sem tocar no Stage')) throw new Error('PR MADRI deve possuir validação estática sem escrita remota.');
           if(!remoteJob.includes('Backup obrigatório antes do CRUD remoto manual')) throw new Error('CRUD remoto manual MADRI deve ter backup obrigatório.');
 
-          console.log('[OK] STAGE/PROD preservam baseline zero; seed e CRUD remoto MADRI exigem operação manual explícita.');
+          if(/\n\s*push:\s*\n/.test(oprRestore)) throw new Error('Restore OPR não pode disparar automaticamente por push.');
+          if(!/workflow_dispatch:\s*(?:\n|$)/.test(oprRestore)) throw new Error('Restore OPR deve ser operação manual explícita.');
+          if(!oprRestore.includes("inputs.confirm == 'RESTORE-OPR-STAGE'")) throw new Error('Restore OPR manual deve exigir confirmação RESTORE-OPR-STAGE.');
+          if(!oprRestore.includes('Backup obrigatório do D1 antes do restore OPR')) throw new Error('Restore OPR manual deve manter backup obrigatório antes de qualquer escrita.');
+
+          console.log('[OK] STAGE/PROD preservam baseline zero; seed/CRUD MADRI e restore OPR exigem operação manual explícita com backup.');
           NODE
       - name: Teste consolidado de governança
         run: npm run test:governance
