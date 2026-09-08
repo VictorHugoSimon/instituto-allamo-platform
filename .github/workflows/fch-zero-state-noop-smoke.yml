@@ -1,0 +1,62 @@
+name: FCH Zero-State No-Op Smoke
+
+on:
+  push:
+    branches: [validation/fch-zero-state-noop]
+    paths:
+      - '.github/workflows/fch-zero-state-noop-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fch-zero-state-noop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validar governança estática FCH
+        run: node scripts/validate-fch-workflow-governance.mjs
+
+      - name: Provar baseline zero e no-op sem credenciais
+        env:
+          GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: ''
+          GOOGLE_CLIENT_ID: ''
+          GOOGLE_CLIENT_SECRET: ''
+          GOOGLE_REFRESH_TOKEN: ''
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const stage='https://allamo-pmo-stage.pages.dev';
+          const production='https://allamo-pmo.pages.dev';
+          const get=async(base,path)=>{
+            const r=await fetch(base+path,{headers:{'cache-control':'no-cache'},cache:'no-store'});
+            if(!r.ok) throw new Error(`${base}${path}: HTTP ${r.status}`);
+            const j=await r.json();
+            if(!Array.isArray(j)) throw new Error(`${base}${path}: resposta não é array`);
+            return j;
+          };
+          const [sc,sp,pc,pp]=await Promise.all([
+            get(stage,'/api/companies'),get(stage,'/api/projects'),
+            get(production,'/api/companies'),get(production,'/api/projects')
+          ]);
+          const state={stage:{companies:sc.length,projects:sp.length},production:{companies:pc.length,projects:pp.length}};
+          console.log('Estado observado:',JSON.stringify(state));
+          if(sc.length!==0||sp.length!==0||pc.length!==0||pp.length!==0){
+            throw new Error('Baseline não está integralmente zero; smoke não pode afirmar no-op.');
+          }
+          const official=fs.readFileSync('.github/workflows/sync-fch-curve-detailed.yml','utf8');
+          for(const needle of [
+            'Gate de ativação + baseline zero',
+            "set('FCH_SHOULD_SYNC','false')",
+            'STAGE e Produção estão em baseline zero',
+            'Nenhuma credencial foi exigida e nenhuma escrita foi executada.',
+            "if: env.FCH_SHOULD_SYNC == 'true'"
+          ]) if(!official.includes(needle)) throw new Error('Proteção FCH ausente: '+needle);
+          console.log('OK: FCH em baseline zero resulta em no-op saudável sem credencial Google e sem qualquer escrita.');
+          NODE
