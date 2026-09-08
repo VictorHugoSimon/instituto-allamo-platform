@@ -1,0 +1,43 @@
+name: MADRI - Padronização OPR - Static Gate
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'public/madri/**'
+      - 'public/madri-*/**'
+      - 'scripts/validate-madri-opr-standardization.mjs'
+      - '.github/workflows/madri-opr-standardization-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  madri-opr-standard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+      - name: Validar contrato visual, rotas e isolamento MADRI
+        run: node scripts/validate-madri-opr-standardization.mjs
+      - name: Build completo para regressão
+        run: npm run build:work
+      - name: Validar bundle MADRI existente
+        run: npm run test:madri-pmo
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### MADRI × padrão OPR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Escopo: Stage / PR para develop" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Produção: não alterada" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dados OPR: não utilizados" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Gate: rotas 01–15 + Design System + isolamento + build" >> "$GITHUB_STEP_SUMMARY"
