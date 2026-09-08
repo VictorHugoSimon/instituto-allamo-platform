@@ -17,6 +17,7 @@ const PROJECT_NAME='PMO Onboarding Smoke Project 2026-09-08';
 const sqlString=v=>`'${String(v).replace(/'/g,"''")}'`;
 const sqlIdent=v=>`"${String(v).replace(/"/g,'""')}"`;
 const fail=m=>{throw new Error(m)};
+const sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
 
 function runWrangler(args,{capture=true}={}){
   const r=spawnSync('npx',['--yes',WRANGLER,...args],{
@@ -37,19 +38,38 @@ function extractResults(node){
   }
   return null;
 }
-function executeSql(sql,{json=true,capture=true}={}){
+function parseJsonOutput(out){
+  const text=String(out||'').trim();
+  try{return JSON.parse(text)}catch{}
+  const candidates=[];
+  const a=text.indexOf('['),b=text.lastIndexOf(']');
+  if(a>=0&&b>a)candidates.push(text.slice(a,b+1));
+  const c=text.indexOf('{'),d=text.lastIndexOf('}');
+  if(c>=0&&d>c)candidates.push(text.slice(c,d+1));
+  for(const candidate of candidates){try{return JSON.parse(candidate)}catch{}}
+  fail('Saída D1 não-JSON');
+}
+function query(sql){
+  let last='';
+  for(let attempt=1;attempt<=4;attempt++){
+    const r=spawnSync('npx',['--yes',WRANGLER,'d1','execute',DB,'--remote','--config',CONFIG,'--command',sql,'--json'],{
+      cwd:ROOT,encoding:'utf8',stdio:['ignore','pipe','pipe'],shell:false
+    });
+    if(!r.error&&r.status===0){
+      try{return extractResults(parseJsonOutput(r.stdout||''))||[]}catch(e){last=e?.message||String(e)}
+    }else{
+      last=`status=${r.status}; ${String(r.stderr||r.stdout||'').slice(-800)}`;
+    }
+    if(attempt<4){console.warn(`[WARN] consulta D1 tentativa ${attempt}/4 falhou; retry seguro somente leitura.`);sleep(1500*attempt)}
+  }
+  fail(`Consulta D1 falhou após 4 tentativas: ${last}`);
+}
+function executeMutation(sql){
   const tmp=path.join(os.tmpdir(),`allamo-onboarding-smoke-${Date.now()}-${Math.random().toString(16).slice(2)}.sql`);
   fs.writeFileSync(tmp,sql.endsWith('\n')?sql:sql+'\n','utf8');
-  try{
-    const args=['d1','execute',DB,'--remote','--config',CONFIG,'--file',tmp];
-    if(json)args.push('--json');
-    const out=runWrangler(args,{capture});
-    if(!json)return [];
-    let parsed;try{parsed=JSON.parse(out)}catch{fail('Saída D1 não-JSON')}
-    return extractResults(parsed)||[];
-  }finally{try{fs.unlinkSync(tmp)}catch{}}
+  try{runWrangler(['d1','execute',DB,'--remote','--config',CONFIG,'--file',tmp],{capture:false})}
+  finally{try{fs.unlinkSync(tmp)}catch{}}
 }
-const query=sql=>executeSql(sql,{json:true,capture:true});
 
 function ensureStageOnly(){
   if(!fs.existsSync(CONFIG))fail(`${CONFIG} ausente`);
@@ -114,7 +134,7 @@ async function prepare(){
     buildInsert('projects',projectValues,{omitPrimaryAuto:true}),
     "SELECT 'PMO_ONBOARDING_STAGE_FIXTURE_CREATED' AS status;"
   ].join('\n');
-  executeSql(sql,{json:false,capture:false});
+  executeMutation(sql);
   const f=getFixture();
   if(f.companies.length!==1||f.projects.length!==1)fail(`Fixture incompleto após INSERT: ${JSON.stringify(f)}`);
   if(String(f.projects[0].company_id)!==COMPANY_ID)fail('Projeto fixture não pertence à empresa fixture');
@@ -175,7 +195,7 @@ function cleanup(){
   statements.push(`DELETE FROM companies WHERE id=${sqlString(COMPANY_ID)} AND name=${sqlString(COMPANY_NAME)};`);
   statements.push('PRAGMA foreign_keys=ON;');
   statements.push("SELECT 'PMO_ONBOARDING_STAGE_FIXTURE_CLEANED' AS status;");
-  executeSql(statements.join('\n'),{json:false,capture:false});
+  executeMutation(statements.join('\n'));
   const remaining=getFixture();
   if(remaining.companies.length||remaining.projects.length)fail(`Cleanup deixou fixture: ${JSON.stringify(remaining)}`);
   const b=baseline();
