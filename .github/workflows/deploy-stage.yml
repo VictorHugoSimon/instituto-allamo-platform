@@ -70,17 +70,22 @@ jobs:
           retention-days: 14
       - name: Dry-run do schema aditivo no Stage
         timeout-minutes: 10
-        run: node scripts/ensure-additive-schema.mjs --env=stage
+        run: |
+          node scripts/ensure-additive-schema.mjs --env=stage
+          node scripts/ensure-onboarding-schema.mjs --env=stage
       - name: Aplicar somente schema aditivo no Stage
         timeout-minutes: 10
         run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
+      - name: Aplicar ledger idempotente de onboarding no Stage
+        timeout-minutes: 10
+        run: node scripts/ensure-onboarding-schema.mjs --env=stage --apply --confirm=APPLY-ONBOARDING-SCHEMA-STAGE
       - name: Materializar configuração exclusiva de Stage
         run: |
           cp wrangler.stage.toml wrangler.toml
           grep -F 'name = "allamo-pmo-stage"' wrangler.toml
       - name: Registrar configuração Stage validada
         env: { GH_TOKEN: "${{ github.token }}" }
-        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração, backup e schema de Stage validados; nenhum dado de negócio foi provisionado'
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=allamo/stage-config -f description='Configuração, backup e schemas aditivos de Stage validados; nenhum dado de negócio foi provisionado'
       - name: Publicar exatamente o artefato validado no STAGE canônico
         run: npx wrangler@4.124.0 pages deploy public --project-name allamo-pmo-stage --branch develop --commit-hash "$GITHUB_SHA" --commit-dirty=true
       - name: Confirmar que a URL canônica recebeu este commit
@@ -109,6 +114,7 @@ jobs:
           echo "- Fingerprint pós-deploy: obrigatório" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório e retido por 14 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Onboarding: ledger idempotente aplicado antes do deploy; nenhum tenant é criado pelo schema" >> "$GITHUB_STEP_SUMMARY"
           echo "- Dados de negócio: nunca criados/reparados automaticamente pela release" >> "$GITHUB_STEP_SUMMARY"
           echo "- Estado zero: válido quando companies e projects estão vazios" >> "$GITHUB_STEP_SUMMARY"
           echo "- Smokes: governança genérica + integridade PMO; sem rotinas tenant-specific na release padrão" >> "$GITHUB_STEP_SUMMARY"
