@@ -2,7 +2,7 @@
   "dataset": "MADRI — baseline de requisitos RFI × Blueprint",
   "version": "2026-09-08.v1",
   "generated_from": "Matriz_Auditoria_RFI_x_Blueprint_MADRI_v1.xlsx",
-  "source_sha256": "415f3a9979dca119bb95a120ae912331bb8b41674b09a9fc05d833d346105",
+  "source_sha256": "415f3a9979dca119bb95a120ae912331bb8b41674b09a9fc05d833cedd346105",
   "source_note": "RFI reconstruída a partir dos materiais disponíveis; o RFI final enviado aos fornecedores ainda não foi localizado. Não converter classificação STD/CFG/DEV/INT sem validação.",
   "counts": {
     "rfi_reconstructed": 71,
