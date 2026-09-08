@@ -24,12 +24,15 @@ if(badArityPattern().test(privateApi)){
 const privateBundle=privateApi+'\n\n// MADRI GOVERNANCE PLATFORM API\n'+governanceApi;
 
 const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const markerLineRe=marker=>new RegExp(`^[\\t ]*${escRe(marker.trim())}[\\t ]*$`,'gm');
+const countMarkerLines=(text,marker)=>(text.match(markerLineRe(marker))||[]).length;
 const stripAllBlocks=(text,start,end)=>{
   const s=escRe(start.trim()),e=escRe(end.trim());
   const re=new RegExp(`^[\\t ]*${s}[\\t ]*\\r?\\n[\\s\\S]*?^[\\t ]*${e}[\\t ]*(?:\\r?\\n)?`,'gm');
   const cleaned=text.replace(re,'');
-  if(cleaned.includes(start.trim())||cleaned.includes(end.trim())){
-    throw new Error(`Marcador MADRI órfão após limpeza: ${start.trim()} / ${end.trim()}`);
+  const orphanStarts=countMarkerLines(cleaned,start),orphanEnds=countMarkerLines(cleaned,end);
+  if(orphanStarts||orphanEnds){
+    throw new Error(`Marcador MADRI órfão após limpeza: start=${orphanStarts}, end=${orphanEnds} (${start.trim()})`);
   }
   return cleaned;
 };
@@ -56,7 +59,7 @@ for(const [s,e] of [
   ['    // BEGIN MADRI GOVERNANCE PLATFORM API','    // END MADRI GOVERNANCE PLATFORM API'],
   ['    // BEGIN MADRI GOVERNANCE API','    // END MADRI GOVERNANCE API']
 ]){
-  if(w.includes(s.trim())||w.includes(e.trim()))w=stripAllBlocks(w,s,e);
+  if(countMarkerLines(w,s)||countMarkerLines(w,e))w=stripAllBlocks(w,s,e);
 }
 
 w=injectOnce(
@@ -76,14 +79,16 @@ w=injectOnce(
   '    '
 );
 
-// Hardening final: um único bloco público, um único privado, Governance presente
-// e SQL de ações com aridade correta.
+// Hardening final: contamos MARCADORES REAIS EM LINHA, e não qualquer ocorrência
+// textual da frase em comentários/strings gerados por outros hardeners.
 w=normalizeInsertArity(w);
-const privateBlocks=(w.match(/BEGIN MADRI PMO PRIVATE API/g)||[]).length;
-const publicBlocks=(w.match(/BEGIN MADRI PMO PUBLIC API/g)||[]).length;
+const privateBlocks=countMarkerLines(w,PRIVATE_START);
+const publicBlocks=countMarkerLines(w,PUBLIC_START);
+const privateEnds=countMarkerLines(w,PRIVATE_END);
+const publicEnds=countMarkerLines(w,PUBLIC_END);
 const governanceRoutes=(w.match(/path==='madri-platform\/context'/g)||[]).length;
-if(privateBlocks!==1)throw new Error(`Worker MADRI inválido: ${privateBlocks} blocos privados encontrados.`);
-if(publicBlocks!==1)throw new Error(`Worker MADRI inválido: ${publicBlocks} blocos públicos encontrados.`);
+if(privateBlocks!==1||privateEnds!==1)throw new Error(`Worker MADRI inválido: bloco privado start=${privateBlocks}, end=${privateEnds}.`);
+if(publicBlocks!==1||publicEnds!==1)throw new Error(`Worker MADRI inválido: bloco público start=${publicBlocks}, end=${publicEnds}.`);
 if(governanceRoutes!==1)throw new Error(`Worker MADRI inválido: esperado 1 contrato de governança; encontrado ${governanceRoutes}.`);
 if(badArityPattern().test(w))throw new Error('Worker final ainda contém INSERT MADRI com 26 valores para 25 colunas.');
 const workerGoodInserts=w.split(goodInsert).length-1;
