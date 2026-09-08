@@ -68,14 +68,18 @@ jobs:
           path: backup-stage-${{ github.sha }}.sql
           if-no-files-found: error
           retention-days: 14
-      - name: Dry-run do schema aditivo no Stage
+      - name: Dry-run dos schemas aditivos no Stage
         timeout-minutes: 10
         run: |
           node scripts/ensure-additive-schema.mjs --env=stage
+          node scripts/ensure-madri-governance-schema.mjs --env=stage
           node scripts/ensure-onboarding-schema.mjs --env=stage
-      - name: Aplicar somente schema aditivo no Stage
+      - name: Aplicar schema aditivo geral no Stage
         timeout-minutes: 10
         run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
+      - name: Aplicar schema MADRI Governance no Stage
+        timeout-minutes: 10
+        run: node scripts/ensure-madri-governance-schema.mjs --env=stage --apply --confirm=APPLY-MADRI-GOV-STAGE
       - name: Aplicar ledger idempotente de onboarding no Stage
         timeout-minutes: 10
         run: node scripts/ensure-onboarding-schema.mjs --env=stage --apply --confirm=APPLY-ONBOARDING-SCHEMA-STAGE
@@ -113,7 +117,8 @@ jobs:
           echo "- Production branch do projeto Stage: develop (validada via API Cloudflare)" >> "$GITHUB_STEP_SUMMARY"
           echo "- Fingerprint pós-deploy: obrigatório" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório e retido por 14 dias" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Schema: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Schema geral: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
+          echo "- MADRI Governance: schema dedicado e idempotente aplicado somente no D1 Stage" >> "$GITHUB_STEP_SUMMARY"
           echo "- Onboarding: ledger idempotente aplicado antes do deploy; nenhum tenant é criado pelo schema" >> "$GITHUB_STEP_SUMMARY"
           echo "- Dados de negócio: nunca criados/reparados automaticamente pela release" >> "$GITHUB_STEP_SUMMARY"
           echo "- Estado zero: válido quando companies e projects estão vazios" >> "$GITHUB_STEP_SUMMARY"
