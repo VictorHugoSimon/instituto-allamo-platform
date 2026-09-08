@@ -13,10 +13,13 @@ const LEGACY_GOV=[
   ['    // BEGIN MADRI GOVERNANCE PLATFORM API','    // END MADRI GOVERNANCE PLATFORM API'],
   ['    // BEGIN MADRI GOVERNANCE API','    // END MADRI GOVERNANCE API']
 ];
+const PUBLIC_ANCHOR='    // REPORT PÚBLICO (sem login) — link aberto do cliente';
+const PRIVATE_ANCHOR="    if (path === 'projects' && request.method === 'GET')";
 
 const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const markerLineRe=marker=>new RegExp(`^[\\t ]*${escRe(marker.trim())}[\\t ]*$`,'gm');
 const countMarkerLines=(text,marker)=>(text.match(markerLineRe(marker))||[]).length;
+const markerLineNumbers=(text,marker)=>{const re=markerLineRe(marker),out=[];let m;while((m=re.exec(text)))out.push(text.slice(0,m.index).split(/\r?\n/).length);return out};
 const stripAllBlocks=(text,start,end)=>{
   const s=escRe(start.trim()),e=escRe(end.trim());
   const re=new RegExp(`^[\\t ]*${s}[\\t ]*\\r?\\n[\\s\\S]*?^[\\t ]*${e}[\\t ]*(?:\\r?\\n)?`,'gm');
@@ -72,30 +75,23 @@ let w=fs.readFileSync(worker,'utf8');
 // Removemos TODOS os wrappers canônicos/legados antes de reinjetar.
 w=cleanInjectedWrappers(w,'public/_worker.js');
 
-w=injectOnce(
-  w,
-  PUBLIC_START,
-  PUBLIC_END,
-  publicApi,
-  '    // REPORT PÚBLICO (sem login) — link aberto do cliente',
-  '    '
-);
-w=injectOnce(
-  w,
-  PRIVATE_START,
-  PRIVATE_END,
-  privateBundle,
-  "    if (path === 'projects' && request.method === 'GET')",
-  '    '
-);
+w=injectOnce(w,PUBLIC_START,PUBLIC_END,publicApi,PUBLIC_ANCHOR,'    ');
+w=injectOnce(w,PRIVATE_START,PRIVATE_END,privateBundle,PRIVATE_ANCHOR,'    ');
+
+// Canonicalização final do endpoint PÚBLICO. Alguns hardeners anteriores do pipeline
+// podem materializar uma cópia dentro de um artefato intermediário durante o mesmo
+// build. Depois que o bundle privado já está montado, removemos TODAS as cópias
+// públicas do Worker final e reinjetamos exatamente uma no ponto público correto.
+w=stripAllBlocks(w,PUBLIC_START,PUBLIC_END);
+w=injectOnce(w,PUBLIC_START,PUBLIC_END,publicApi,PUBLIC_ANCHOR,'    ');
 
 // Hardening final: contamos apenas MARCADORES REAIS EM LINHA.
 w=normalizeInsertArity(w);
 const privateBlocks=countMarkerLines(w,PRIVATE_START),privateEnds=countMarkerLines(w,PRIVATE_END);
 const publicBlocks=countMarkerLines(w,PUBLIC_START),publicEnds=countMarkerLines(w,PUBLIC_END);
 const governanceRoutes=(w.match(/path==='madri-platform\/context'/g)||[]).length;
-if(privateBlocks!==1||privateEnds!==1)throw new Error(`Worker MADRI inválido: bloco privado start=${privateBlocks}, end=${privateEnds}.`);
-if(publicBlocks!==1||publicEnds!==1)throw new Error(`Worker MADRI inválido: bloco público start=${publicBlocks}, end=${publicEnds}.`);
+if(privateBlocks!==1||privateEnds!==1)throw new Error(`Worker MADRI inválido: bloco privado start=${privateBlocks}, end=${privateEnds}; linhas start=${markerLineNumbers(w,PRIVATE_START).join(',')}, end=${markerLineNumbers(w,PRIVATE_END).join(',')}.`);
+if(publicBlocks!==1||publicEnds!==1)throw new Error(`Worker MADRI inválido: bloco público start=${publicBlocks}, end=${publicEnds}; linhas start=${markerLineNumbers(w,PUBLIC_START).join(',')}, end=${markerLineNumbers(w,PUBLIC_END).join(',')}.`);
 if(governanceRoutes!==1)throw new Error(`Worker MADRI inválido: esperado 1 contrato de governança; encontrado ${governanceRoutes}.`);
 if(badArityPattern().test(w))throw new Error('Worker final ainda contém INSERT MADRI com 26 valores para 25 colunas.');
 const workerGoodInserts=w.split(goodInsert).length-1;
