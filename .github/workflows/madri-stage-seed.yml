@@ -1,0 +1,93 @@
+name: MADRI - Seed Governança STAGE
+
+on:
+  push:
+    branches: [feature/madri-stage-seed-rfi-tests-v1]
+    paths:
+      - 'data/madri-governance-seed-v1.json.gz.b64'
+      - 'scripts/apply-madri-stage-seed.mjs'
+      - '.github/workflows/madri-stage-seed.yml'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite APPLY-MADRI-SEED-STAGE para executar o seed no D1 STAGE'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-stage-seed-v1
+  cancel-in-progress: false
+
+jobs:
+  seed-madri-stage:
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'APPLY-MADRI-SEED-STAGE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Validar autenticação e alvo STAGE
+        run: |
+          npx wrangler@4.124.0 whoami
+          grep -F 'name = "allamo-pmo-stage"' wrangler.stage.toml
+
+      - name: Garantir schema MADRI antes do seed
+        run: |
+          node scripts/ensure-madri-governance-schema.mjs --env=stage
+          node scripts/ensure-madri-governance-schema.mjs --env=stage --apply --confirm=APPLY-MADRI-GOV-STAGE
+
+      - name: Backup obrigatório do D1 STAGE
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-madri-seed-stage-${GITHUB_SHA}.sql"
+
+      - name: Guardar backup antes do seed
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-before-madri-seed-${{ github.sha }}
+          path: backup-madri-seed-stage-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Dry-run do pacote MADRI
+        run: node scripts/apply-madri-stage-seed.mjs --env=stage
+
+      - name: Aplicar seed MADRI somente no STAGE
+        run: node scripts/apply-madri-stage-seed.mjs --env=stage --apply --confirm=APPLY-MADRI-SEED-STAGE
+
+      - name: Validar API MADRI após seed
+        run: |
+          curl --fail --retry 5 --retry-delay 2 --silent --show-error https://allamo-pmo-stage.pages.dev/api/madri-platform/context
+          curl --fail --retry 5 --retry-delay 2 --silent --show-error https://allamo-pmo-stage.pages.dev/api/madri-platform/status-report
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### MADRI Seed Governança STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ambiente: STAGE somente" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Requisitos esperados: 86 (71 RFI reconstruídos + 15 novos)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Testes esperados: 54 (TST-001..TST-054)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fases: 15" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Readiness: 17" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Política: INSERT OR IGNORE; nenhuma edição humana existente é sobrescrita" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Produção: proibida por contrato do script" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup D1: obrigatório antes da carga" >> "$GITHUB_STEP_SUMMARY"
