@@ -64,4 +64,6 @@ const projectReserve=worker.indexOf('// [allamo-onboarding-project-request-reser
 const projectInsert=worker.indexOf('INSERT INTO projects',projectReserve);
 if(!(projectGuard>=0&&projectReserve>projectGuard&&projectInsert>projectReserve))throw new Error('Projeto pode ser inserido antes da reserva idempotente.');
 
-console.log('OK: onboarding empresa→projeto exige sessão humana autenticada, request_id persistido, replay idempotente, integridade, auditoria e schema aditivo aplicado antes de qualquer deploy.');
+await import('./validate-onboarding-ui-idempotency.mjs');
+
+console.log('OK: onboarding empresa→projeto exige sessão humana autenticada, request_id persistido, replay idempotente, integridade, auditoria, UI compatível e schema aditivo aplicado antes de qualquer deploy.');
