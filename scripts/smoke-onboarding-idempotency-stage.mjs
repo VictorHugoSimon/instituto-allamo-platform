@@ -45,6 +45,12 @@ async function list(path){
   expect(Array.isArray(r.data),`${path} não retornou array.`);
   return r.data;
 }
+function companySnapshot(items){
+  return JSON.stringify(items.map(x=>({id:String(x?.id??''),name:String(x?.name??'')})).sort((a,b)=>(a.id+'|'+a.name).localeCompare(b.id+'|'+b.name)));
+}
+function projectSnapshot(items){
+  return JSON.stringify(items.map(x=>({id:String(x?.id??''),name:String(x?.name??''),company_id:String(x?.company_id??'')})).sort((a,b)=>(a.id+'|'+a.company_id+'|'+a.name).localeCompare(b.id+'|'+b.company_id+'|'+b.name)));
+}
 function cleanup(){
   // Somente registros com identificadores exclusivos deste run podem ser removidos.
   wrangler(`DELETE FROM projects WHERE company_id='${esc(companyId)}' AND name='${esc(projectName)}';`);
@@ -61,10 +67,21 @@ if(cleanupOnly){
 if(!TOKEN) abort('ALLAMO_SMOKE_TOKEN ausente; sessão humana/técnica efêmera é obrigatória.');
 
 let primaryError=null;
+let baselineCompanies=[];
+let baselineProjects=[];
+let baselineCompaniesSnapshot='';
+let baselineProjectsSnapshot='';
 try{
-  const beforeCompanies=await list('/api/companies');
-  const beforeProjects=await list('/api/projects');
-  expect(beforeCompanies.length===0&&beforeProjects.length===0,`Baseline Stage precisa estar 0/0 antes do smoke; atual=${beforeCompanies.length}/${beforeProjects.length}`);
+  baselineCompanies=await list('/api/companies');
+  baselineProjects=await list('/api/projects');
+  baselineCompaniesSnapshot=companySnapshot(baselineCompanies);
+  baselineProjectsSnapshot=projectSnapshot(baselineProjects);
+  console.log(`[INFO] Baseline preservado do Stage: companies=${baselineCompanies.length}, projects=${baselineProjects.length}. Nenhum registro preexistente será removido.`);
+  if(baselineCompanies.length>0) console.log('[INFO] Empresas preexistentes:',baselineCompanies.map(x=>`${x?.id??''}:${x?.name??''}`).join(' | '));
+  if(baselineProjects.length>0) console.log('[INFO] Projetos preexistentes:',baselineProjects.map(x=>`${x?.id??''}:${x?.company_id??''}:${x?.name??''}`).join(' | '));
+
+  expect(!baselineCompanies.some(x=>String(x?.id)===companyId||String(x?.name)===companyName),'Identificador temporário do smoke colide com empresa preexistente.');
+  expect(!baselineProjects.some(x=>String(x?.name)===projectName&&String(x?.company_id)===companyId),'Identificador temporário do smoke colide com projeto preexistente.');
 
   const companyBody={id:companyId,name:companyName,system:'PMO Smoke',status_text:'Homologação temporária'};
 
@@ -82,7 +99,10 @@ try{
   expect(cConflict.status===409&&cConflict.data?.code==='idempotency_conflict',`Conflito de request_id de empresa deveria ser 409/idempotency_conflict; recebeu ${cConflict.status}/${cConflict.data?.code||'sem-code'}`);
 
   const afterCompany=await list('/api/companies');
-  expect(afterCompany.length===1&&String(afterCompany[0]?.id)===companyId,'Empresa temporária deveria existir exatamente uma vez.');
+  const ownCompanies=afterCompany.filter(x=>String(x?.id)===companyId&&String(x?.name)===companyName);
+  expect(afterCompany.length===baselineCompanies.length+1&&ownCompanies.length===1,'Empresa temporária deveria acrescentar exatamente um registro ao baseline, sem alterar os existentes.');
+  const withoutOwnCompany=afterCompany.filter(x=>String(x?.id)!==companyId);
+  expect(companySnapshot(withoutOwnCompany)===baselineCompaniesSnapshot,'Baseline de empresas foi alterado durante o smoke; abortando sem tocar nos registros preexistentes.');
 
   const projectBody={name:projectName,company_id:companyId,status:'Backlog',summary:'Homologação idempotente temporária'};
   const p1=await api('/api/projects',{method:'POST',body:projectBody,key:projectRequestId});
@@ -97,7 +117,9 @@ try{
 
   const afterProject=await list('/api/projects');
   const ownProjects=afterProject.filter(p=>String(p.company_id)===companyId&&String(p.name)===projectName);
-  expect(afterProject.length===1&&ownProjects.length===1&&String(ownProjects[0]?.id)===projectId,'Projeto temporário deveria existir exatamente uma vez.');
+  expect(afterProject.length===baselineProjects.length+1&&ownProjects.length===1&&String(ownProjects[0]?.id)===projectId,'Projeto temporário deveria acrescentar exatamente um registro ao baseline, sem duplicação.');
+  const withoutOwnProject=afterProject.filter(p=>String(p.id)!==projectId);
+  expect(projectSnapshot(withoutOwnProject)===baselineProjectsSnapshot,'Baseline de projetos foi alterado durante o smoke; abortando sem tocar nos registros preexistentes.');
 
   console.log('[OK] Smoke funcional: sessão obrigatória, criação empresa→projeto, replay e conflitos idempotentes comprovados no Stage.');
 }catch(e){
@@ -111,8 +133,11 @@ try{
 try{
   const finalCompanies=await list('/api/companies');
   const finalProjects=await list('/api/projects');
-  expect(finalCompanies.length===0&&finalProjects.length===0,`Stage não retornou ao baseline 0/0; atual=${finalCompanies.length}/${finalProjects.length}`);
-  console.log('[OK] Stage retornou ao baseline companies=0/projects=0 após o smoke.');
+  if(baselineCompaniesSnapshot||baselineProjectsSnapshot){
+    expect(companySnapshot(finalCompanies)===baselineCompaniesSnapshot,`Empresas do Stage não retornaram exatamente ao baseline preservado; atual=${finalCompanies.length}, baseline=${baselineCompanies.length}`);
+    expect(projectSnapshot(finalProjects)===baselineProjectsSnapshot,`Projetos do Stage não retornaram exatamente ao baseline preservado; atual=${finalProjects.length}, baseline=${baselineProjects.length}`);
+    console.log(`[OK] Stage retornou exatamente ao baseline preservado: companies=${baselineCompanies.length}, projects=${baselineProjects.length}.`);
+  }
 }catch(e){
   console.error('[ERRO] Verificação final de baseline falhou:',e.message||String(e));
   if(!primaryError)primaryError=e;
