@@ -82,15 +82,13 @@ function q(v){
 }
 function inList(values){return values.map(q).join(',')}
 
-const companies=query(`SELECT id,name FROM companies WHERE lower(CAST(id AS TEXT)) IN ('madrid','madri') OR lower(name) IN ('madrid','madri') ORDER BY id;`);
-if(companies.length!==1)throw new Error(`Contexto MADRI ambíguo/ausente: ${companies.length} empresa(s) encontrada(s).`);
+// Resolve o tenant pelo escopo canônico do Plano de Ação, não por nome textual.
+const companies=query(`SELECT DISTINCT c.id,c.name FROM companies c JOIN work_items w ON w.company_id=c.id WHERE w.pmo_scope='MADRI_NUCCI' AND w.archived_at IS NULL ORDER BY c.id;`);
+if(companies.length!==1)throw new Error(`Contexto MADRI ambíguo/ausente no pmo_scope=MADRI_NUCCI: ${companies.length} empresa(s).`);
 const company=companies[0];
-const projects=query(`SELECT id,name FROM projects WHERE company_id=${q(company.id)} AND (lower(name) LIKE '%nucci%' OR lower(name) LIKE '%madri%' OR lower(name) LIKE '%madrid%') ORDER BY CASE WHEN lower(name) LIKE '%nucci%' THEN 0 ELSE 1 END,id;`);
-if(!projects.length)throw new Error('Projeto MADRI/NUCCI não encontrado no STAGE.');
+const projects=query(`SELECT DISTINCT p.id,p.name FROM projects p JOIN work_items w ON w.project_id=p.id WHERE w.company_id=${q(company.id)} AND w.pmo_scope='MADRI_NUCCI' AND w.archived_at IS NULL ORDER BY p.id;`);
+if(projects.length!==1)throw new Error(`Contexto de projeto MADRI_NUCCI ambíguo/ausente: ${projects.length} projeto(s).`);
 const project=projects[0];
-if(projects.length>1 && !String(project.name||'').toLowerCase().includes('nucci')){
-  throw new Error(`Contexto de projeto ambíguo: ${projects.map(x=>`${x.id}:${x.name}`).join(', ')}`);
-}
 
 const requiredTables=['madri_platform_sequence','madri_requirements','madri_tests','madri_implementation_phases','madri_readiness'];
 for(const t of requiredTables){
