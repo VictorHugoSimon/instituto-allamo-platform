@@ -87,12 +87,16 @@ jobs:
         run: |
           node scripts/ensure-work-management-schema.mjs --env=production
           node scripts/ensure-additive-schema.mjs --env=production
+          node scripts/ensure-onboarding-schema.mjs --env=production
 
       - name: Garantir schema base de Work Management em Produção
         run: node scripts/ensure-work-management-schema.mjs --env=production --apply --confirm=APPLY-WORK-SCHEMA-PRODUCTION
 
       - name: Aplicar somente schema aditivo em Produção
         run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
+
+      - name: Aplicar ledger idempotente de onboarding em Produção
+        run: node scripts/ensure-onboarding-schema.mjs --env=production --apply --confirm=APPLY-ONBOARDING-SCHEMA-PRODUCTION
 
       - name: Gate final antes do deploy produtivo
         run: npm run test:release
@@ -145,6 +149,7 @@ jobs:
           echo "- Backup D1: obrigatório e retido por 30 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema base Work Management: dry-run + aplicação idempotente" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema aditivo: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Onboarding: ledger idempotente aplicado antes do deploy; nenhum tenant é criado pelo schema" >> "$GITHUB_STEP_SUMMARY"
           echo "- Dados de negócio: deploy NÃO cria nem repara empresas/projetos automaticamente" >> "$GITHUB_STEP_SUMMARY"
           echo "- Recuperação de tenants: somente operação manual, explícita e confirmada" >> "$GITHUB_STEP_SUMMARY"
           echo "- Autenticação: API Token com fallback para Global API Key + e-mail quando disponível" >> "$GITHUB_STEP_SUMMARY"
