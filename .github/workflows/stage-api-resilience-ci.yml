@@ -30,3 +30,62 @@ jobs:
         run: npm run test:freshness
       - name: Validate persistence guard
         run: npm run test:platform
+
+  onboarding-stage-smoke:
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'ops/onboarding-idempotency-stage-smoke-20260908' && github.base_ref == 'develop' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exato da branch operacional
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Instalar dependências travadas
+        run: npm ci
+      - name: Validar isolamento absoluto de Stage
+        run: |
+          grep -F 'name = "allamo-pmo-stage"' wrangler.stage.toml
+          if grep -E '^database_name\s*=\s*"allamo-pmo"\s*$' wrangler.stage.toml; then
+            echo 'Config de Stage aponta para Produção; abortando.' >&2
+            exit 2
+          fi
+      - name: Preparar autenticação Cloudflare já usada pela release oficial
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Confirmar autenticação Cloudflare
+        run: npx wrangler@4.124.0 whoami
+      - name: Backup obrigatório do D1 Stage antes do smoke
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-onboarding-smoke-${GITHUB_RUN_ID}.sql"
+      - name: Guardar backup pré-smoke
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-onboarding-smoke-backup-${{ github.run_id }}
+          path: backup-stage-onboarding-smoke-${{ github.run_id }}.sql
+          if-no-files-found: error
+          retention-days: 14
+      - name: Criar sessão efêmera autenticada no Stage
+        run: node scripts/prepare-stage-smoke-session.mjs
+      - name: Executar onboarding empresa → projeto com replay e conflito
+        env:
+          ALLAMO_SMOKE_BASE: https://allamo-pmo-stage.pages.dev
+        run: node scripts/smoke-onboarding-idempotency-stage.mjs
+      - name: Cleanup redundante e estritamente escopado
+        if: always()
+        env:
+          ALLAMO_SMOKE_BASE: https://allamo-pmo-stage.pages.dev
+        run: node scripts/smoke-onboarding-idempotency-stage.mjs --cleanup-only
+      - name: Expirar sessão técnica de smoke
+        if: always()
+        run: node scripts/expire-stage-smoke-session.mjs
+      - name: Confirmar retorno ao zero-state e integridade
+        if: always()
+        run: |
+          node scripts/smoke-governance-environment.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage --allow-zero=true
+          node scripts/smoke-stage-data-integrity.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage
