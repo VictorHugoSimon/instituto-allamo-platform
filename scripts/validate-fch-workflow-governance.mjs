@@ -40,6 +40,13 @@ for (const needle of [
   if (!official.includes(needle)) throw new Error(`Governança FCH oficial incompleta: ${needle}`);
 }
 
+if (!official.includes('- uses: actions/checkout@v4')) {
+  throw new Error('Workflow FCH precisa fazer checkout da própria ref da execução.');
+}
+if (/^\s+ref:\s*(develop|main)\s*$/m.test(official)) {
+  throw new Error('Workflow FCH não pode fixar checkout em main/develop; deve usar a ref que disparou a execução.');
+}
+
 const gateIndex=official.indexOf('Gate de ativação + baseline zero');
 const googleIndex=official.indexOf('Preflight Google Drive read-only');
 const stageWriteIndex=official.indexOf('Atualizar fatos da Curva S no Stage');
@@ -90,4 +97,4 @@ if (!legacyA.includes('não grava dados') || !legacyB.includes('não altera Stag
   throw new Error('Rotinas legadas precisam declarar que não fazem escrita operacional.');
 }
 
-console.log('OK: FCH oficial é zero-state safe, opt-in, read-only na origem e só grava com projetos reais explicitamente mapeados; legados permanecem manuais.');
+console.log('OK: FCH oficial é zero-state safe, opt-in, usa a própria ref da execução, é read-only na origem e só grava com projetos reais explicitamente mapeados; legados permanecem manuais.');
