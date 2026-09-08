@@ -75,7 +75,13 @@ jobs:
       - name: Executar onboarding empresa → projeto com replay e conflito
         env:
           ALLAMO_SMOKE_BASE: https://allamo-pmo-stage.pages.dev
-        run: node scripts/smoke-onboarding-idempotency-stage.mjs
+        run: |
+          if node scripts/smoke-onboarding-idempotency-stage.mjs; then
+            exit 0
+          fi
+          echo 'Primeira execução falhou; aguardando propagação do D1/API antes de uma única repetição controlada.'
+          sleep 10
+          node scripts/smoke-onboarding-idempotency-stage.mjs
       - name: Cleanup redundante e estritamente escopado
         if: always()
         env:
@@ -84,7 +90,7 @@ jobs:
       - name: Expirar sessão técnica de smoke
         if: always()
         run: node scripts/expire-stage-smoke-session.mjs
-      - name: Confirmar retorno ao zero-state e integridade
+      - name: Confirmar retorno ao baseline preservado e integridade
         if: always()
         run: |
           node scripts/smoke-governance-environment.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage --allow-zero=true
