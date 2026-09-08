@@ -1,0 +1,69 @@
+name: MADRI Stage Requirements Seed v1
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'data/madri/requirements-seed-v1.json.gz.b64'
+      - 'scripts/seed-madri-requirements-stage.mjs'
+      - '.github/workflows/madri-stage-requirements-seed.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'data/madri/requirements-seed-v1.json.gz.b64'
+      - 'scripts/seed-madri-requirements-stage.mjs'
+      - '.github/workflows/madri-stage-requirements-seed.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-stage-requirements-seed-v1
+  cancel-in-progress: false
+
+jobs:
+  validate-seed:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Validar pacote 71 + 15 sem acesso ao banco
+        run: node scripts/seed-madri-requirements-stage.mjs --env=stage --validate-only
+
+  seed-stage:
+    if: github.event_name == 'push'
+    needs: validate-seed
+    runs-on: ubuntu-24.04
+    environment: stage
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Validar autenticação Cloudflare
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Backup obrigatório do D1 Stage antes do seed
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-pre-madri-req-${GITHUB_SHA}.sql"
+      - name: Guardar backup pré-seed
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-pre-madri-requirements-${{ github.sha }}
+          path: backup-stage-pre-madri-req-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 14
+      - name: Dry-run com resolução real de contexto
+        run: node scripts/seed-madri-requirements-stage.mjs --env=stage
+      - name: Aplicar 86 requisitos somente no Stage
+        run: node scripts/seed-madri-requirements-stage.mjs --env=stage --apply --confirm=SEED-MADRI-REQ-STAGE
+      - name: Verificar 86 de 86 no D1 Stage
+        run: node scripts/seed-madri-requirements-stage.mjs --env=stage --verify-only
