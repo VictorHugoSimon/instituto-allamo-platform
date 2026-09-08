@@ -109,6 +109,8 @@ jobs:
           must(cockpit.projects.length===projectRows.length,'Drill-down do Cockpit diverge da quantidade de projetos.');
 
           console.log(`[EVIDÊNCIA] STAGE: ${companyRows.length} empresa(s) / ${projectRows.length} projeto(s).`);
+          console.log('[EVIDÊNCIA] Empresas:',companyRows.map(c=>({id:c.id,name:c.name,status:c.status||c.status_text||null})));
+          console.log('[EVIDÊNCIA] Projetos:',projectRows.map(p=>({id:p.id,name:p.name,company_id:p.company_id,status:p.status||null})));
           must(companyRows.length>0&&projectRows.length>0,'Gate base não vazia PENDENTE: STAGE não possui empresa/projeto real para validar transição zero→dados. Nenhum dado será criado pelo smoke.');
 
           metricNull(cockpit.management?.structured_critical_risks,'management.structured_critical_risks');
