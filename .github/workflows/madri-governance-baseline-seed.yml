@@ -1,0 +1,77 @@
+name: MADRI - Baseline Governança - Seed STAGE
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite SEED-MADRI-BASELINE-STAGE para aplicar o baseline no D1 Stage'
+        required: true
+        type: string
+      reason:
+        description: 'Motivo / referência da carga'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-governance-baseline-stage
+  cancel-in-progress: false
+
+jobs:
+  seed-stage:
+    if: ${{ inputs.confirm == 'SEED-MADRI-BASELINE-STAGE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Preflight Cloudflare
+        run: npx wrangler@4.124.0 whoami
+      - name: Garantir schema MADRI Governance no Stage
+        run: node scripts/ensure-madri-governance-schema.mjs --env=stage
+      - name: Backup obrigatório do D1 Stage
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-madri-baseline-${GITHUB_RUN_ID}.sql"
+      - name: Guardar backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-madri-baseline-backup-${{ github.run_id }}
+          path: backup-stage-madri-baseline-${{ github.run_id }}.sql
+          if-no-files-found: error
+          retention-days: 14
+      - name: Dry-run do baseline MADRI
+        run: node scripts/seed-madri-governance-baseline.mjs --env=stage
+      - name: Aplicar baseline MADRI de forma idempotente
+        run: node scripts/seed-madri-governance-baseline.mjs --env=stage --apply --confirm=SEED-MADRI-BASELINE-STAGE
+      - name: Revalidar baseline após carga
+        run: node scripts/seed-madri-governance-baseline.mjs --env=stage
+      - name: Smoke de integridade PMO Stage
+        run: node scripts/smoke-stage-data-integrity.mjs --base=https://allamo-pmo-stage.pages.dev --env=stage
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### MADRI · Seed Baseline STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ambiente: STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fonte: Matriz_Auditoria_RFI_x_Blueprint_MADRI_v1.xlsx" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Baseline: 71 requisitos RFI reconstruídos + 15 novos = 86" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Bootstrap: 15 fases + 17 itens de readiness" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Estratégia: INSERT OR IGNORE; registros existentes não são sobrescritos" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup D1: obrigatório antes da carga" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Motivo: ${{ inputs.reason || 'Carga inicial governada do baseline MADRI' }}" >> "$GITHUB_STEP_SUMMARY"
