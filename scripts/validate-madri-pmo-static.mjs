@@ -55,10 +55,15 @@ const goodInsert='VALUES('+Array(24).fill('?').join(',')+',1)';
 must(!badArity.test(worker),'Worker final contém INSERT MADRI com 26 valores para 25 colunas');
 const normalizedInserts=worker.split(goodInsert).length-1;
 must(normalizedInserts>=2,`Worker deve conter os dois INSERTs MADRI normalizados; encontrado ${normalizedInserts}`);
-const privateBlocks=(worker.match(/BEGIN MADRI PMO PRIVATE API/g)||[]).length;
-const publicBlocks=(worker.match(/BEGIN MADRI PMO PUBLIC API/g)||[]).length;
-must(privateBlocks===1,`Worker deve conter exatamente 1 bloco privado MADRI; encontrado ${privateBlocks}`);
-must(publicBlocks===1,`Worker deve conter exatamente 1 bloco público MADRI; encontrado ${publicBlocks}`);
+// Contar apenas marcadores canônicos em linhas próprias. Outros hardeners podem conter
+// a frase em comentário/string de diagnóstico, o que não representa um segundo bloco.
+const privateBlocks=(worker.match(/^[\t ]*\/\/ BEGIN MADRI PMO PRIVATE API[\t ]*$/gm)||[]).length;
+const publicBlocks=(worker.match(/^[\t ]*\/\/ BEGIN MADRI PMO PUBLIC API[\t ]*$/gm)||[]).length;
+const privateEnds=(worker.match(/^[\t ]*\/\/ END MADRI PMO PRIVATE API[\t ]*$/gm)||[]).length;
+const publicEnds=(worker.match(/^[\t ]*\/\/ END MADRI PMO PUBLIC API[\t ]*$/gm)||[]).length;
+must(privateBlocks===1&&privateEnds===1,`Worker deve conter exatamente 1 bloco privado MADRI; start=${privateBlocks}, end=${privateEnds}`);
+must(publicBlocks===1&&publicEnds===1,`Worker deve conter exatamente 1 bloco público MADRI; start=${publicBlocks}, end=${publicEnds}`);
 must(builder.includes('badArityPattern')&&builder.includes('normalizeInsertArity'),'Build não possui hardening explícito de aridade dos INSERTs MADRI');
+must(builder.includes('countMarkerLines'),'Build valida marcadores reais em linha, não ocorrências textuais');
 
 console.log(`[OK] MADRI PMO: contrato, isolamento, quatro abas, Vision Roadmap e ${normalizedInserts} INSERTs work_items 25×25 validados.`);
