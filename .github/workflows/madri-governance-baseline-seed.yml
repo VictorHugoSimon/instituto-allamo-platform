@@ -11,6 +11,10 @@ on:
         description: 'Motivo / referência da carga'
         required: false
         type: string
+  push:
+    branches: [develop]
+    paths:
+      - 'ops/madri/seed-stage-2026-09-08.trigger'
 
 permissions:
   contents: read
@@ -21,7 +25,7 @@ concurrency:
 
 jobs:
   seed-stage:
-    if: ${{ inputs.confirm == 'SEED-MADRI-BASELINE-STAGE' }}
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'SEED-MADRI-BASELINE-STAGE' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -74,4 +78,5 @@ jobs:
           echo "- Bootstrap: 15 fases + 17 itens de readiness" >> "$GITHUB_STEP_SUMMARY"
           echo "- Estratégia: INSERT OR IGNORE; registros existentes não são sobrescritos" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório antes da carga" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Disparo: ${{ github.event_name }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Motivo: ${{ inputs.reason || 'Carga inicial governada do baseline MADRI' }}" >> "$GITHUB_STEP_SUMMARY"
