@@ -4,17 +4,150 @@ on:
   schedule:
     - cron: '5 */2 * * *'
   workflow_dispatch:
+  push:
+    branches:
+      - ops/onboarding-stage-smoke-20260908
+    paths:
+      - '.github/workflows/operational-health.yml'
 
 permissions:
   contents: read
   issues: write
+  actions: read
 
 concurrency:
   group: allamo-operational-health
   cancel-in-progress: true
 
 jobs:
+  onboarding-stage-smoke:
+    if: "${{ github.event_name == 'push' && github.actor == 'VictorHugoSimon' && github.event.head_commit.message == 'OPS: execute onboarding STAGE smoke v2 2026-09-08' }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_DEVELOP_SHA: eb5ecbffc6020042742e6bbed355df97a51542bd
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências travadas
+        run: npm ci
+
+      - name: Gate de concorrência e imutabilidade do develop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/branches/develop" --jq '.commit.sha')"
+          echo "develop atual: ${current}"
+          test "${current}" = "${EXPECTED_DEVELOP_SHA}"
+          active="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" --jq '[.workflow_runs[] | select((.path==".github/workflows/deploy-stage.yml" or .path==".github/workflows/madri-governance-baseline-seed.yml") and (.status=="in_progress" or .status=="queued" or .status=="waiting" or .status=="pending" or .status=="requested"))] | length')"
+          echo "Operações D1 STAGE concorrentes: ${active}"
+          test "${active}" = "0"
+
+      - name: Validar autenticação Cloudflare sem expor segredo
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+          npx wrangler@4.124.0 whoami >/dev/null
+
+      - name: Comprovar release canônica e baseline zero
+        run: |
+          node scripts/verify-stage-canonical-release.mjs --base=https://allamo-pmo-stage.pages.dev --sha=${EXPECTED_DEVELOP_SHA}
+          node scripts/operational-health-check.mjs
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+          ALLAMO_PRODUCTION_URL: https://allamo-pmo.pages.dev
+
+      - name: Backup obrigatório do D1 STAGE
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-onboarding-smoke-${GITHUB_SHA}.sql"
+          test -s "backup-onboarding-smoke-${GITHUB_SHA}.sql"
+
+      - name: Preservar backup de rollback
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-onboarding-smoke-backup-${{ github.sha }}
+          path: backup-onboarding-smoke-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Gate final imediatamente antes da mutação
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/branches/develop" --jq '.commit.sha')"
+          test "${current}" = "${EXPECTED_DEVELOP_SHA}"
+          active="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" --jq '[.workflow_runs[] | select((.path==".github/workflows/deploy-stage.yml" or .path==".github/workflows/madri-governance-baseline-seed.yml") and (.status=="in_progress" or .status=="queued" or .status=="waiting" or .status=="pending" or .status=="requested"))] | length')"
+          echo "Operações D1 STAGE concorrentes antes do fixture: ${active}"
+          test "${active}" = "0"
+
+      - name: Criar fixture efêmero no STAGE
+        id: prepare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          STAGE_ONBOARDING_SMOKE_BACKUP: backup-onboarding-smoke-${{ github.sha }}.sql
+        run: node scripts/ops-onboarding-stage-smoke.mjs --mode=prepare
+
+      - name: Validar Cockpit, integridade e métricas indisponíveis
+        id: validate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+        run: node scripts/ops-onboarding-stage-smoke.mjs --mode=validate
+
+      - name: Remover somente o fixture criado pelo smoke
+        id: cleanup
+        if: always() && steps.prepare.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ops-onboarding-stage-smoke.mjs --mode=cleanup
+
+      - name: Comprovar retorno ao zero-state
+        if: always() && steps.prepare.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+        run: node scripts/ops-onboarding-stage-smoke.mjs --mode=final
+
+      - name: Operational Health final STAGE + Produção
+        if: always()
+        run: node scripts/operational-health-check.mjs
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+          ALLAMO_PRODUCTION_URL: https://allamo-pmo.pages.dev
+
+      - name: Resumo da homologação controlada
+        if: always()
+        run: |
+          echo '### Onboarding STAGE — smoke efêmero v2 · 08/09/2026' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Pré-condição: STAGE e Produção em baseline 0/0' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Concorrência: deploy STAGE e seed MADRI bloqueiam a operação' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Fixture: exclusivo, marcado como smoke e nunca cliente real' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Backup D1 STAGE: obrigatório e preservado' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Validações: 0→1/1, Cockpit D1, órfãos, métricas sem fonte, retorno 1/1→0' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Cleanup: executa somente quando o fixture foi criado' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Usuários/sessões/permissões: não alterados' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Produção: somente leitura' >> "$GITHUB_STEP_SUMMARY"
+
   health:
+    if: "${{ github.event_name != 'push' }}"
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
