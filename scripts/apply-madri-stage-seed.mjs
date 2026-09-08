@@ -82,13 +82,41 @@ function q(v){
 }
 function inList(values){return values.map(q).join(',')}
 
-// Resolve o tenant pelo escopo canônico do Plano de Ação, não por nome textual.
-const companies=query(`SELECT DISTINCT c.id,c.name FROM companies c JOIN work_items w ON w.company_id=c.id WHERE w.pmo_scope='MADRI_NUCCI' AND w.archived_at IS NULL ORDER BY c.id;`);
-if(companies.length!==1)throw new Error(`Contexto MADRI ambíguo/ausente no pmo_scope=MADRI_NUCCI: ${companies.length} empresa(s).`);
-const company=companies[0];
-const projects=query(`SELECT DISTINCT p.id,p.name FROM projects p JOIN work_items w ON w.project_id=p.id WHERE w.company_id=${q(company.id)} AND w.pmo_scope='MADRI_NUCCI' AND w.archived_at IS NULL ORDER BY p.id;`);
-if(projects.length!==1)throw new Error(`Contexto de projeto MADRI_NUCCI ambíguo/ausente: ${projects.length} projeto(s).`);
-const project=projects[0];
+// Diagnóstico somente leitura: nenhuma empresa/projeto é criada ou reparada por este seed.
+const allCompanies=query(`SELECT id,name FROM companies ORDER BY id;`);
+const allProjects=query(`SELECT id,name,company_id FROM projects ORDER BY id;`);
+const scopeRows=query(`SELECT company_id,project_id,pmo_scope,COUNT(*) n FROM work_items GROUP BY company_id,project_id,pmo_scope ORDER BY n DESC LIMIT 50;`);
+const scopedCompanies=query(`SELECT DISTINCT c.id,c.name FROM companies c JOIN work_items w ON w.company_id=c.id WHERE w.pmo_scope='MADRI_NUCCI' AND w.archived_at IS NULL ORDER BY c.id;`);
+const namedCompanies=allCompanies.filter(c=>/(^|\b)(madri|madrid)(\b|$)/i.test(String(c.name||''))||/^(madri|madrid)$/i.test(String(c.id||'')));
+
+let company=null,project=null,resolution='';
+if(scopedCompanies.length===1){
+  const c=scopedCompanies[0];
+  const scopedProjects=query(`SELECT DISTINCT p.id,p.name,p.company_id FROM projects p JOIN work_items w ON w.project_id=p.id WHERE w.company_id=${q(c.id)} AND w.pmo_scope='MADRI_NUCCI' AND w.archived_at IS NULL ORDER BY p.id;`);
+  if(scopedProjects.length===1){company=c;project=scopedProjects[0];resolution='pmo_scope:MADRI_NUCCI'}
+}
+if(!company && namedCompanies.length===1){
+  const c=namedCompanies[0];
+  const candidates=allProjects.filter(p=>String(p.company_id)===String(c.id)&&/(nucci|madri|madrid)/i.test(String(p.name||'')));
+  if(candidates.length===1){company=c;project=candidates[0];resolution='nome MADRI/NUCCI'}
+}
+if(!company && allCompanies.length===1 && allProjects.length===1 && String(allProjects[0].company_id)===String(allCompanies[0].id)){
+  company=allCompanies[0];project=allProjects[0];resolution='fallback tenant único do STAGE';
+}
+
+console.log(JSON.stringify({
+  diagnostic:{
+    companies:allCompanies,
+    projects:allProjects,
+    work_item_scopes:scopeRows
+  },
+  resolution:company&&project?{method:resolution,company,project}:null
+},null,2));
+
+if(!company||!project){
+  throw new Error(`Não foi possível resolver com segurança o contexto MADRI existente no STAGE. companies=${allCompanies.length}, projects=${allProjects.length}, scoped=${scopedCompanies.length}. Nenhum tenant/projeto será criado automaticamente.`);
+}
+if(String(project.company_id)!==String(company.id))throw new Error('Projeto resolvido não pertence à empresa resolvida.');
 
 const requiredTables=['madri_platform_sequence','madri_requirements','madri_tests','madri_implementation_phases','madri_readiness'];
 for(const t of requiredTables){
@@ -108,6 +136,7 @@ console.log(JSON.stringify({
   mode: APPLY?'apply':'dry-run',
   environment:'stage',
   seed_version:seed.version,
+  context_resolution:resolution,
   company:{id:company.id,name:company.name},
   project:{id:project.id,name:project.name},
   package:{requirements:86,tests:54,phases:15,readiness:17},
@@ -188,6 +217,7 @@ console.log(JSON.stringify({
   ok:true,
   environment:'stage',
   seed_version:seed.version,
+  context_resolution:resolution,
   verified:{requirements:reqAfter,tests:testAfter,phases:phaseAfter,readiness:readyAfter,sequences:seq},
   inserted_this_run:{
     requirements:reqAfter-reqBefore,
