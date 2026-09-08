@@ -66,7 +66,14 @@ function norm(v) {
 
 const companies = query('SELECT id,name FROM companies ORDER BY id;');
 const matches = companies.filter(r => ['madri', 'madrid'].includes(norm(r.id)) || ['madri', 'madrid'].includes(norm(r.name)));
-if (matches.length !== 1) throw new Error(`Tenant MADRI deve resolver de forma única; encontrado(s): ${matches.length}`);
+if (matches.length !== 1) {
+  const allProjects = query('SELECT id,name,company_id FROM projects ORDER BY company_id,id;');
+  console.log('Empresas atualmente presentes no Stage:');
+  for (const c of companies) console.log(`- ${c.name} [${c.id}]`);
+  console.log('Projetos atualmente presentes no Stage:');
+  for (const p of allProjects) console.log(`- ${p.name} [${p.id}] company_id=${p.company_id}`);
+  throw new Error(`Tenant MADRI deve resolver de forma única; encontrado(s): ${matches.length}. Nenhuma escrita foi executada.`);
+}
 const company = matches[0];
 const projects = query(`SELECT id,name,company_id FROM projects WHERE company_id=${sqlQuote(company.id)} ORDER BY id;`);
 const project = projects.find(r => /nucci/i.test(String(r.name || ''))) || projects.find(r => /madri|madrid/i.test(String(r.name || ''))) || projects[0];
