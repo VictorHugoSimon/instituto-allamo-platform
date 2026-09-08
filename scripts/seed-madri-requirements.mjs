@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 const WRANGLER='wrangler@4.124.0';
 const DB='DB';
+const PMO_SCOPE='MADRI_NUCCI';
 const DATA_DIR='data/madri/rfi-requirements';
 const MANIFEST=`${DATA_DIR}/manifest.json`;
 
@@ -89,13 +90,18 @@ const q=s=>`'${String(s??'').replace(/'/g,"''")}'`;
 const tableOk=query("SELECT name FROM sqlite_master WHERE type='table' AND name='madri_requirements';").some(r=>r.name==='madri_requirements');
 if(!tableOk){console.error('[ABORTADO] madri_requirements não existe no D1 Stage.');process.exit(2);}
 
-const ctx=query("SELECT company_id, project_id FROM work_items WHERE pmo_scope='MADRI_NUCCI' AND archived_at IS NULL GROUP BY company_id,project_id;");
-if(ctx.length!==1){
-  console.error(`[ABORTADO] Esperado exatamente 1 contexto MADRI_NUCCI no Stage; encontrado ${ctx.length}.`);
+const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+const companies=query('SELECT id,name FROM companies ORDER BY id;');
+const madriCompanies=companies.filter(r=>['madri','madrid'].includes(norm(r.id))||['madri','madrid'].includes(norm(r.name)));
+if(madriCompanies.length!==1){
+  console.error(`[ABORTADO] Esperada exatamente 1 empresa MADRI/Madrid no Stage; encontrado ${madriCompanies.length}.`);
   process.exit(2);
 }
-const companyId=String(ctx[0].company_id);
-const projectId=Number(ctx[0].project_id);
+const companyId=String(madriCompanies[0].id);
+const projects=query(`SELECT id,name,company_id FROM projects WHERE company_id=${q(companyId)} ORDER BY id;`);
+const project=projects.find(r=>/nucci/i.test(String(r.name||'')))||projects.find(r=>/madri|madrid/i.test(String(r.name||'')))||projects[0]||null;
+if(!project){console.error('[ABORTADO] Projeto MADRI/NUCCI não encontrado no Stage.');process.exit(2);}
+const projectId=Number(project.id);
 if(!companyId || !Number.isFinite(projectId)){
   console.error('[ABORTADO] Contexto MADRI inválido.');
   process.exit(2);
@@ -104,7 +110,7 @@ if(!companyId || !Number.isFinite(projectId)){
 const inList=ids.map(q).join(',');
 const existing=Number(query(`SELECT COUNT(*) AS n FROM madri_requirements WHERE company_id=${q(companyId)} AND project_id=${projectId} AND display_id IN (${inList});`)[0]?.n||0);
 console.log(`Ambiente: stage`);
-console.log(`Contexto MADRI: company_id=${companyId} project_id=${projectId}`);
+console.log(`Contexto MADRI: company_id=${companyId} project_id=${projectId} pmo_scope=${PMO_SCOPE}`);
 console.log(`Dataset: ${records.length} requisitos (${dataset.counts.rfi_reconstructed} RFI reconstruídos + ${dataset.counts.new_requirements} novos)`);
 console.log(`Já existentes por display_id: ${existing}`);
 console.log(`Fonte SHA256: ${dataset.source_sha256}`);
