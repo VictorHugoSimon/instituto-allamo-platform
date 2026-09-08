@@ -1,0 +1,41 @@
+name: MADRI - Baseline Governança CI
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'data/madri-governance-baseline/**'
+      - 'scripts/seed-madri-governance-baseline.mjs'
+      - '.github/workflows/madri-governance-baseline-*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validar sintaxe do seed
+        run: node --check scripts/seed-madri-governance-baseline.mjs
+      - name: Validar baseline auditado
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p='data/madri-governance-baseline/requirements-v1.json';
+          const b=JSON.parse(fs.readFileSync(p,'utf8'));
+          if(b.counts?.rfi_reconstructed!==71||b.counts?.new_post_rfi!==15||b.counts?.total!==86) throw new Error('Contagens do baseline inválidas');
+          if(b.rfi?.length!==71||b.new?.length!==15) throw new Error('Quantidade física de linhas inválida');
+          const ids=[...b.rfi.map(r=>r[0]),...b.new.map(r=>r[0])];
+          if(new Set(ids).size!==86) throw new Error('IDs duplicados');
+          if(!ids.includes('RFI-SPED-01')||!ids.includes('RFI-AF-01')||!ids.includes('RFI-RH-08')||!ids.includes('NEW-015')) throw new Error('Baseline perdeu requisitos críticos conhecidos');
+          const status=new Map(); for(const r of b.rfi) status.set(r[3],(status.get(r[3])||0)+1);
+          if((status.get('Coberto explícito')||0)!==26||(status.get('Coberto parcial')||0)!==25||((status.get('Lacuna')||0)+(status.get('Lacuna / a confirmar')||0))!==20) throw new Error('Distribuição de cobertura diverge da auditoria');
+          if(/\bOPR\b/i.test(JSON.stringify(b))) throw new Error('Baseline MADRI não pode conter dados OPR');
+          console.log('[OK] Baseline MADRI: 71 RFI + 15 novos, cobertura e isolamento validados.');
+          NODE
