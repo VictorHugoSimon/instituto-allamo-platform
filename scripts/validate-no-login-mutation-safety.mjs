@@ -56,12 +56,12 @@ for(const [workflow,env,confirm] of [[stageWorkflow,'stage','APPLY-ONBOARDING-SC
 }
 
 const companyGuard=worker.indexOf('// [allamo-onboarding-company-request-guard]');
-const companyInsert=worker.indexOf('INSERT INTO companies');
-const companyReserve=worker.indexOf('// [allamo-onboarding-company-request-reserve]');
-if(!(companyGuard>=0&&companyReserve>companyGuard&&companyReserve<companyInsert))throw new Error('Empresa pode ser inserida antes da reserva idempotente.');
+const companyReserve=worker.indexOf('// [allamo-onboarding-company-request-reserve]',companyGuard);
+const companyInsert=worker.indexOf('INSERT INTO companies',companyReserve);
+if(!(companyGuard>=0&&companyReserve>companyGuard&&companyInsert>companyReserve))throw new Error('Empresa pode ser inserida antes da reserva idempotente.');
 const projectGuard=worker.indexOf('// [allamo-onboarding-project-request-guard]');
-const projectInsert=worker.indexOf('INSERT INTO projects');
-const projectReserve=worker.indexOf('// [allamo-onboarding-project-request-reserve]');
-if(!(projectGuard>=0&&projectReserve>projectGuard&&projectReserve<projectInsert))throw new Error('Projeto pode ser inserido antes da reserva idempotente.');
+const projectReserve=worker.indexOf('// [allamo-onboarding-project-request-reserve]',projectGuard);
+const projectInsert=worker.indexOf('INSERT INTO projects',projectReserve);
+if(!(projectGuard>=0&&projectReserve>projectGuard&&projectInsert>projectReserve))throw new Error('Projeto pode ser inserido antes da reserva idempotente.');
 
 console.log('OK: onboarding empresa→projeto exige sessão humana autenticada, request_id persistido, replay idempotente, integridade, auditoria e schema aditivo aplicado antes de qualquer deploy.');
