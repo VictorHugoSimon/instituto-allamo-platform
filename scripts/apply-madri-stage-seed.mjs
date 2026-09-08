@@ -2,11 +2,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { gunzipSync } from 'node:zlib';
 
 const WRANGLER='wrangler@4.124.0';
 const DB='DB';
 const CONFIG='wrangler.stage.toml';
-const DATA='data/madri-governance-seed-v1.json';
+const DATA='data/madri-governance-seed-v1.json.gz.b64';
 const APPLY=process.argv.includes('--apply');
 const envArg=(process.argv.find(a=>a.startsWith('--env='))||'').slice(6).toLowerCase();
 const confirmArg=(process.argv.find(a=>a.startsWith('--confirm='))||'').slice(10);
@@ -25,7 +26,7 @@ if(!fs.existsSync(CONFIG)||!fs.existsSync(DATA)){
   process.exit(2);
 }
 
-const seed=JSON.parse(fs.readFileSync(DATA,'utf8'));
+const seed=JSON.parse(gunzipSync(Buffer.from(fs.readFileSync(DATA,'utf8').trim(),'base64')).toString('utf8'));
 if(seed?.policy?.production_forbidden!==true){
   throw new Error('Contrato de segurança do seed inválido: production_forbidden deve ser true.');
 }
