@@ -33,12 +33,28 @@ const block=start+'\n'+api+'\n'+end;
 const reviewBlock=reviewStart+'\n'+reviewApi+'\n'+reviewEnd;
 const webhookBlock=webhookStart+'\n'+metaProvider+'\n'+metaWebhook+'\n'+webhookEnd;
 
-// 1) Webhook machine-to-machine: precisa existir antes da autenticação de usuário.
-if(worker.includes(webhookStart)){
-  const a=worker.indexOf(webhookStart),b=worker.indexOf(webhookEnd,a);
-  if(b<0)throw new Error('Marcador final do webhook WhatsApp ausente.');
-  worker=worker.slice(0,a)+webhookBlock+worker.slice(b+webhookEnd.length);
-}else if(worker.includes(currentUserNeedle)){
+const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const markerRe=marker=>new RegExp(`^[\\t ]*${escRe(marker.trim())}[\\t ]*$`,'gm');
+const countMarker=(text,marker)=>(text.match(markerRe(marker))||[]).length;
+const stripAll=(text,s,e,label)=>{
+  const starts=countMarker(text,s),ends=countMarker(text,e);
+  if(starts!==ends)throw new Error(`${label}: wrappers inconsistentes (begin=${starts}, end=${ends}).`);
+  if(!starts)return text;
+  const re=new RegExp(`^[\\t ]*${escRe(s.trim())}[\\t ]*\\r?\\n[\\s\\S]*?^[\\t ]*${escRe(e.trim())}[\\t ]*(?:\\r?\\n)?`,'gm');
+  const cleaned=text.replace(re,'');
+  const rs=countMarker(cleaned,s),reCount=countMarker(cleaned,e);
+  if(rs||reCount)throw new Error(`${label}: wrappers residuais após limpeza (begin=${rs}, end=${reCount}).`);
+  return cleaned;
+};
+
+// Build idempotente: removemos todas as materializações anteriores e reinjetamos
+// uma única cópia de cada bloco na ordem correta do pipeline.
+worker=stripAll(worker,webhookStart,webhookEnd,'Webhook WhatsApp');
+worker=stripAll(worker,reviewStart,reviewEnd,'Fila de quarentena');
+worker=stripAll(worker,start,end,'Service Hub');
+
+// 1) Webhook machine-to-machine: antes da autenticação de usuário.
+if(worker.includes(currentUserNeedle)){
   worker=worker.replace(currentUserNeedle,webhookBlock+'\n'+currentUserNeedle);
 }else if(worker.includes(authNeedle)){
   worker=worker.replace(authNeedle,webhookBlock+'\n'+authNeedle);
@@ -46,38 +62,28 @@ if(worker.includes(webhookStart)){
   throw new Error('Ponto de injeção pre-auth do webhook WhatsApp não encontrado no Worker.');
 }
 
-// 2) Fila de quarentena: exige usuário autenticado, mas não exige empresa selecionada.
-if(worker.includes(reviewStart)){
-  const a=worker.indexOf(reviewStart),b=worker.indexOf(reviewEnd,a);
-  if(b<0)throw new Error('Marcador final da fila de quarentena WhatsApp ausente.');
-  worker=worker.slice(0,a)+reviewBlock+worker.slice(b+reviewEnd.length);
-}else if(worker.includes(authNeedle)){
+// 2) Fila de quarentena: após o gate de autenticação, antes das APIs tenant-scoped.
+if(worker.includes(authNeedle)){
   worker=worker.replace(authNeedle,authNeedle+'\n'+reviewBlock);
 }else{
   throw new Error('Ponto de injeção autenticado da fila de quarentena não encontrado no Worker.');
 }
 
 // 3) API tenant-scoped autenticada do Service Hub.
-if(worker.includes(start)){
-  const a=worker.indexOf(start),b=worker.indexOf(end,a);
-  if(b<0)throw new Error('Marcador final do Valkíria Service Hub ausente.');
-  worker=worker.slice(0,a)+block+worker.slice(b+end.length);
+const generatedNeedle=generatedCandidates.find(x=>worker.includes(x));
+if(generatedNeedle){
+  worker=worker.replace(generatedNeedle,block+'\n'+generatedNeedle);
+}else if(worker.includes(sourceWhereNeedle)){
+  worker=worker.replace(sourceWhereNeedle,block+'\n'+sourceWhereNeedle);
+}else if(worker.includes(sourceScopeNeedle)){
+  worker=worker.replace(sourceScopeNeedle,sourceScopeNeedle+'\n'+block);
 }else{
-  const generatedNeedle=generatedCandidates.find(x=>worker.includes(x));
-  if(generatedNeedle){
-    worker=worker.replace(generatedNeedle,block+'\n'+generatedNeedle);
-  }else if(worker.includes(sourceWhereNeedle)){
-    worker=worker.replace(sourceWhereNeedle,block+'\n'+sourceWhereNeedle);
-  }else if(worker.includes(sourceScopeNeedle)){
-    worker=worker.replace(sourceScopeNeedle,sourceScopeNeedle+'\n'+block);
-  }else{
-    throw new Error('Ponto de injeção do Service Hub não encontrado no Worker.');
-  }
+  throw new Error('Ponto de injeção do Service Hub não encontrado no Worker.');
 }
 
-const starts=worker.split(start).length-1,ends=worker.split(end).length-1;
-const reviewStarts=worker.split(reviewStart).length-1,reviewEnds=worker.split(reviewEnd).length-1;
-const webhookStarts=worker.split(webhookStart).length-1,webhookEnds=worker.split(webhookEnd).length-1;
+const starts=countMarker(worker,start),ends=countMarker(worker,end);
+const reviewStarts=countMarker(worker,reviewStart),reviewEnds=countMarker(worker,reviewEnd);
+const webhookStarts=countMarker(worker,webhookStart),webhookEnds=countMarker(worker,webhookEnd);
 if(starts!==1||ends!==1)throw new Error(`Service Hub deve existir uma única vez no Worker (begin=${starts}, end=${ends}).`);
 if(reviewStarts!==1||reviewEnds!==1)throw new Error(`Fila de quarentena deve existir uma única vez no Worker (begin=${reviewStarts}, end=${reviewEnds}).`);
 if(webhookStarts!==1||webhookEnds!==1)throw new Error(`Webhook WhatsApp deve existir uma única vez no Worker (begin=${webhookStarts}, end=${webhookEnds}).`);
@@ -87,4 +93,4 @@ if(reviewPos<authPos)throw new Error('Fila de quarentena foi injetada antes do g
 if(servicePos>=0&&reviewPos>servicePos)throw new Error('Fila de quarentena deve executar antes da API tenant-scoped do Service Hub.');
 
 fs.writeFileSync(workerFile,worker);
-console.log('OK: Service Hub + webhook pre-auth + fila autenticada de quarentena injetados no Worker principal.');
+console.log('OK: Service Hub + webhook pre-auth + fila autenticada de quarentena injetados de forma idempotente.');

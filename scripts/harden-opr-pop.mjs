@@ -5,17 +5,18 @@ const versionApiFile='src/opr-pop-versioning-api.js';
 const popStart='    // BEGIN ALLAMO OPR POP API',popEnd='    // END ALLAMO OPR POP API';
 const verStart='    // BEGIN ALLAMO OPR POP VERSIONING API',verEnd='    // END ALLAMO OPR POP VERSIONING API';
 const pmoNeedle='    // BEGIN ALLAMO OPR PMO API';
-function sync(text,start,end,content,needle,indent=''){
-  const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end;
-  if(text.includes(start)){const a=text.indexOf(start),b=text.indexOf(end,a);if(b<0)throw new Error('Marcador final ausente: '+end);return text.slice(0,a)+block+text.slice(b+end.length)}
-  if(!text.includes(needle))throw new Error('Ponto de injeção OPR não encontrado: '+needle);
-  return text.replace(needle,block+'\n'+needle);
-}
-let worker=fs.readFileSync(workerFile,'utf8');
-worker=sync(worker,popStart,popEnd,fs.readFileSync(popApiFile,'utf8'),pmoNeedle,'    ');
-worker=sync(worker,verStart,verEnd,fs.readFileSync(versionApiFile,'utf8'),popStart,'    ');
-if((worker.match(/BEGIN ALLAMO OPR POP API/g)||[]).length!==1)throw new Error('Bloco POP OPR duplicado.');
-if((worker.match(/BEGIN ALLAMO OPR POP VERSIONING API/g)||[]).length!==1)throw new Error('Bloco de versionamento POP duplicado.');
+const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const lineRe=m=>new RegExp(`^[\\t ]*${escRe(m.trim())}[\\t ]*$`,'gm');
+const count=(t,m)=>(t.match(lineRe(m))||[]).length;
+function stripAll(text,start,end){const re=new RegExp(`^[\\t ]*${escRe(start.trim())}[\\t ]*\\r?\\n[\\s\\S]*?^[\\t ]*${escRe(end.trim())}[\\t ]*(?:\\r?\\n)?`,'gm');const out=text.replace(re,'');if(count(out,start)||count(out,end))throw new Error(`Wrapper OPR POP órfão: ${start.trim()}`);return out}
+function inject(text,start,end,content,needle,indent=''){if(!text.includes(needle))throw new Error('Ponto de injeção OPR não encontrado: '+needle);const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end+'\n';return text.replace(needle,block+needle)}
+let worker=fs.readFileSync(workerFile,'utf8'),popApi=fs.readFileSync(popApiFile,'utf8'),versionApi=fs.readFileSync(versionApiFile,'utf8');
+for(const [s,e] of [[verStart,verEnd],[popStart,popEnd]]){if(count(worker,s)!==count(worker,e))throw new Error(`Wrappers OPR POP inconsistentes: ${s.trim()}`);if(count(worker,s))worker=stripAll(worker,s,e);if(count(popApi,s)||count(popApi,e))popApi=stripAll(popApi,s,e);if(count(versionApi,s)||count(versionApi,e))versionApi=stripAll(versionApi,s,e)}
+worker=inject(worker,popStart,popEnd,popApi,pmoNeedle,'    ');
+worker=inject(worker,verStart,verEnd,versionApi,popStart,'    ');
+const ps=count(worker,popStart),pe=count(worker,popEnd),vs=count(worker,verStart),ve=count(worker,verEnd);
+if(ps!==1||pe!==1)throw new Error(`Bloco POP OPR inválido start=${ps} end=${pe}.`);
+if(vs!==1||ve!==1)throw new Error(`Bloco de versionamento POP inválido start=${vs} end=${ve}.`);
 if(worker.indexOf(verStart)>worker.indexOf(popStart)||worker.indexOf(popStart)>worker.indexOf(pmoNeedle))throw new Error('Ordem das APIs OPR POP inválida.');
 fs.writeFileSync(workerFile,worker);
 
@@ -57,4 +58,4 @@ if(fs.existsSync(page)){
   }
   fs.writeFileSync(page,html);
 }
-console.log('OK: POP OPR persistente, versão corrente no cabeçalho, histórico imutável e quatro links oficiais.');
+console.log('OK: POP OPR persistente, versão corrente no cabeçalho, histórico imutável e quatro links oficiais; build idempotente.');
