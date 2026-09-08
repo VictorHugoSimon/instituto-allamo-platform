@@ -45,13 +45,15 @@ must(report.includes('/api/madri-platform/status-report'),'Status Report deriva 
 must(report.includes('/api/madri-platform/phases')&&report.includes('/api/madri-platform/readiness'),'Status Report usa marcos/readiness MADRI');
 must(!report.includes('http-equiv="refresh"'),'Status Report permanente não redireciona para artefato legado');
 
-const migration=read('migrations/2026-09-03-madri-governance-platform.sql');
+const migration=read('migrations/2026-09-08-madri-governance-platform.sql');
 const govApi=read('src/madri-governance-platform-api.js');
+const ensureMadri=read('scripts/ensure-madri-governance-schema.mjs');
 for(const table of ['madri_requirements','madri_risks','madri_integrations','madri_tests','madri_test_defects','madri_documents','madri_document_versions','madri_implementation_phases','madri_readiness','madri_decisions','madri_platform_audit'])must(migration.includes(`CREATE TABLE IF NOT EXISTS ${table}`),`schema dedicado contém ${table}`);
 for(const route of ['madri-platform/context','madri-platform/status-report','madri-platform/bootstrap'])must(govApi.includes(route),`API Governance contém ${route}`);
 must(govApi.includes("pmo_scope='MADRI_NUCCI'"),'Status Report D1 isola ações pelo escopo MADRI_NUCCI');
 must(govApi.includes('Teste só pode ser Aprovado'),'API aplica regra de aceite de teste com evidência');
 must(govApi.includes('Não armazene segredo'),'API impede armazenamento explícito de segredo em integrações');
+must(ensureMadri.includes('2026-09-08-madri-governance-platform.sql'),'ensure MADRI aponta para a migration vigente');
 
 const builder=read('scripts/build-madri-pmo.mjs');
 must(builder.includes('stripAllBlocks'),'Builder remove todos os blocos MADRI antigos antes de injetar');
