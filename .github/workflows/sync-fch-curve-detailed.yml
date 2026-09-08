@@ -40,8 +40,6 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: develop
 
       - uses: actions/setup-node@v4
         with:
