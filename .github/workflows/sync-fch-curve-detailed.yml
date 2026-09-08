@@ -27,6 +27,9 @@ jobs:
     env:
       FCH_FILE_ID: '1EwBf-iJyXsIKu5UoPP6iv-T9gnQQjPfH'
       FCH_FOLDER_ID: ${{ secrets.FCH_FOLDER_ID }}
+      ALLAMO_FCH_SYNC_ENABLED: ${{ vars.ALLAMO_FCH_SYNC_ENABLED }}
+      FCH_TARGET_PROJECT_MAP_STAGE: ${{ vars.FCH_TARGET_PROJECT_MAP_STAGE }}
+      FCH_TARGET_PROJECT_MAP_PRODUCTION: ${{ vars.FCH_TARGET_PROJECT_MAP_PRODUCTION }}
       GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -40,7 +43,72 @@ jobs:
         with:
           ref: develop
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Gate de ativação + baseline zero
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const enabled=String(process.env.ALLAMO_FCH_SYNC_ENABLED||'').trim().toLowerCase()==='true';
+          const stage='https://allamo-pmo-stage.pages.dev';
+          const production='https://allamo-pmo.pages.dev';
+          const out=process.env.GITHUB_ENV;
+          const summary=process.env.GITHUB_STEP_SUMMARY;
+          const set=(k,v)=>fs.appendFileSync(out,`${k}=${v}\n`);
+          const note=text=>fs.appendFileSync(summary,text+'\n');
+          set('FCH_SHOULD_SYNC','false');
+          if(!enabled){
+            note('### FCH oficial → Curva S');
+            note('- Estado: **desativado por governança** (`ALLAMO_FCH_SYNC_ENABLED` diferente de `true`).');
+            note('- Nenhuma credencial foi exigida e nenhuma escrita foi executada.');
+            console.log('[FCH] no-op: sincronização não habilitada explicitamente.');
+            process.exit(0);
+          }
+          const get=async(base,path)=>{
+            const r=await fetch(base+path,{headers:{'cache-control':'no-cache'},cache:'no-store'});
+            if(!r.ok) throw new Error(`${base}${path}: HTTP ${r.status}`);
+            const j=await r.json();
+            if(!Array.isArray(j)) throw new Error(`${base}${path}: resposta não é array`);
+            return j;
+          };
+          const [sc,sp,pc,pp]=await Promise.all([
+            get(stage,'/api/companies'),get(stage,'/api/projects'),
+            get(production,'/api/companies'),get(production,'/api/projects')
+          ]);
+          const stageZero=sc.length===0&&sp.length===0;
+          const prodZero=pc.length===0&&pp.length===0;
+          if(stageZero&&prodZero){
+            note('### FCH oficial → Curva S');
+            note('- Estado: **no-op saudável**; STAGE e Produção estão em baseline zero.');
+            note('- Nenhuma credencial foi exigida e nenhuma escrita foi executada.');
+            console.log('[FCH] no-op: STAGE e Produção em 0 empresas / 0 projetos.');
+            process.exit(0);
+          }
+          if(stageZero!==prodZero) throw new Error(`FCH bloqueado: ambientes divergentes. stageZero=${stageZero} productionZero=${prodZero}`);
+          const parseMap=(raw,label)=>{
+            if(!String(raw||'').trim()) throw new Error(`${label} ausente. Configure o mapeamento explícito antes de habilitar FCH.`);
+            let m; try{m=JSON.parse(raw);}catch{throw new Error(`${label} deve ser JSON válido.`)}
+            if(!m||Array.isArray(m)||typeof m!=='object') throw new Error(`${label} deve ser objeto JSON.`);
+            for(const target of ['OPR','MADRI']) if(!String(m[target]||'').trim()) throw new Error(`${label} precisa mapear ${target} para um project_id real.`);
+            return m;
+          };
+          const sm=parseMap(process.env.FCH_TARGET_PROJECT_MAP_STAGE,'FCH_TARGET_PROJECT_MAP_STAGE');
+          const pm=parseMap(process.env.FCH_TARGET_PROJECT_MAP_PRODUCTION,'FCH_TARGET_PROJECT_MAP_PRODUCTION');
+          const validate=(map,projects,label)=>{
+            const ids=new Set(projects.map(p=>String(p.id)));
+            for(const [target,id] of Object.entries(map)) if(!ids.has(String(id))) throw new Error(`${label}: ${target} aponta para project_id inexistente: ${id}`);
+          };
+          validate(sm,sp,'STAGE');
+          validate(pm,pp,'Produção');
+          set('FCH_SHOULD_SYNC','true');
+          console.log('[FCH] gate aprovado: opt-in explícito + projetos reais mapeados nos dois ambientes.');
+          NODE
+
       - name: Preflight Google Drive read-only
+        if: env.FCH_SHOULD_SYNC == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -54,7 +122,7 @@ jobs:
             echo "::error title=FCH sem credencial Google::Configure GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON (preferencial) ou o trio GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/GOOGLE_REFRESH_TOKEN."
             {
               echo '### FCH bloqueado antes de qualquer escrita'
-              echo '- Motivo: credencial Google Drive read-only ausente.'
+              echo '- Motivo: sincronização foi habilitada, mas a credencial Google Drive read-only está ausente.'
               echo '- Preferencial: secret `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` de uma service account com acesso somente ao arquivo/pasta FCH.'
               echo '- Nenhum dado foi alterado no Stage ou em Produção.'
             } >> "$GITHUB_STEP_SUMMARY"
@@ -62,19 +130,24 @@ jobs:
           fi
 
       - uses: actions/setup-python@v5
+        if: env.FCH_SHOULD_SYNC == 'true'
         with:
           python-version: '3.12'
 
       - name: Dependências do leitor read-only
+        if: env.FCH_SHOULD_SYNC == 'true'
         run: python -m pip install --disable-pip-version-check --quiet openpyxl google-auth requests
 
       - name: Validar leitor
+        if: env.FCH_SHOULD_SYNC == 'true'
         run: python -m py_compile scripts/read-fch-detailed-readonly.py
 
       - name: Ler FCH sem modificar origem
+        if: env.FCH_SHOULD_SYNC == 'true'
         run: python scripts/read-fch-detailed-readonly.py --output /tmp/fch-detail.json
 
       - name: Validar payload detalhado
+        if: env.FCH_SHOULD_SYNC == 'true'
         run: |
           test -s /tmp/fch-detail.json
           python - <<'PY'
@@ -86,23 +159,28 @@ jobs:
           print(p['summary'])
           PY
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
       - name: Preparar autenticação Cloudflare
+        if: env.FCH_SHOULD_SYNC == 'true'
         run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
 
       - name: Garantir schema Stage
+        if: env.FCH_SHOULD_SYNC == 'true'
         run: node scripts/ensure-additive-schema.mjs --env=stage --apply --confirm=APPLY-ADDITIVE-STAGE
 
       - name: Atualizar fatos da Curva S no Stage
+        if: env.FCH_SHOULD_SYNC == 'true'
+        env:
+          FCH_TARGET_PROJECT_MAP: ${{ vars.FCH_TARGET_PROJECT_MAP_STAGE }}
         run: node scripts/sync-fch-detailed-to-d1.mjs --env=stage --file=/tmp/fch-detail.json
 
       - name: Garantir schema Produção
+        if: env.FCH_SHOULD_SYNC == 'true'
         run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
 
       - name: Atualizar fatos da Curva S em Produção
+        if: env.FCH_SHOULD_SYNC == 'true'
+        env:
+          FCH_TARGET_PROJECT_MAP: ${{ vars.FCH_TARGET_PROJECT_MAP_PRODUCTION }}
         run: node scripts/sync-fch-detailed-to-d1.mjs --env=production --file=/tmp/fch-detail.json
 
       - name: Limpar arquivo temporário
@@ -113,10 +191,11 @@ jobs:
         if: always()
         run: |
           echo '### FCH oficial → Curva S' >> "$GITHUB_STEP_SUMMARY"
+          echo "- Execução habilitada: ${FCH_SHOULD_SYNC:-false}" >> "$GITHUB_STEP_SUMMARY"
           echo '- Fonte: Google Drive, estritamente somente leitura (`drive.readonly`)' >> "$GITHUB_STEP_SUMMARY"
-          echo "- Autenticação: ${FCH_AUTH_MODE:-não configurada}" >> "$GITHUB_STEP_SUMMARY"
-          echo '- Detecção de colunas: por cabeçalho, não por letra fixa' >> "$GITHUB_STEP_SUMMARY"
-          echo '- OPR_Madri: 100% OPR + 100% MADRI' >> "$GITHUB_STEP_SUMMARY"
+          echo "- Autenticação: ${FCH_AUTH_MODE:-não exigida/não configurada}" >> "$GITHUB_STEP_SUMMARY"
+          echo '- Mapeamento: OPR/MADRI só podem apontar para projetos reais explicitamente configurados' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Baseline zero: execução saudável sem credenciais e sem escrita' >> "$GITHUB_STEP_SUMMARY"
           echo '- Capacidade física: deduplicada por `source_entry_hash`' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Atualização: Stage + Produção, somente tabelas derivadas do PMO' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Atualização: Stage + Produção somente após opt-in e validações' >> "$GITHUB_STEP_SUMMARY"
           echo '- Frequência: uma única rotina oficial por hora' >> "$GITHUB_STEP_SUMMARY"
