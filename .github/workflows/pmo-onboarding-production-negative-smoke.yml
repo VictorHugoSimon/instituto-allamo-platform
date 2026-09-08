@@ -1,0 +1,81 @@
+name: PMO Onboarding Production Negative Smoke
+
+on:
+  push:
+    branches: [validation/pmo-onboarding-production-negative]
+    paths:
+      - '.github/workflows/pmo-onboarding-production-negative-smoke.yml'
+      - 'scripts/smoke-pmo-onboarding-production-negative.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pmo-onboarding-production-negative-smoke
+  cancel-in-progress: false
+
+jobs:
+  onboarding-production-negative-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ALLAMO_PRODUCTION_URL: https://allamo-pmo.pages.dev
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Confirmar baseline zero antes do smoke
+        run: |
+          set -euo pipefail
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "SELECT (SELECT COUNT(*) FROM companies) AS companies, (SELECT COUNT(*) FROM projects) AS projects;" --json > /tmp/before.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('/tmp/before.json','utf8');
+          const a=raw.indexOf('['),b=raw.lastIndexOf(']');
+          if(a<0||b<a)throw new Error('Resposta D1 sem JSON reconhecível');
+          const row=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[])[0]||{};
+          if(Number(row.companies)!==0||Number(row.projects)!==0)throw new Error('Baseline PRODUÇÃO não está em 0 empresas / 0 projetos: '+JSON.stringify(row));
+          console.log('OK baseline antes: 0 empresas / 0 projetos.');
+          NODE
+
+      - name: Smoke negativo autenticado do onboarding
+        run: |
+          set -euo pipefail
+          TOKEN="$(node -e "console.log(require('node:crypto').randomUUID())")"
+          echo "::add-mask::$TOKEN"
+          cleanup() {
+            npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "DELETE FROM sessions WHERE token='$TOKEN';" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "INSERT INTO sessions (token,user_id,expires_at) SELECT '$TOKEN',id,datetime('now','+10 minutes') FROM users WHERE role IN ('admin','pmo') AND (status IS NULL OR status <> 'Bloqueado') ORDER BY CASE role WHEN 'admin' THEN 0 ELSE 1 END,id LIMIT 1;" >/dev/null
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "SELECT COUNT(*) AS smoke_sessions FROM sessions WHERE token='$TOKEN';" --json > /tmp/session.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('/tmp/session.json','utf8');
+          const a=raw.indexOf('['),b=raw.lastIndexOf(']');
+          const row=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[])[0]||{};
+          if(Number(row.smoke_sessions)!==1)throw new Error('Não foi possível criar sessão efêmera de smoke com usuário admin/pmo existente.');
+          console.log('OK: sessão efêmera de smoke criada; será removida ao final desta etapa.');
+          NODE
+          ALLAMO_PMO_SMOKE_TOKEN="$TOKEN" node scripts/smoke-pmo-onboarding-production-negative.mjs
+
+      - name: Confirmar ausência de escrita de negócio após o smoke
+        if: always()
+        run: |
+          set -euo pipefail
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "SELECT (SELECT COUNT(*) FROM companies) AS companies, (SELECT COUNT(*) FROM projects) AS projects;" --json > /tmp/after.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('/tmp/after.json','utf8');
+          const a=raw.indexOf('['),b=raw.lastIndexOf(']');
+          if(a<0||b<a)throw new Error('Resposta D1 sem JSON reconhecível');
+          const row=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[])[0]||{};
+          if(Number(row.companies)!==0||Number(row.projects)!==0)throw new Error('Smoke alterou dados de negócio em PRODUÇÃO: '+JSON.stringify(row));
+          console.log('OK baseline depois: 0 empresas / 0 projetos. Nenhum tenant/projeto fictício criado.');
+          NODE
