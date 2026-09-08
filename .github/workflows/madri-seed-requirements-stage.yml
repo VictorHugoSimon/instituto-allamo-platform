@@ -1,0 +1,71 @@
+name: MADRI - Seed Requisitos RFI no STAGE
+
+on:
+  push:
+    branches: [feature/madri-rfi-seed-stage-v2]
+    paths:
+      - 'data/madri/rfi-requirements/**'
+      - 'scripts/seed-madri-requirements.mjs'
+      - 'scripts/validate-madri-requirements-seed.mjs'
+      - '.github/workflows/madri-seed-requirements-stage.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-rfi-stage-seed
+  cancel-in-progress: false
+
+jobs:
+  seed-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar dataset e contrato
+        run: node scripts/validate-madri-requirements-seed.mjs
+
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Preflight Cloudflare
+        run: npx wrangler@4.124.0 whoami
+
+      - name: Garantir schema MADRI em dry-run
+        run: node scripts/ensure-madri-governance-schema.mjs --env=stage
+
+      - name: Backup obrigatório D1 Stage
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-before-madri-rfi-${GITHUB_SHA}.sql"
+
+      - name: Guardar backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-before-madri-rfi-${{ github.sha }}
+          path: backup-stage-before-madri-rfi-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Seed dry-run
+        run: node scripts/seed-madri-requirements.mjs --env=stage
+
+      - name: Aplicar baseline RFI × Blueprint no Stage
+        run: node scripts/seed-madri-requirements.mjs --env=stage --apply --confirm=SEED-MADRI-RFI-STAGE
+
+      - name: Verificação pós-seed
+        run: node scripts/seed-madri-requirements.mjs --env=stage
