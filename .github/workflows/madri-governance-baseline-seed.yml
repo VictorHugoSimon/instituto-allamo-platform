@@ -19,8 +19,10 @@ on:
 permissions:
   contents: read
 
+# Serializa qualquer escrita do baseline com a release canônica de STAGE.
+# Assim backup/schema/deploy e seed nunca disputam o mesmo D1 ao mesmo tempo.
 concurrency:
-  group: madri-governance-baseline-stage
+  group: allamo-pmo-stage-release
   cancel-in-progress: false
 
 jobs:
@@ -78,5 +80,6 @@ jobs:
           echo "- Bootstrap: 15 fases + 17 itens de readiness" >> "$GITHUB_STEP_SUMMARY"
           echo "- Estratégia: INSERT OR IGNORE; registros existentes não são sobrescritos" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup D1: obrigatório antes da carga" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Serialização: mesmo concurrency group da Release STAGE" >> "$GITHUB_STEP_SUMMARY"
           echo "- Disparo: ${{ github.event_name }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Motivo: ${{ inputs.reason || 'Carga inicial governada do baseline MADRI' }}" >> "$GITHUB_STEP_SUMMARY"
