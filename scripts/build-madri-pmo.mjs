@@ -1,27 +1,18 @@
 import fs from 'node:fs';
 
 const worker='public/_worker.js';
-const publicApi=fs.readFileSync('src/madri-pmo-public-api.js','utf8');
+let publicApi=fs.readFileSync('src/madri-pmo-public-api.js','utf8');
 let privateApi=fs.readFileSync('src/madri-pmo-api.js','utf8');
-const governanceApi=fs.readFileSync('src/madri-governance-platform-api.js','utf8');
+let governanceApi=fs.readFileSync('src/madri-governance-platform-api.js','utf8');
 
-// Correção defensiva do contrato de criação de ações MADRI.
-// Os INSERTs em work_items possuem 25 colunas: 24 parâmetros + version=1.
-const goodInsert='VALUES('+Array(24).fill('?').join(',')+',1)';
-const badArityPattern=()=>/VALUES\(\s*(?:\?\s*,\s*){25}1\s*\)/g;
-const normalizeInsertArity=text=>text.replace(badArityPattern(),goodInsert);
-
-privateApi=normalizeInsertArity(privateApi);
-const normalizedPrivateInserts=privateApi.split(goodInsert).length-1;
-if(normalizedPrivateInserts<2){
-  throw new Error(`Contrato INSERT MADRI incompleto: esperado >=2 INSERTs normalizados; encontrado ${normalizedPrivateInserts}.`);
-}
-if(badArityPattern().test(privateApi)){
-  throw new Error('API MADRI ainda contém INSERT com 26 valores para 25 colunas.');
-}
-
-// PMO privado + Governance Platform compartilham um único bloco autenticado.
-const privateBundle=privateApi+'\n\n// MADRI GOVERNANCE PLATFORM API\n'+governanceApi;
+const PUBLIC_START='    // BEGIN MADRI PMO PUBLIC API';
+const PUBLIC_END='    // END MADRI PMO PUBLIC API';
+const PRIVATE_START='    // BEGIN MADRI PMO PRIVATE API';
+const PRIVATE_END='    // END MADRI PMO PRIVATE API';
+const LEGACY_GOV=[
+  ['    // BEGIN MADRI GOVERNANCE PLATFORM API','    // END MADRI GOVERNANCE PLATFORM API'],
+  ['    // BEGIN MADRI GOVERNANCE API','    // END MADRI GOVERNANCE API']
+];
 
 const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const markerLineRe=marker=>new RegExp(`^[\\t ]*${escRe(marker.trim())}[\\t ]*$`,'gm');
@@ -36,31 +27,50 @@ const stripAllBlocks=(text,start,end)=>{
   }
   return cleaned;
 };
+const cleanInjectedWrappers=(text,label)=>{
+  let out=text;
+  for(const [s,e] of [[PUBLIC_START,PUBLIC_END],[PRIVATE_START,PRIVATE_END],...LEGACY_GOV]){
+    const starts=countMarkerLines(out,s),ends=countMarkerLines(out,e);
+    if(starts||ends){
+      if(starts!==ends)throw new Error(`${label}: wrappers MADRI inconsistentes (${s.trim()} start=${starts}, end=${ends}).`);
+      out=stripAllBlocks(out,s,e);
+    }
+  }
+  return out;
+};
 const injectOnce=(text,start,end,content,needle,indent='')=>{
   if(!text.includes(needle))throw new Error('Ponto de injeção MADRI não encontrado: '+needle);
   const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end+'\n';
   return text.replace(needle,block+needle);
 };
 
-const PUBLIC_START='    // BEGIN MADRI PMO PUBLIC API';
-const PUBLIC_END='    // END MADRI PMO PUBLIC API';
-const PRIVATE_START='    // BEGIN MADRI PMO PRIVATE API';
-const PRIVATE_END='    // END MADRI PMO PRIVATE API';
+// Outros hardeners do build podem materializar wrappers em artefatos intermediários.
+// Sanitizamos também os três arquivos-fonte lidos neste processo para impedir que
+// um bloco gerado seja encapsulado novamente dentro de outro bloco MADRI.
+publicApi=cleanInjectedWrappers(publicApi,'src/madri-pmo-public-api.js');
+privateApi=cleanInjectedWrappers(privateApi,'src/madri-pmo-api.js');
+governanceApi=cleanInjectedWrappers(governanceApi,'src/madri-governance-platform-api.js');
+
+// Correção defensiva do contrato de criação de ações MADRI.
+// Os INSERTs em work_items possuem 25 colunas: 24 parâmetros + version=1.
+const goodInsert='VALUES('+Array(24).fill('?').join(',')+',1)';
+const badArityPattern=()=>/VALUES\(\s*(?:\?\s*,\s*){25}1\s*\)/g;
+const normalizeInsertArity=text=>text.replace(badArityPattern(),goodInsert);
+privateApi=normalizeInsertArity(privateApi);
+const normalizedPrivateInserts=privateApi.split(goodInsert).length-1;
+if(normalizedPrivateInserts<2){
+  throw new Error(`Contrato INSERT MADRI incompleto: esperado >=2 INSERTs normalizados; encontrado ${normalizedPrivateInserts}.`);
+}
+if(badArityPattern().test(privateApi))throw new Error('API MADRI ainda contém INSERT com 26 valores para 25 colunas.');
+
+// PMO privado + Governance Platform compartilham um único bloco autenticado.
+const privateBundle=privateApi+'\n\n// MADRI GOVERNANCE PLATFORM API\n'+governanceApi;
 
 let w=fs.readFileSync(worker,'utf8');
 
-// O artefato public/_worker.js pode vir de um build anterior. Removemos TODAS as
-// cópias canônicas antes de reinjetar para tornar o build realmente idempotente.
-w=stripAllBlocks(w,PUBLIC_START,PUBLIC_END);
-w=stripAllBlocks(w,PRIVATE_START,PRIVATE_END);
-
-// Remove também marcador legado da Governance caso tenha sido gerado por branch antiga.
-for(const [s,e] of [
-  ['    // BEGIN MADRI GOVERNANCE PLATFORM API','    // END MADRI GOVERNANCE PLATFORM API'],
-  ['    // BEGIN MADRI GOVERNANCE API','    // END MADRI GOVERNANCE API']
-]){
-  if(countMarkerLines(w,s)||countMarkerLines(w,e))w=stripAllBlocks(w,s,e);
-}
+// O artefato public/_worker.js pode vir de um build anterior ou de hardeners anteriores.
+// Removemos TODOS os wrappers canônicos/legados antes de reinjetar.
+w=cleanInjectedWrappers(w,'public/_worker.js');
 
 w=injectOnce(
   w,
@@ -79,13 +89,10 @@ w=injectOnce(
   '    '
 );
 
-// Hardening final: contamos MARCADORES REAIS EM LINHA, e não qualquer ocorrência
-// textual da frase em comentários/strings gerados por outros hardeners.
+// Hardening final: contamos apenas MARCADORES REAIS EM LINHA.
 w=normalizeInsertArity(w);
-const privateBlocks=countMarkerLines(w,PRIVATE_START);
-const publicBlocks=countMarkerLines(w,PUBLIC_START);
-const privateEnds=countMarkerLines(w,PRIVATE_END);
-const publicEnds=countMarkerLines(w,PUBLIC_END);
+const privateBlocks=countMarkerLines(w,PRIVATE_START),privateEnds=countMarkerLines(w,PRIVATE_END);
+const publicBlocks=countMarkerLines(w,PUBLIC_START),publicEnds=countMarkerLines(w,PUBLIC_END);
 const governanceRoutes=(w.match(/path==='madri-platform\/context'/g)||[]).length;
 if(privateBlocks!==1||privateEnds!==1)throw new Error(`Worker MADRI inválido: bloco privado start=${privateBlocks}, end=${privateEnds}.`);
 if(publicBlocks!==1||publicEnds!==1)throw new Error(`Worker MADRI inválido: bloco público start=${publicBlocks}, end=${publicEnds}.`);
@@ -95,4 +102,4 @@ const workerGoodInserts=w.split(goodInsert).length-1;
 if(workerGoodInserts<2)throw new Error(`Worker final não contém os dois INSERTs MADRI normalizados; encontrado ${workerGoodInserts}.`);
 
 fs.writeFileSync(worker,w);
-console.log(`OK: MADRI canônico — 1 bloco público, 1 bloco privado (PMO + Governance) e ${workerGoodInserts} INSERTs work_items validados.`);
+console.log(`OK: MADRI canônico — fontes sanitizadas, 1 bloco público, 1 bloco privado (PMO + Governance) e ${workerGoodInserts} INSERTs work_items validados.`);
