@@ -2,17 +2,23 @@ name: OPR STAGE - Restore Isolado do Backup Validado
 
 on:
   workflow_dispatch:
-  push:
-    branches: [develop]
-    paths:
-      - '.github/workflows/opr-stage-restore-once.yml'
+    inputs:
+      confirm:
+        description: "Digite RESTORE-OPR-STAGE para confirmar o restore manual isolado"
+        required: true
+        type: string
+      reason:
+        description: "Motivo operacional/auditoria para executar o restore"
+        required: true
+        type: string
 
 permissions:
   contents: read
   actions: write
 
+# Operação excepcional e manual-only. Nunca deve ser executada por push/PR/schedule.
 # Grupo próprio: a restauração espera explicitamente qualquer release STAGE terminar antes
-# de tocar no D1. Isso evita que o próprio push deste workflow cancele o restore pendente.
+# de tocar no D1. Isso evita concorrência com uma release STAGE já em andamento.
 concurrency:
   group: opr-stage-restore-isolado
   cancel-in-progress: false
@@ -28,6 +34,21 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
     steps:
+      - name: Gate manual obrigatório
+        env:
+          RESTORE_CONFIRM: ${{ inputs.confirm }}
+          RESTORE_REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          if [ "${RESTORE_CONFIRM}" != "RESTORE-OPR-STAGE" ]; then
+            echo "Confirmação inválida. Restore bloqueado." >&2
+            exit 1
+          fi
+          if [ -z "$(printf '%s' "${RESTORE_REASON}" | tr -d '[:space:]')" ]; then
+            echo "Motivo operacional é obrigatório. Restore bloqueado." >&2
+            exit 1
+          fi
+          echo "Gate manual confirmado. Nenhuma escrita ocorreu ainda."
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node.js
@@ -121,8 +142,12 @@ jobs:
           echo "Release STAGE final solicitado."
       - name: Resumo
         if: always()
+        env:
+          RESTORE_REASON: ${{ inputs.reason }}
         run: |
           echo "### Restore OPR STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Execução: manual-only via workflow_dispatch" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Motivo informado: ${RESTORE_REASON}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Fonte: backup D1 validado do release 2026-09-03 / commit 828ac534" >> "$GITHUB_STEP_SUMMARY"
           echo "- Escopo: somente id/company_id=opr" >> "$GITHUB_STEP_SUMMARY"
           echo "- Estratégia: INSERT OR IGNORE, sem DELETE e sem UPDATE de MADRI/Dual/Semeali" >> "$GITHUB_STEP_SUMMARY"
