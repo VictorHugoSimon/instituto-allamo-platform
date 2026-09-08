@@ -63,3 +63,63 @@ jobs:
         run: node scripts/validate-pmo-cockpit-v2.mjs
       - name: Validar navegação do Cockpit materializada no build
         run: node scripts/validate-pmo-cockpit-navigation.mjs
+
+  cockpit-stage-readonly-runtime:
+    if: github.head_ref == 'ops/pmo-cockpit-stage-readonly-20260908'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validar Cockpit publicado no STAGE sem qualquer mutação
+        env:
+          ALLAMO_STAGE_URL: https://allamo-pmo-stage.pages.dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          const base=process.env.ALLAMO_STAGE_URL.replace(/\/$/,'');
+          const get=async path=>{
+            const r=await fetch(base+path,{method:'GET',headers:{'cache-control':'no-store'},redirect:'follow'});
+            const text=await r.text();
+            if(!r.ok)throw new Error(`${path}: HTTP ${r.status} · ${text.slice(0,220)}`);
+            try{return JSON.parse(text)}catch{throw new Error(`${path}: resposta não é JSON`)}
+          };
+          const must=(ok,msg)=>{if(!ok)throw new Error(msg)};
+          const metricNull=(metric,name)=>{
+            must(metric&&metric.available===false,`${name}: esperado available=false`);
+            must(metric.value===null,`${name}: fonte ausente deve retornar value=null`);
+          };
+
+          const [companies,projects,cockpit]=await Promise.all([
+            get('/api/companies'),
+            get('/api/projects'),
+            get('/api/pmo-cockpit')
+          ]);
+
+          const companyRows=Array.isArray(companies)?companies:(companies?.companies||companies?.data||[]);
+          const projectRows=Array.isArray(projects)?projects:(projects?.projects||projects?.data||[]);
+          must(Array.isArray(companyRows),'GET /api/companies não retornou lista reconhecível.');
+          must(Array.isArray(projectRows),'GET /api/projects não retornou lista reconhecível.');
+          must(cockpit&&cockpit.source==='D1','Cockpit não declara D1 como fonte real.');
+          must(cockpit.portfolio&&Array.isArray(cockpit.projects),'Contrato do Cockpit incompleto.');
+          must(cockpit.portfolio.companies===companyRows.length,`Contagem de empresas diverge: API=${companyRows.length}, Cockpit=${cockpit.portfolio.companies}`);
+          must(cockpit.portfolio.projects===projectRows.length,`Contagem de projetos diverge: API=${projectRows.length}, Cockpit=${cockpit.portfolio.projects}`);
+          must(cockpit.projects.length===projectRows.length,'Drill-down do Cockpit diverge da quantidade de projetos.');
+
+          console.log(`[EVIDÊNCIA] STAGE: ${companyRows.length} empresa(s) / ${projectRows.length} projeto(s).`);
+          must(companyRows.length>0&&projectRows.length>0,'Gate base não vazia PENDENTE: STAGE não possui empresa/projeto real para validar transição zero→dados. Nenhum dado será criado pelo smoke.');
+
+          metricNull(cockpit.management?.structured_critical_risks,'management.structured_critical_risks');
+          metricNull(cockpit.capacity?.utilization,'capacity.utilization');
+          metricNull(cockpit.governance?.report_freshness_policy,'governance.report_freshness_policy');
+          metricNull(cockpit.adoption?.heatmap,'adoption.heatmap');
+          if(cockpit.capacity?.actual_hours?.available===false)must(cockpit.capacity.actual_hours.value===null,'capacity.actual_hours indisponível não pode carregar valor fabricado.');
+
+          const healthKeys=['green','yellow','red','stale','not_applicable'];
+          const healthTotal=healthKeys.reduce((sum,key)=>sum+Number(cockpit.health?.[key]||0),0);
+          must(healthTotal===projectRows.length,`Saúde soma ${healthTotal}, projetos reais=${projectRows.length}.`);
+          console.log('[OK] Cockpit STAGE usa base real não vazia e preserva métricas ausentes como Não disponível/null.');
+          console.log('[OK] Smoke operacional executou exclusivamente GET; nenhuma rota de mutação foi chamada.');
+          NODE
