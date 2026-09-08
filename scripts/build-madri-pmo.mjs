@@ -44,7 +44,10 @@ const cleanInjectedWrappers=(text,label)=>{
 const injectOnce=(text,start,end,content,needle,indent='')=>{
   if(!text.includes(needle))throw new Error('Ponto de injeção MADRI não encontrado: '+needle);
   const block=start+'\n'+content.split('\n').map(x=>indent+x).join('\n')+'\n'+end+'\n';
-  return text.replace(needle,block+needle);
+  // IMPORTANTE: callback evita expansão dos tokens especiais $&, $`, $' etc.
+  // A Governance API contém uma regex em template literal terminando em "$`";
+  // usando string de replacement, o JS injetava o prefixo inteiro do Worker e corrompia o bundle.
+  return text.replace(needle,()=>block+needle);
 };
 
 // Outros hardeners do build podem materializar wrappers em artefatos intermediários.
