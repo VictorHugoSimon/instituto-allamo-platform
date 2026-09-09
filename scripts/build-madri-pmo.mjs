@@ -4,6 +4,7 @@ const worker='public/_worker.js';
 let publicApi=fs.readFileSync('src/madri-pmo-public-api.js','utf8');
 let privateApi=fs.readFileSync('src/madri-pmo-api.js','utf8');
 let governanceApi=fs.readFileSync('src/madri-governance-platform-api.js','utf8');
+let pageApi=fs.readFileSync('src/madri-page-persistence-api.js','utf8');
 
 const PUBLIC_START='    // BEGIN MADRI PMO PUBLIC API';
 const PUBLIC_END='    // END MADRI PMO PUBLIC API';
@@ -51,11 +52,11 @@ const injectOnce=(text,start,end,content,needle,indent='')=>{
 };
 
 // Outros hardeners do build podem materializar wrappers em artefatos intermediários.
-// Sanitizamos também os três arquivos-fonte lidos neste processo para impedir que
-// um bloco gerado seja encapsulado novamente dentro de outro bloco MADRI.
+// Sanitizamos também os arquivos-fonte lidos neste processo para impedir encapsulamento duplicado.
 publicApi=cleanInjectedWrappers(publicApi,'src/madri-pmo-public-api.js');
 privateApi=cleanInjectedWrappers(privateApi,'src/madri-pmo-api.js');
 governanceApi=cleanInjectedWrappers(governanceApi,'src/madri-governance-platform-api.js');
+pageApi=cleanInjectedWrappers(pageApi,'src/madri-page-persistence-api.js');
 
 // Correção defensiva do contrato de criação de ações MADRI.
 // Os INSERTs em work_items possuem 25 colunas: 24 parâmetros + version=1.
@@ -69,8 +70,8 @@ if(normalizedPrivateInserts<2){
 }
 if(badArityPattern().test(privateApi))throw new Error('API MADRI ainda contém INSERT com 26 valores para 25 colunas.');
 
-// PMO privado + Governance Platform compartilham um único bloco autenticado.
-const privateBundle=privateApi+'\n\n// MADRI GOVERNANCE PLATFORM API\n'+governanceApi;
+// PMO privado + Governance Platform + persistência documental compartilham um único bloco autenticado.
+const privateBundle=privateApi+'\n\n// MADRI GOVERNANCE PLATFORM API\n'+governanceApi+'\n\n// MADRI PAGE PERSISTENCE API\n'+pageApi;
 
 let w=fs.readFileSync(worker,'utf8');
 
@@ -81,10 +82,7 @@ w=cleanInjectedWrappers(w,'public/_worker.js');
 w=injectOnce(w,PUBLIC_START,PUBLIC_END,publicApi,PUBLIC_ANCHOR,'    ');
 w=injectOnce(w,PRIVATE_START,PRIVATE_END,privateBundle,PRIVATE_ANCHOR,'    ');
 
-// Canonicalização final do endpoint PÚBLICO. Alguns hardeners anteriores do pipeline
-// podem materializar uma cópia dentro de um artefato intermediário durante o mesmo
-// build. Depois que o bundle privado já está montado, removemos TODAS as cópias
-// públicas do Worker final e reinjetamos exatamente uma no ponto público correto.
+// Canonicalização final do endpoint PÚBLICO.
 w=stripAllBlocks(w,PUBLIC_START,PUBLIC_END);
 w=injectOnce(w,PUBLIC_START,PUBLIC_END,publicApi,PUBLIC_ANCHOR,'    ');
 
@@ -93,12 +91,15 @@ w=normalizeInsertArity(w);
 const privateBlocks=countMarkerLines(w,PRIVATE_START),privateEnds=countMarkerLines(w,PRIVATE_END);
 const publicBlocks=countMarkerLines(w,PUBLIC_START),publicEnds=countMarkerLines(w,PUBLIC_END);
 const governanceRoutes=(w.match(/path==='madri-platform\/context'/g)||[]).length;
+const pageRoutes=(w.match(/const mpagCurrent=path\.match/g)||[]).length;
 if(privateBlocks!==1||privateEnds!==1)throw new Error(`Worker MADRI inválido: bloco privado start=${privateBlocks}, end=${privateEnds}; linhas start=${markerLineNumbers(w,PRIVATE_START).join(',')}, end=${markerLineNumbers(w,PRIVATE_END).join(',')}.`);
 if(publicBlocks!==1||publicEnds!==1)throw new Error(`Worker MADRI inválido: bloco público start=${publicBlocks}, end=${publicEnds}; linhas start=${markerLineNumbers(w,PUBLIC_START).join(',')}, end=${markerLineNumbers(w,PUBLIC_END).join(',')}.`);
 if(governanceRoutes!==1)throw new Error(`Worker MADRI inválido: esperado 1 contrato de governança; encontrado ${governanceRoutes}.`);
+if(pageRoutes!==1)throw new Error(`Worker MADRI inválido: esperado 1 contrato de persistência de páginas; encontrado ${pageRoutes}.`);
 if(badArityPattern().test(w))throw new Error('Worker final ainda contém INSERT MADRI com 26 valores para 25 colunas.');
 const workerGoodInserts=w.split(goodInsert).length-1;
 if(workerGoodInserts<2)throw new Error(`Worker final não contém os dois INSERTs MADRI normalizados; encontrado ${workerGoodInserts}.`);
 
 fs.writeFileSync(worker,w);
-console.log(`OK: MADRI canônico — fontes sanitizadas, 1 bloco público, 1 bloco privado (PMO + Governance) e ${workerGoodInserts} INSERTs work_items validados.`);
+await import('./harden-madri-page-persistence.mjs');
+console.log(`OK: MADRI canônico — 1 bloco público, 1 bloco privado (PMO + Governance + páginas D1) e ${workerGoodInserts} INSERTs work_items validados.`);
