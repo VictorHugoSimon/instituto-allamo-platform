@@ -39,12 +39,22 @@ for(const [needle,label] of [
   ['BEGIN ALLAMO WORK IMPORT API','API materializada no Worker'],
   ['END ALLAMO WORK IMPORT API','fim da API materializada'],
   ['BEGIN ALLAMO WORK IMPORT UI','UI materializada no portal'],
-  ['END ALLAMO WORK IMPORT UI','fim da UI materializada']
+  ['END ALLAMO WORK IMPORT UI','fim da UI materializada'],
+  ['allamoWorkNoLoginHost','Work Management sem login nos hosts oficiais'],
+  ['allamoWorkImportNoLoginHost','importador sem login nos hosts oficiais'],
+  ['awm-import-excel','botão Importar Excel materializado'],
+  ['allamoImportReady','botão do importador religado após render'],
+  ['setInterval(ensureButton,1200)','fallback de renderização do botão']
 ])must(worker+index,needle,label);
+
+if(index.includes("const t=T();if(!t)throw new Error('Sessão não encontrada. Entre novamente no portal.')"))throw new Error('Work Management ainda exige token local no host oficial.');
+if(index.includes("const t=token();if(!t)throw new Error('Sessão não encontrada. Entre novamente no portal.')"))throw new Error('Importador Excel ainda exige token local no host oficial.');
 
 must(hardener,"src/work-import-api.js",'fonte API no hardener');
 must(hardener,"src/work-import-ui.js",'fonte UI no hardener');
+must(hardener,'allamoWorkNoLoginHost','hardening sem login do Work Management');
+must(hardener,'allamoWorkImportNoLoginHost','hardening sem login do importador');
 must(mutationHardener,"await import('./harden-work-import.mjs')",'importador encadeado no build oficial');
 must(mutationValidator,"await import('./validate-work-import.mjs')",'validador encadeado ao gate de mutações');
 
-console.log('OK: importador Excel→Work Management possui mapeamento flexível, prévia/dry-run, RBAC, auditoria e deduplicação sem schema ou seed automático.');
+console.log('OK: Work Management + importador Excel operam sem login nos hosts oficiais, com botão persistente, mapeamento flexível, dry-run, RBAC, auditoria e deduplicação.');
