@@ -65,5 +65,6 @@ const projectInsert=worker.indexOf('INSERT INTO projects',projectReserve);
 if(!(projectGuard>=0&&projectReserve>projectGuard&&projectInsert>projectReserve))throw new Error('Projeto pode ser inserido antes da reserva idempotente.');
 
 await import('./validate-onboarding-ui-idempotency.mjs');
+await import('./validate-work-import.mjs');
 
-console.log('OK: onboarding empresa→projeto exige sessão humana autenticada, request_id persistido, replay idempotente, integridade, auditoria, UI compatível e schema aditivo aplicado antes de qualquer deploy.');
+console.log('OK: mutações protegidas; onboarding empresa→projeto e importação Excel→Work Management possuem sessão/RBAC, idempotência/deduplicação, auditoria e validação antes de gravar.');
