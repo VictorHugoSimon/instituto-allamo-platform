@@ -120,3 +120,4 @@ if(changed){
 }
 
 await import('./harden-onboarding-ui-idempotency.mjs');
+await import('./harden-work-import.mjs');
