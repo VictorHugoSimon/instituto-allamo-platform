@@ -1,0 +1,118 @@
+name: MADRI - Bootstrap Tenant + Baseline STAGE (one-time)
+
+on:
+  push:
+    branches:
+      - ops/madri-stage-bootstrap-once-2026-09-09
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-stage-bootstrap-once
+  cancel-in-progress: false
+
+jobs:
+  bootstrap-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout da operação isolada
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar autenticação Cloudflare
+        run: |
+          node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+          npx wrangler@4.124.0 whoami
+
+      - name: Confirmar configuração exclusiva de STAGE
+        run: |
+          test -f wrangler.stage.toml
+          grep -F 'name = "allamo-pmo-stage"' wrangler.stage.toml
+          if grep -Fq 'allamo-pmo-production' wrangler.stage.toml; then
+            echo 'Config de Produção detectada no arquivo Stage.' >&2
+            exit 1
+          fi
+
+      - name: Backup obrigatório do D1 Stage
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-before-madri-bootstrap-${GITHUB_SHA}.sql"
+
+      - name: Guardar backup Stage
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-before-madri-bootstrap-${{ github.sha }}
+          path: backup-stage-before-madri-bootstrap-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Garantir schema MADRI Governance no Stage
+        run: |
+          node scripts/ensure-madri-governance-schema.mjs --env=stage
+          node scripts/ensure-madri-governance-schema.mjs --env=stage --apply --confirm=APPLY-MADRI-GOV-STAGE
+
+      - name: Criar tenant MADRI e projeto NUCCI somente se ausentes
+        shell: bash
+        run: |
+          cat > .tmp-madri-stage-tenant.sql <<'SQL'
+          PRAGMA foreign_keys = ON;
+          BEGIN TRANSACTION;
+          INSERT INTO companies(id,name,system,status,status_text,pmo_mode,progress,summary)
+          SELECT 'madri','Madri','Nucci','s','Em implantação','PMO Direto',0,'Implantação MADRI × NUCCI — ambiente de homologação'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM companies
+            WHERE lower(CAST(id AS TEXT)) IN ('madri','madrid') OR lower(name) IN ('madri','madrid')
+          );
+          INSERT INTO projects(name,company_id,status,badge,urgency,summary)
+          SELECT 'Implantação NUCCI ERP','madri','Em andamento','started','Média','Implantação ERP/TMS NUCCI na MADRI'
+          WHERE EXISTS (SELECT 1 FROM companies WHERE id='madri')
+            AND NOT EXISTS (
+              SELECT 1 FROM projects
+              WHERE company_id='madri' AND (lower(name) LIKE '%nucci%' OR lower(name) LIKE '%madri%')
+            );
+          COMMIT;
+          SQL
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --file .tmp-madri-stage-tenant.sql
+          rm -f .tmp-madri-stage-tenant.sql
+
+      - name: Validar tenant MADRI único no Stage
+        run: |
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT c.id,c.name,p.id AS project_id,p.name AS project_name FROM companies c LEFT JOIN projects p ON p.company_id=c.id WHERE lower(CAST(c.id AS TEXT)) IN ('madri','madrid') OR lower(c.name) IN ('madri','madrid') ORDER BY p.id;"
+          node scripts/seed-madri-governance-baseline.mjs --env=stage
+
+      - name: Materializar Plano de Ação MADRI idempotente no Stage
+        run: npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --file migrations/2026-08-30-madri-pmo-master-plan.sql
+
+      - name: Aplicar baseline MADRI no D1 Stage
+        run: node scripts/seed-madri-governance-baseline.mjs --env=stage --apply --confirm=SEED-MADRI-BASELINE-STAGE
+
+      - name: Verificação idempotente pós-seed
+        run: |
+          node scripts/seed-madri-governance-baseline.mjs --env=stage
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT COUNT(*) AS actions FROM work_items WHERE company_id='madri' AND pmo_scope='MADRI_NUCCI' AND archived_at IS NULL; SELECT COUNT(*) AS requirements FROM madri_requirements WHERE company_id='madri' AND archived_at IS NULL; SELECT COUNT(*) AS tests FROM madri_tests WHERE company_id='madri' AND archived_at IS NULL; SELECT COUNT(*) AS phases FROM madri_implementation_phases WHERE company_id='madri' AND archived_at IS NULL; SELECT COUNT(*) AS readiness FROM madri_readiness WHERE company_id='madri' AND archived_at IS NULL;"
+
+      - name: Resumo
+        run: |
+          echo '### MADRI STAGE bootstrap concluído' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Ambiente alterado: STAGE somente' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Tenant canônico: madri / Madri' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Projeto: Implantação NUCCI ERP' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Requisitos esperados: 86' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Testes esperados: 54' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Fases esperadas: 15' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Readiness esperado: 17' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Produção: não acessada' >> "$GITHUB_STEP_SUMMARY"
