@@ -70,7 +70,6 @@ jobs:
         run: |
           cat > .tmp-madri-stage-tenant.sql <<'SQL'
           PRAGMA foreign_keys = ON;
-          BEGIN TRANSACTION;
           INSERT INTO companies(id,name,system,status,status_text,pmo_mode,progress,summary)
           SELECT 'madri','Madri','Nucci','s','Em implantação','PMO Direto',0,'Implantação MADRI × NUCCI — ambiente de homologação'
           WHERE NOT EXISTS (
@@ -84,10 +83,17 @@ jobs:
               SELECT 1 FROM projects
               WHERE company_id='madri' AND (lower(name) LIKE '%nucci%' OR lower(name) LIKE '%madri%')
             );
-          COMMIT;
           SQL
           npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --file .tmp-madri-stage-tenant.sql
           rm -f .tmp-madri-stage-tenant.sql
+
+      - name: Adaptar seed para execução remota D1 sem transação SQL explícita
+        run: |
+          sed -i "/'BEGIN TRANSACTION;',/d; /'COMMIT;',/d" scripts/seed-madri-governance-baseline.mjs
+          if grep -q "BEGIN TRANSACTION" scripts/seed-madri-governance-baseline.mjs; then
+            echo 'Seed ainda contém transação SQL explícita.' >&2
+            exit 1
+          fi
 
       - name: Validar tenant MADRI único no Stage
         run: |
@@ -95,7 +101,10 @@ jobs:
           node scripts/seed-madri-governance-baseline.mjs --env=stage
 
       - name: Materializar Plano de Ação MADRI idempotente no Stage
-        run: npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --file migrations/2026-08-30-madri-pmo-master-plan.sql
+        run: |
+          sed '/^[[:space:]]*BEGIN TRANSACTION;/d;/^[[:space:]]*COMMIT;/d' migrations/2026-08-30-madri-pmo-master-plan.sql > .tmp-madri-master-plan.sql
+          npx wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --file .tmp-madri-master-plan.sql
+          rm -f .tmp-madri-master-plan.sql
 
       - name: Aplicar baseline MADRI no D1 Stage
         run: node scripts/seed-madri-governance-baseline.mjs --env=stage --apply --confirm=SEED-MADRI-BASELINE-STAGE
