@@ -163,9 +163,9 @@ if (!APPLY) {
   process.exit(0);
 }
 
+// O D1 remoto executa o arquivo como lote atômico; BEGIN/COMMIT explícitos não são aceitos pelo Wrangler remoto.
 const sql = [
   'PRAGMA foreign_keys = ON;',
-  'BEGIN TRANSACTION;',
   ...requirements.map(reqSql),
   ...tests.map(testSql),
   ...phases.map(phaseSql),
@@ -173,7 +173,6 @@ const sql = [
   `INSERT INTO madri_platform_sequence(project_id,company_id,entity,next_value,updated_at) VALUES(${lit(project.id)},${lit(company.id)},'tests',55,datetime('now')) ON CONFLICT(project_id,entity) DO UPDATE SET company_id=excluded.company_id,next_value=MAX(madri_platform_sequence.next_value,55),updated_at=datetime('now');`,
   `INSERT INTO madri_platform_sequence(project_id,company_id,entity,next_value,updated_at) VALUES(${lit(project.id)},${lit(company.id)},'phases',16,datetime('now')) ON CONFLICT(project_id,entity) DO UPDATE SET company_id=excluded.company_id,next_value=MAX(madri_platform_sequence.next_value,16),updated_at=datetime('now');`,
   `INSERT INTO madri_platform_sequence(project_id,company_id,entity,next_value,updated_at) VALUES(${lit(project.id)},${lit(company.id)},'readiness',18,datetime('now')) ON CONFLICT(project_id,entity) DO UPDATE SET company_id=excluded.company_id,next_value=MAX(madri_platform_sequence.next_value,18),updated_at=datetime('now');`,
-  'COMMIT;',
 ].join('\n');
 const tmp = `.tmp-madri-baseline-${process.pid}.sql`;
 fs.writeFileSync(tmp, sql, 'utf8');
