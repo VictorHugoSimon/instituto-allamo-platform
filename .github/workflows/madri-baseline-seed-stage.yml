@@ -1,0 +1,86 @@
+name: MADRI - Seed Baseline D1 STAGE
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'data/madri/madri-governance-*-baseline.json.gz.b64'
+      - 'scripts/seed-madri-governance-baseline.mjs'
+      - 'scripts/validate-madri-baseline-seed.mjs'
+      - '.github/workflows/madri-baseline-seed-stage.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'data/madri/madri-governance-*-baseline.json.gz.b64'
+      - 'scripts/seed-madri-governance-baseline.mjs'
+      - 'scripts/validate-madri-baseline-seed.mjs'
+      - '.github/workflows/madri-baseline-seed-stage.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-baseline-seed-stage
+  cancel-in-progress: false
+
+jobs:
+  validate-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Validar baseline e contrato Stage-only
+        run: |
+          node --check scripts/seed-madri-governance-baseline.mjs
+          node scripts/validate-madri-baseline-seed.mjs
+
+  seed-stage:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: validate-baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Preflight Cloudflare
+        run: npx wrangler@4.124.0 whoami
+      - name: Backup obrigatório do D1 Stage antes do baseline
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-madri-baseline-${GITHUB_SHA}.sql"
+      - name: Guardar backup Stage
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-madri-baseline-backup-${{ github.sha }}
+          path: backup-stage-madri-baseline-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 14
+      - name: Garantir schema MADRI Governance Stage
+        run: |
+          node scripts/ensure-madri-governance-schema.mjs --env=stage
+          node scripts/ensure-madri-governance-schema.mjs --env=stage --apply --confirm=APPLY-MADRI-GOV-STAGE
+      - name: Dry-run do baseline MADRI
+        run: node scripts/seed-madri-governance-baseline.mjs --env=stage
+      - name: Aplicar baseline MADRI no D1 Stage
+        run: node scripts/seed-madri-governance-baseline.mjs --env=stage --apply --confirm=SEED-MADRI-BASELINE-STAGE
+      - name: Verificação idempotente pós-seed
+        run: node scripts/seed-madri-governance-baseline.mjs --env=stage
+      - name: Resumo
+        run: |
+          echo "### MADRI Baseline D1 — STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Requisitos reconstruídos + novos: 86" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Testes preservados: TST-001..TST-054" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fases de implantação: 15" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Itens de readiness: 17" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Escrita: INSERT OR IGNORE, sem update/delete de registros de negócio" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ambiente: somente D1 Stage" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup: obrigatório, retenção 14 dias" >> "$GITHUB_STEP_SUMMARY"
