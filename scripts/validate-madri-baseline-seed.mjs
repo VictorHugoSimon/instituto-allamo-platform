@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import zlib from 'node:zlib';
+
+const reqFile='data/madri/madri-governance-requirements-baseline.json.gz.b64';
+const testFile='data/madri/madri-governance-tests-baseline.json.gz.b64';
+const seedFile='scripts/seed-madri-governance-baseline.mjs';
+const workflowFile='.github/workflows/madri-baseline-seed-stage.yml';
+for(const f of [reqFile,testFile,seedFile,workflowFile]) if(!fs.existsSync(f)) throw new Error(`Arquivo ausente: ${f}`);
+const decode=f=>JSON.parse(zlib.gunzipSync(Buffer.from(fs.readFileSync(f,'utf8').trim(),'base64')).toString('utf8'));
+const req=decode(reqFile),test=decode(testFile);
+if(!Array.isArray(req.requirements)||req.requirements.length!==86) throw new Error('Baseline deve conter exatamente 86 requisitos.');
+if(!Array.isArray(test.tests)||test.tests.length!==54) throw new Error('Baseline deve conter exatamente 54 testes.');
+if(new Set(req.requirements.map(x=>x.display_id)).size!==86) throw new Error('IDs de requisitos duplicados.');
+if(new Set(test.tests.map(x=>x.display_id)).size!==54) throw new Error('IDs de testes duplicados.');
+const expectedTests=Array.from({length:54},(_,i)=>`TST-${String(i+1).padStart(3,'0')}`);
+if(expectedTests.some((id,i)=>test.tests[i]?.display_id!==id)) throw new Error('Baseline de testes não preserva TST-001..TST-054 em ordem.');
+const seed=fs.readFileSync(seedFile,'utf8');
+const wf=fs.readFileSync(workflowFile,'utf8');
+for(const token of ['--env=stage','SEED-MADRI-BASELINE-STAGE','INSERT OR IGNORE','requisitos=86','testes=54','fases=15','readiness=17']) if(!seed.includes(token)) throw new Error(`Contrato de seed ausente: ${token}`);
+if(/wrangler\.production|--env=production|APPLY-MADRI-GOV-PRODUCTION/i.test(seed+wf)) throw new Error('Seed MADRI não pode referenciar Produção.');
+if(!wf.includes('secure-d1-export.mjs')||!wf.includes('ensure-madri-governance-schema.mjs')||!wf.includes('--confirm=SEED-MADRI-BASELINE-STAGE')) throw new Error('Workflow Stage sem backup/schema/confirmação obrigatórios.');
+if(!wf.includes('branches: [develop]')) throw new Error('Workflow de aplicação deve ficar restrito ao push em develop.');
+console.log('[OK] Seed MADRI Stage: 86 requisitos, 54 testes, 15 fases e 17 itens de readiness; idempotente, com backup e sem Produção.');
