@@ -54,7 +54,7 @@ for(const c of ['pmo_scope','front','dependency_text','impact_text','critical_pa
 
 // POP e Mapa Mestre: persistência global D1, histórico e ausência de localStorage operacional.
 for(const t of ['madri_page_documents','madri_page_document_history']){must(pageMigration.includes(`CREATE TABLE IF NOT EXISTS ${t}`),`Tabela de página ausente: ${t}`);must(pageSchema.includes(t),`Schema dedicado não protege ${t}`)}
-for(const token of ['madri-platform/pages','SAVE','RESTORE','madri_page_document_history'])must(pageApi.includes(token),`API de páginas incompleta: ${token}`);
+for(const token of ['mpagCurrent','madri_page_documents','SAVE','RESTORE','madri_page_document_history'])must(pageApi.includes(token),`API de páginas incompleta: ${token}`);
 must(pageRuntime.includes('/api/madri-platform/')&&pageRuntime.includes("'pages/'+page"),'Runtime de páginas não usa API MADRI');
 for(const [name,text] of Object.entries({pop,map})){
   must(text.includes('/madri/assets/page-persistence.js'),`${name}: runtime D1 não carregado`);
