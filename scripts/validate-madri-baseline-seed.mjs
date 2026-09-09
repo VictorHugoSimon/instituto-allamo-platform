@@ -17,6 +17,7 @@ if(expectedTests.some((id,i)=>test.tests[i]?.display_id!==id)) throw new Error('
 const seed=fs.readFileSync(seedFile,'utf8');
 const wf=fs.readFileSync(workflowFile,'utf8');
 for(const token of ['--env=stage','SEED-MADRI-BASELINE-STAGE','INSERT OR IGNORE','requisitos=86','testes=54','fases=15','readiness=17']) if(!seed.includes(token)) throw new Error(`Contrato de seed ausente: ${token}`);
+if(/BEGIN\s+TRANSACTION|SAVEPOINT|\bCOMMIT\s*;/i.test(seed)) throw new Error('Seed MADRI remoto não pode usar BEGIN/COMMIT/SAVEPOINT SQL explícitos no Wrangler D1.');
 if(/wrangler\.production|--env=production|APPLY-MADRI-GOV-PRODUCTION/i.test(seed+wf)) throw new Error('Seed MADRI não pode referenciar Produção.');
 if(!wf.includes('secure-d1-export.mjs')||!wf.includes('ensure-madri-governance-schema.mjs')||!wf.includes('--confirm=SEED-MADRI-BASELINE-STAGE')) throw new Error('Workflow Stage sem backup/schema/confirmação obrigatórios.');
 if(!wf.includes('branches: [develop]')) throw new Error('Workflow de aplicação deve ficar restrito ao push em develop.');
