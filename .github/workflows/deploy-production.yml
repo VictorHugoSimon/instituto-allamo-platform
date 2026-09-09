@@ -87,6 +87,7 @@ jobs:
         run: |
           node scripts/ensure-work-management-schema.mjs --env=production
           node scripts/ensure-additive-schema.mjs --env=production
+          node scripts/ensure-madri-governance-schema.mjs --env=production
           node scripts/ensure-onboarding-schema.mjs --env=production
 
       - name: Garantir schema base de Work Management em Produção
@@ -94,6 +95,9 @@ jobs:
 
       - name: Aplicar somente schema aditivo em Produção
         run: node scripts/ensure-additive-schema.mjs --env=production --apply --confirm=APPLY-ADDITIVE-PRODUCTION
+
+      - name: Aplicar schema MADRI Governance em Produção
+        run: node scripts/ensure-madri-governance-schema.mjs --env=production --apply --confirm=APPLY-MADRI-GOV-PRODUCTION
 
       - name: Aplicar ledger idempotente de onboarding em Produção
         run: node scripts/ensure-onboarding-schema.mjs --env=production --apply --confirm=APPLY-ONBOARDING-SCHEMA-PRODUCTION
@@ -149,6 +153,7 @@ jobs:
           echo "- Backup D1: obrigatório e retido por 30 dias" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema base Work Management: dry-run + aplicação idempotente" >> "$GITHUB_STEP_SUMMARY"
           echo "- Schema aditivo: dry-run + aplicação somente aditiva" >> "$GITHUB_STEP_SUMMARY"
+          echo "- MADRI Governance: schema dedicado e idempotente aplicado somente no D1 de Produção" >> "$GITHUB_STEP_SUMMARY"
           echo "- Onboarding: ledger idempotente aplicado antes do deploy; nenhum tenant é criado pelo schema" >> "$GITHUB_STEP_SUMMARY"
           echo "- Dados de negócio: deploy NÃO cria nem repara empresas/projetos automaticamente" >> "$GITHUB_STEP_SUMMARY"
           echo "- Recuperação de tenants: somente operação manual, explícita e confirmada" >> "$GITHUB_STEP_SUMMARY"

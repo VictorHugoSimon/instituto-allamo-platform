@@ -10,9 +10,15 @@ const migration=read('migrations/2026-08-30-madri-pmo-master-plan.sql');
 const builder=read('scripts/build-madri-pmo.mjs');
 const schema=read('scripts/ensure-madri-pmo-schema.mjs');
 const worker=read('public/_worker.js');
+const pageApi=read('src/madri-page-persistence-api.js');
+const pageMigration=read('migrations/2026-09-09-madri-page-persistence.sql');
+const pageSchema=read('scripts/ensure-madri-governance-schema.mjs');
+const pageRuntime=read('public/madri/assets/page-persistence.js');
+const pop=read('public/madri-pop/index.html');
+const map=read('public/madri-mapa-implantacao/index.html');
 
 // Isolamento deliberado: nenhum conteúdo de projeto alheio nos artefatos MADRI.
-for(const [name,text] of Object.entries({api,pub,plan,report,migration,builder,schema})){
+for(const [name,text] of Object.entries({api,pub,plan,report,migration,builder,schema,pageApi,pageMigration,pageSchema,pageRuntime})){
   must(!/Dual Clima|dualclima|\bOPR\b|TOTVS|Ciclone/i.test(text),`${name}: dado de outro projeto detectado`);
 }
 
@@ -46,8 +52,20 @@ must(seedActions>=18,`Seed de ações insuficiente: ${seedActions}`);
 for(const t of ['madri_pmo_demands','madri_pmo_roles','madri_pmo_cadence'])must(migration.includes(`CREATE TABLE IF NOT EXISTS ${t}`),`Tabela ausente: ${t}`);
 for(const c of ['pmo_scope','front','dependency_text','impact_text','critical_path','next_step','evidence','source_ref','version'])must(schema.includes(c),`Coluna aditiva não protegida: ${c}`);
 
+// POP e Mapa Mestre: persistência global D1, histórico e ausência de localStorage operacional.
+for(const t of ['madri_page_documents','madri_page_document_history']){must(pageMigration.includes(`CREATE TABLE IF NOT EXISTS ${t}`),`Tabela de página ausente: ${t}`);must(pageSchema.includes(t),`Schema dedicado não protege ${t}`)}
+for(const token of ['mpagCurrent','madri_page_documents','SAVE','RESTORE','madri_page_document_history'])must(pageApi.includes(token),`API de páginas incompleta: ${token}`);
+must(pageRuntime.includes('/api/madri-platform/')&&pageRuntime.includes("'pages/'+page"),'Runtime de páginas não usa API MADRI');
+for(const [name,text] of Object.entries({pop,map})){
+  must(text.includes('/madri/assets/page-persistence.js'),`${name}: runtime D1 não carregado`);
+  must(!/localStorage\s*\./.test(text),`${name}: localStorage ainda é fonte operacional`);
+}
+must(pop.includes('Histórico de versões D1'),'POP não comunica histórico D1');
+must(map.includes('persistência no D1 MADRI'),'Mapa Mestre não comunica persistência D1');
+
 // Build precisa injetar API pública antes do login e API privada no bloco autenticado.
 must(builder.includes('MADRI PMO PUBLIC API')&&builder.includes('MADRI PMO PRIVATE API'),'Build MADRI não injeta os dois endpoints');
+must(builder.includes('madri-page-persistence-api.js')&&builder.includes('harden-madri-page-persistence.mjs'),'Build não materializa persistência D1 das páginas');
 
 // Regressão real encontrada no Stage: 25 colunas de work_items não podem receber 26 valores.
 const badArity=/VALUES\(\s*(?:\?\s*,\s*){25}1\s*\)/g;
@@ -55,10 +73,14 @@ const goodInsert='VALUES('+Array(24).fill('?').join(',')+',1)';
 must(!badArity.test(worker),'Worker final contém INSERT MADRI com 26 valores para 25 colunas');
 const normalizedInserts=worker.split(goodInsert).length-1;
 must(normalizedInserts>=2,`Worker deve conter os dois INSERTs MADRI normalizados; encontrado ${normalizedInserts}`);
-const privateBlocks=(worker.match(/BEGIN MADRI PMO PRIVATE API/g)||[]).length;
-const publicBlocks=(worker.match(/BEGIN MADRI PMO PUBLIC API/g)||[]).length;
-must(privateBlocks===1,`Worker deve conter exatamente 1 bloco privado MADRI; encontrado ${privateBlocks}`);
-must(publicBlocks===1,`Worker deve conter exatamente 1 bloco público MADRI; encontrado ${publicBlocks}`);
+const privateBlocks=(worker.match(/^[\t ]*\/\/ BEGIN MADRI PMO PRIVATE API[\t ]*$/gm)||[]).length;
+const publicBlocks=(worker.match(/^[\t ]*\/\/ BEGIN MADRI PMO PUBLIC API[\t ]*$/gm)||[]).length;
+const privateEnds=(worker.match(/^[\t ]*\/\/ END MADRI PMO PRIVATE API[\t ]*$/gm)||[]).length;
+const publicEnds=(worker.match(/^[\t ]*\/\/ END MADRI PMO PUBLIC API[\t ]*$/gm)||[]).length;
+must(privateBlocks===1&&privateEnds===1,`Worker deve conter exatamente 1 bloco privado MADRI; start=${privateBlocks}, end=${privateEnds}`);
+must(publicBlocks===1&&publicEnds===1,`Worker deve conter exatamente 1 bloco público MADRI; start=${publicBlocks}, end=${publicEnds}`);
+must(worker.includes('MADRI Page Persistence'),'Worker final não contém API de persistência de páginas');
 must(builder.includes('badArityPattern')&&builder.includes('normalizeInsertArity'),'Build não possui hardening explícito de aridade dos INSERTs MADRI');
+must(builder.includes('countMarkerLines'),'Build valida marcadores reais em linha, não ocorrências textuais');
 
-console.log(`[OK] MADRI PMO: contrato, isolamento, quatro abas, Vision Roadmap e ${normalizedInserts} INSERTs work_items 25×25 validados.`);
+console.log(`[OK] MADRI PMO: contrato, isolamento, quatro abas, Vision Roadmap, POP/Mapa D1 e ${normalizedInserts} INSERTs work_items 25×25 validados.`);
