@@ -17,7 +17,7 @@ for(const [needle,label] of [
   ['dry_run','pré-validação sem escrita'],
   ['excel-import:','token estável de deduplicação'],
   ['duplicates','contagem de duplicados'],
-  ["event_type,event_name",'auditoria via Work Events'],
+  ["await wmEvent(item,'imported'",'auditoria via Work Events'],
   ["work-items:importar",'auditoria de lote']
 ])must(api,needle,label);
 if(/\b(?:DELETE|DROP|TRUNCATE)\b/i.test(api))throw new Error('API de importação não pode conter operação destrutiva.');
