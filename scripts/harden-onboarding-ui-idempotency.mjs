@@ -36,7 +36,7 @@ if(!template.includes(marker)){
 
   replaceOnce(
     "else { await this.api('company-create',{method:'POST',body:JSON.stringify(f)}); }",
-    "else { if(!this.state.token) throw new Error('Onboarding exige sessão humana autenticada. Faça login para cadastrar empresa.'); const requestId=this.state.companyRequestId||this.onboardingRequestId('company'); if(!this.state.companyRequestId)this.setState({companyRequestId:requestId}); await this.api('company-create',{method:'POST',headers:{'Idempotency-Key':requestId},body:JSON.stringify(f)}); }",
+    "else { const requestId=this.state.companyRequestId||this.onboardingRequestId('company'); if(!this.state.companyRequestId)this.setState({companyRequestId:requestId}); await this.api('company-create',{method:'POST',headers:{'Idempotency-Key':requestId},body:JSON.stringify(f)}); }",
     'POST de empresa'
   );
 
@@ -54,11 +54,22 @@ if(!template.includes(marker)){
 
   replaceOnce(
     "try{ await this.api('projects',{ method:'POST', body:JSON.stringify(f) }); await this.loadData(); this.setState({ modal:null, saving:false }); this.forceUpdate(); }",
-    "try{ if(!this.state.token) throw new Error('Onboarding exige sessão humana autenticada. Faça login para cadastrar projeto.'); const requestId=this.state.projectRequestId||this.onboardingRequestId('project'); if(!this.state.projectRequestId)this.setState({projectRequestId:requestId}); await this.api('projects',{ method:'POST', headers:{'Idempotency-Key':requestId}, body:JSON.stringify(f) }); await this.loadData(); this.setState({ modal:null, saving:false, projectRequestId:null }); this.forceUpdate(); }",
+    "try{ const requestId=this.state.projectRequestId||this.onboardingRequestId('project'); if(!this.state.projectRequestId)this.setState({projectRequestId:requestId}); await this.api('projects',{ method:'POST', headers:{'Idempotency-Key':requestId}, body:JSON.stringify(f) }); await this.loadData(); this.setState({ modal:null, saving:false, projectRequestId:null }); this.forceUpdate(); }",
     'POST de projeto'
   );
 }else{
   console.log('OK: UI de onboarding já contém idempotência explícita.');
+}
+
+// Migração de builds que já receberam a regra antiga de sessão humana.
+for(const legacy of [
+  "if(!this.state.token) throw new Error('Onboarding exige sessão humana autenticada. Faça login para cadastrar empresa.'); ",
+  "if(!this.state.token) throw new Error('Onboarding exige sessão humana autenticada. Faça login para cadastrar projeto.'); "
+]){
+  if(template.includes(legacy)){
+    template=template.split(legacy).join('');
+    changed=true;
+  }
 }
 
 for(const required of [
@@ -67,19 +78,18 @@ for(const required of [
   "headers:{'Idempotency-Key':requestId}, body:JSON.stringify(f)",
   "companyRequestId:null",
   "projectRequestId:null",
-  "Selecione a empresa do projeto.",
-  "Onboarding exige sessão humana autenticada. Faça login para cadastrar empresa.",
-  "Onboarding exige sessão humana autenticada. Faça login para cadastrar projeto."
+  "Selecione a empresa do projeto."
 ]){
   if(!template.includes(required)) throw new Error('Hardening de onboarding incompleto: '+required);
 }
+if(template.includes('Onboarding exige sessão humana autenticada')) throw new Error('UI ainda exige login para onboarding no modo oficial sem login.');
 
 if(changed){
   const serialized=JSON.stringify(template).replace(/<\//gi,'<\\u002F');
   if(serialized.toLowerCase().includes('</script')) throw new Error('Serialização insegura do template.');
   html=html.slice(0,start)+serialized+html.slice(end);
   fs.writeFileSync(file,html);
-  console.log('OK: UI de onboarding envia Idempotency-Key, preserva retry e exige empresa/sessão.');
+  console.log('OK: UI de onboarding envia Idempotency-Key e funciona no modo oficial sem login.');
 }else{
   console.log('OK: nenhum patch adicional necessário.');
 }
