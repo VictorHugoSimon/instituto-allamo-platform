@@ -1,0 +1,125 @@
+name: MADRI - Bootstrap Context + Baseline PRODUCTION - Authorized
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ops/production/madri-bootstrap-authorized-2026-09-09.json'
+      - 'scripts/bootstrap-madri-production-context.mjs'
+      - 'scripts/seed-madri-governance-baseline-production.mjs'
+      - 'scripts/validate-madri-production-bootstrap.mjs'
+      - 'scripts/validate-madri-baseline-seed-production.mjs'
+      - 'data/madri/madri-governance-*-baseline.json.gz.b64'
+      - '.github/workflows/madri-production-bootstrap-authorized.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ops/production/madri-bootstrap-authorized-2026-09-09.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-production-bootstrap-authorized-20260909
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Validar bootstrap autorizado MADRI Produção
+        run: |
+          node --check scripts/bootstrap-madri-production-context.mjs
+          node --check scripts/seed-madri-governance-baseline-production.mjs
+          node scripts/validate-madri-baseline-seed-production.mjs
+          node scripts/validate-madri-production-bootstrap.mjs
+
+  bootstrap-production:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+
+      - name: Preparar autenticação Cloudflare Produção
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+
+      - name: Preflight Cloudflare Produção
+        run: npx wrangler@4.124.0 whoami
+
+      - name: Dry-run schemas e contexto antes da mutação
+        run: |
+          node scripts/ensure-work-management-schema.mjs --env=production
+          node scripts/ensure-madri-governance-schema.mjs --env=production
+          node scripts/bootstrap-madri-production-context.mjs
+
+      - name: Backup obrigatório do D1 Produção antes de qualquer escrita
+        run: node scripts/secure-d1-export.mjs --config wrangler.production.toml --output "backup-production-before-madri-bootstrap-${GITHUB_SHA}.sql"
+
+      - name: Guardar backup D1 Produção
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-production-before-madri-bootstrap-${{ github.sha }}
+          path: backup-production-before-madri-bootstrap-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Garantir schema base Work Management em Produção
+        run: node scripts/ensure-work-management-schema.mjs --env=production --apply --confirm=APPLY-WORK-SCHEMA-PRODUCTION
+
+      - name: Garantir schema MADRI Governance em Produção
+        run: node scripts/ensure-madri-governance-schema.mjs --env=production --apply --confirm=APPLY-MADRI-GOV-PRODUCTION
+
+      - name: Criar contexto Madri + Implantação NUCCI ERP e Plano Mestre
+        run: node scripts/bootstrap-madri-production-context.mjs --apply --confirm=CREATE-MADRI-CONTEXT-PRODUCTION
+
+      - name: Dry-run baseline MADRI no contexto criado
+        run: node scripts/seed-madri-governance-baseline-production.mjs
+
+      - name: Carregar baseline MADRI autorizado em Produção
+        run: node scripts/seed-madri-governance-baseline-production.mjs --apply --confirm=SEED-MADRI-BASELINE-PRODUCTION
+
+      - name: Verificação idempotente do baseline
+        run: node scripts/seed-madri-governance-baseline-production.mjs
+
+      - name: Validar contexto e contagens produtivas isoladas
+        run: |
+          npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.production.toml --command "SELECT c.id company_id,c.name company_name,p.id project_id,p.name project_name,(SELECT COUNT(*) FROM work_items w WHERE w.company_id=c.id AND w.project_id=p.id AND w.pmo_scope='MADRI_NUCCI' AND w.id LIKE 'MADRI-ACT-%' AND w.archived_at IS NULL) actions,(SELECT COUNT(*) FROM madri_requirements r WHERE r.company_id=c.id AND r.project_id=p.id AND r.archived_at IS NULL) requirements,(SELECT COUNT(*) FROM madri_tests t WHERE t.company_id=c.id AND t.project_id=p.id AND t.archived_at IS NULL) tests,(SELECT COUNT(*) FROM madri_implementation_phases f WHERE f.company_id=c.id AND f.project_id=p.id AND f.archived_at IS NULL) phases,(SELECT COUNT(*) FROM madri_readiness rd WHERE rd.company_id=c.id AND rd.project_id=p.id AND rd.archived_at IS NULL) readiness FROM companies c JOIN projects p ON p.company_id=c.id WHERE lower(replace(c.name,' ','')) IN ('madri','madrid') AND lower(p.name) LIKE '%nucci%';" --json > /tmp/madri-production-bootstrap.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('/tmp/madri-production-bootstrap.json','utf8');
+          const a=raw.indexOf('['),b=raw.lastIndexOf(']');
+          if(a<0||b<a)throw new Error('Resposta D1 sem JSON reconhecível');
+          const rows=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[]);
+          if(rows.length!==1)throw new Error(`Contexto MADRI/NUCCI produtivo não é único: ${rows.length}`);
+          const r=rows[0];
+          if(Number(r.actions)<18||Number(r.requirements)<86||Number(r.tests)<54||Number(r.phases)<15||Number(r.readiness)<17){
+            throw new Error(`Baseline produtivo incompleto: actions=${r.actions}, req=${r.requirements}, tests=${r.tests}, phases=${r.phases}, readiness=${r.readiness}`);
+          }
+          console.log(`[OK] MADRI Produção: ${r.company_name} / ${r.project_name}; actions=${r.actions}, req=${r.requirements}, tests=${r.tests}, phases=${r.phases}, readiness=${r.readiness}`);
+          NODE
+
+      - name: Resumo da operação autorizada
+        if: always()
+        run: |
+          echo '### MADRI — Bootstrap Contexto + Baseline PRODUÇÃO' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Autorização explícita: registrada no marcador one-shot versionado' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Contexto: Madri + Implantação NUCCI ERP' >> "$GITHUB_STEP_SUMMARY"
+          echo '- PMO scope: MADRI_NUCCI' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Baseline: 18 ações / 86 requisitos / 54 testes / 15 fases / 17 readiness' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Backup D1 Produção: obrigatório, antes de qualquer escrita, retenção 30 dias' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Isolamento: nenhuma mutação OPR, Semeali ou outro tenant' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Execução automática somente no merge que adiciona o marcador autorizado em main' >> "$GITHUB_STEP_SUMMARY"
