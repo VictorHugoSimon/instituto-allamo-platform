@@ -44,3 +44,4 @@ if (/allamo-pmo\.pages\.dev/.test(html) && !/allamo-pmo-stage/.test(html)) {
 }
 
 console.log('OK: baseline funcional contém Trabalho, Reports, IA, PWA por tenant, portal público, séries, anexos, campos dinâmicos e multitenancy.');
+await import('./validate-executive-work-items.mjs');
