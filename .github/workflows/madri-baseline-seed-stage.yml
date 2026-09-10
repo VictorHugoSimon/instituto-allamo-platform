@@ -6,6 +6,7 @@ on:
     paths:
       - 'data/madri/madri-governance-*-baseline.json.gz.b64'
       - 'scripts/seed-madri-governance-baseline.mjs'
+      - 'scripts/bootstrap-madri-stage-context.mjs'
       - 'scripts/validate-madri-baseline-seed.mjs'
       - '.github/workflows/madri-baseline-seed-stage.yml'
   push:
@@ -13,6 +14,7 @@ on:
     paths:
       - 'data/madri/madri-governance-*-baseline.json.gz.b64'
       - 'scripts/seed-madri-governance-baseline.mjs'
+      - 'scripts/bootstrap-madri-stage-context.mjs'
       - 'scripts/validate-madri-baseline-seed.mjs'
       - '.github/workflows/madri-baseline-seed-stage.yml'
 
@@ -34,13 +36,17 @@ jobs:
       - name: Validar baseline e contrato Stage-only
         run: |
           node --check scripts/seed-madri-governance-baseline.mjs
+          node --check scripts/bootstrap-madri-stage-context.mjs
           node scripts/validate-madri-baseline-seed.mjs
+          grep -F "const CONFIG='wrangler.stage.toml'" scripts/bootstrap-madri-stage-context.mjs
+          grep -F "CREATE-MADRI-CONTEXT-STAGE" scripts/bootstrap-madri-stage-context.mjs
+          if grep -Eq "wrangler\.production\.toml|CREATE-MADRI-CONTEXT-PRODUCTION" scripts/bootstrap-madri-stage-context.mjs; then exit 1; fi
 
   seed-stage:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     needs: validate-baseline
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,7 +61,9 @@ jobs:
         run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
       - name: Preflight Cloudflare
         run: npx wrangler@4.124.0 whoami
-      - name: Backup obrigatório do D1 Stage antes do baseline
+      - name: Dry-run do contexto MADRI no Stage
+        run: node scripts/bootstrap-madri-stage-context.mjs
+      - name: Backup obrigatório do D1 Stage antes de qualquer escrita MADRI
         run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-madri-baseline-${GITHUB_SHA}.sql"
       - name: Guardar backup Stage
         uses: actions/upload-artifact@v4
@@ -64,23 +72,47 @@ jobs:
           path: backup-stage-madri-baseline-${{ github.sha }}.sql
           if-no-files-found: error
           retention-days: 14
+      - name: Garantir schema base Work Management Stage
+        run: |
+          node scripts/ensure-work-management-schema.mjs --env=stage
+          node scripts/ensure-work-management-schema.mjs --env=stage --apply --confirm=APPLY-WORK-SCHEMA-STAGE
       - name: Garantir schema MADRI Governance Stage
         run: |
           node scripts/ensure-madri-governance-schema.mjs --env=stage
           node scripts/ensure-madri-governance-schema.mjs --env=stage --apply --confirm=APPLY-MADRI-GOV-STAGE
+      - name: Criar/resolver contexto Madri + Implantação NUCCI ERP no Stage
+        run: node scripts/bootstrap-madri-stage-context.mjs --apply --confirm=CREATE-MADRI-CONTEXT-STAGE
       - name: Dry-run do baseline MADRI
         run: node scripts/seed-madri-governance-baseline.mjs --env=stage
       - name: Aplicar baseline MADRI no D1 Stage
         run: node scripts/seed-madri-governance-baseline.mjs --env=stage --apply --confirm=SEED-MADRI-BASELINE-STAGE
       - name: Verificação idempotente pós-seed
         run: node scripts/seed-madri-governance-baseline.mjs --env=stage
+      - name: Validar Plano Mestre e baseline completo no Stage
+        run: |
+          npx --yes wrangler@4.124.0 d1 execute DB --remote --config wrangler.stage.toml --command "SELECT c.id company_id,c.name company_name,p.id project_id,p.name project_name,(SELECT COUNT(*) FROM work_items w WHERE w.company_id=c.id AND w.project_id=p.id AND w.pmo_scope='MADRI_NUCCI' AND w.id LIKE 'MADRI-ACT-%' AND w.archived_at IS NULL) actions,(SELECT COUNT(*) FROM madri_requirements r WHERE r.company_id=c.id AND r.project_id=p.id AND r.archived_at IS NULL) requirements,(SELECT COUNT(*) FROM madri_tests t WHERE t.company_id=c.id AND t.project_id=p.id AND t.archived_at IS NULL) tests,(SELECT COUNT(*) FROM madri_implementation_phases f WHERE f.company_id=c.id AND f.project_id=p.id AND f.archived_at IS NULL) phases,(SELECT COUNT(*) FROM madri_readiness rd WHERE rd.company_id=c.id AND rd.project_id=p.id AND rd.archived_at IS NULL) readiness FROM companies c JOIN projects p ON p.company_id=c.id WHERE lower(replace(c.name,' ','')) IN ('madri','madrid') AND lower(p.name) LIKE '%nucci%';" --json > /tmp/madri-stage-baseline.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const raw=fs.readFileSync('/tmp/madri-stage-baseline.json','utf8');
+          const a=raw.indexOf('['),b=raw.lastIndexOf(']');
+          if(a<0||b<a)throw new Error('Resposta D1 sem JSON reconhecível');
+          const rows=JSON.parse(raw.slice(a,b+1)).flatMap(x=>x?.results||[]);
+          if(rows.length!==1)throw new Error(`Contexto MADRI/NUCCI Stage não é único: ${rows.length}`);
+          const r=rows[0];
+          if(Number(r.actions)<18||Number(r.requirements)<86||Number(r.tests)<54||Number(r.phases)<15||Number(r.readiness)<17){
+            throw new Error(`Baseline Stage incompleto: actions=${r.actions}, req=${r.requirements}, tests=${r.tests}, phases=${r.phases}, readiness=${r.readiness}`);
+          }
+          console.log(`[OK] MADRI Stage: ${r.company_name} / ${r.project_name}; actions=${r.actions}, req=${r.requirements}, tests=${r.tests}, phases=${r.phases}, readiness=${r.readiness}`);
+          NODE
       - name: Resumo
         run: |
           echo "### MADRI Baseline D1 — STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Contexto: Madri + Implantação NUCCI ERP" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Plano Mestre: 18 ações governadas" >> "$GITHUB_STEP_SUMMARY"
           echo "- Requisitos reconstruídos + novos: 86" >> "$GITHUB_STEP_SUMMARY"
           echo "- Testes preservados: TST-001..TST-054" >> "$GITHUB_STEP_SUMMARY"
           echo "- Fases de implantação: 15" >> "$GITHUB_STEP_SUMMARY"
           echo "- Itens de readiness: 17" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Escrita: INSERT OR IGNORE, sem update/delete de registros de negócio" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Escrita: INSERT OR IGNORE / insert-only, sem delete de registros de negócio" >> "$GITHUB_STEP_SUMMARY"
           echo "- Ambiente: somente D1 Stage" >> "$GITHUB_STEP_SUMMARY"
           echo "- Backup: obrigatório, retenção 14 dias" >> "$GITHUB_STEP_SUMMARY"
