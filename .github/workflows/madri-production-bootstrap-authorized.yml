@@ -6,6 +6,7 @@ on:
     paths:
       - 'ops/production/madri-bootstrap-authorized-2026-09-09.json'
       - 'scripts/bootstrap-madri-production-context.mjs'
+      - 'scripts/ensure-madri-pmo-work-items-columns.mjs'
       - 'scripts/seed-madri-governance-baseline-production.mjs'
       - 'scripts/validate-madri-production-bootstrap.mjs'
       - 'scripts/validate-madri-baseline-seed-production.mjs'
@@ -34,6 +35,7 @@ jobs:
       - name: Validar bootstrap autorizado MADRI Produção
         run: |
           node --check scripts/bootstrap-madri-production-context.mjs
+          node --check scripts/ensure-madri-pmo-work-items-columns.mjs
           node --check scripts/seed-madri-governance-baseline-production.mjs
           node scripts/validate-madri-baseline-seed-production.mjs
           node scripts/validate-madri-production-bootstrap.mjs
@@ -63,6 +65,7 @@ jobs:
       - name: Dry-run schemas e contexto antes da mutação
         run: |
           node scripts/ensure-work-management-schema.mjs --env=production
+          node scripts/ensure-madri-pmo-work-items-columns.mjs
           node scripts/ensure-madri-governance-schema.mjs --env=production
           node scripts/bootstrap-madri-production-context.mjs
 
@@ -79,6 +82,9 @@ jobs:
 
       - name: Garantir schema base Work Management em Produção
         run: node scripts/ensure-work-management-schema.mjs --env=production --apply --confirm=APPLY-WORK-SCHEMA-PRODUCTION
+
+      - name: Garantir extensões MADRI PMO em work_items Produção
+        run: node scripts/ensure-madri-pmo-work-items-columns.mjs --apply --confirm=APPLY-MADRI-PMO-WORK-ITEMS-PRODUCTION
 
       - name: Garantir schema MADRI Governance em Produção
         run: node scripts/ensure-madri-governance-schema.mjs --env=production --apply --confirm=APPLY-MADRI-GOV-PRODUCTION
@@ -120,6 +126,7 @@ jobs:
           echo '- Contexto: Madri + Implantação NUCCI ERP' >> "$GITHUB_STEP_SUMMARY"
           echo '- PMO scope: MADRI_NUCCI' >> "$GITHUB_STEP_SUMMARY"
           echo '- Baseline: 18 ações / 86 requisitos / 54 testes / 15 fases / 17 readiness' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Extensões work_items MADRI PMO: validadas/aplicadas de forma aditiva após o backup' >> "$GITHUB_STEP_SUMMARY"
           echo '- Backup D1 Produção: obrigatório, antes de qualquer escrita, retenção 30 dias' >> "$GITHUB_STEP_SUMMARY"
           echo '- Isolamento: nenhuma mutação OPR, Semeali ou outro tenant' >> "$GITHUB_STEP_SUMMARY"
           echo '- Execução automática somente no merge que adiciona o marcador autorizado em main' >> "$GITHUB_STEP_SUMMARY"
