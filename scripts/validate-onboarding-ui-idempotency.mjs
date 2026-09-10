@@ -25,8 +25,9 @@ must(template,"headers:{'Idempotency-Key':requestId}, body:JSON.stringify(f)",'I
 must(template,'companyRequestId:null','limpeza da chave de empresa');
 must(template,'projectRequestId:null','limpeza da chave de projeto');
 must(template,'Selecione a empresa do projeto.','validação local empresa→projeto');
-must(template,'Faça login para cadastrar empresa.','feedback de sessão para empresa');
-must(template,'Faça login para cadastrar projeto.','feedback de sessão para projeto');
+if(template.includes('Onboarding exige sessão humana autenticada'))throw new Error('UI ainda exige login para cadastrar empresa/projeto.');
+if(template.includes('Faça login para cadastrar empresa.'))throw new Error('Mensagem legada de login permanece na empresa.');
+if(template.includes('Faça login para cadastrar projeto.'))throw new Error('Mensagem legada de login permanece no projeto.');
 
 const companyPost="await this.api('company-create',{method:'POST',headers:{'Idempotency-Key':requestId},body:JSON.stringify(f)})";
 const projectPost="await this.api('projects',{ method:'POST', headers:{'Idempotency-Key':requestId}, body:JSON.stringify(f) })";
@@ -37,11 +38,7 @@ must(hardener,"this.state.companyRequestId||this.onboardingRequestId('company')"
 must(hardener,"this.state.projectRequestId||this.onboardingRequestId('project')",'retry estável do projeto');
 must(hardener,"closeModal(){ this.setState({ modal:null, formError:'', companyRequestId:null, projectRequestId:null }); }",'cancelamento limpa chaves');
 
-// O build oficial chama harden-no-login-mutation-safety.mjs; esse hook encadeia
-// explicitamente o hardener da UI. O gate test:mutation-safety segue a mesma
-// composição via validate-no-login-mutation-safety.mjs. Validamos a cadeia real
-// em vez de exigir duplicação desnecessária no package.json.
 must(buildHook,"await import('./harden-onboarding-ui-idempotency.mjs')",'hardener da UI encadeado no build oficial');
 must(validationHook,"await import('./validate-onboarding-ui-idempotency.mjs')",'validador da UI encadeado no gate de mutações');
 
-console.log('OK: UI do onboarding está compatível com sessão humana + Idempotency-Key + retry sem duplicação e integrada aos hooks oficiais de build/test.');
+console.log('OK: UI do onboarding funciona no modo oficial sem login, mantém Idempotency-Key, retry sem duplicação e integração aos hooks oficiais.');
