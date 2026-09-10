@@ -6,6 +6,7 @@ const api=read('src/work-import-api.js');
 const ui=read('src/work-import-ui.js');
 const hardener=read('scripts/harden-work-import.mjs');
 const fileUploadHardener=read('scripts/harden-work-import-file-upload.mjs');
+const smartTableHardener=read('scripts/harden-work-import-smart-table.mjs');
 const mutationHardener=read('scripts/harden-no-login-mutation-safety.mjs');
 const mutationValidator=read('scripts/validate-no-login-mutation-safety.mjs');
 const must=(haystack,needle,label)=>{if(!haystack.includes(needle))throw new Error(`Ausente ${label}: ${needle}`)};
@@ -53,7 +54,12 @@ for(const [needle,label] of [
   ['sheet_to_json','leitura das abas do workbook'],
   ['O arquivo é lido no navegador','privacidade do upload'],
   ['O limite atual é 500 por importação','limite de arquivo alinhado ao backend'],
-  ["src.value=f.name",'nome do arquivo usado como origem']
+  ["src.value=f.name",'nome do arquivo usado como origem'],
+  ['BEGIN ALLAMO WORK IMPORT SMART TABLE','smart-table materializada'],
+  ['Tabela de demandas detectada automaticamente','feedback de cabeçalho detectado'],
+  ['demandas reais detectadas','contagem real de demandas'],
+  ['linhas auxiliares ignoradas','parâmetros/resumos ignorados'],
+  ['Só Título/Demanda é obrigatório','campos opcionais preenchíveis depois']
 ])must(worker+index,needle,label);
 
 if(index.includes("const t=T();if(!t)throw new Error('Sessão não encontrada. Entre novamente no portal.')"))throw new Error('Work Management ainda exige token local no host oficial.');
@@ -65,13 +71,26 @@ must(hardener,"src/work-import-ui.js",'fonte UI no hardener');
 must(hardener,'allamoWorkNoLoginHost','hardening sem login do Work Management');
 must(hardener,'allamoWorkImportNoLoginHost','hardening sem login do importador');
 must(hardener,"await import('./harden-work-import-file-upload.mjs')",'upload de arquivo encadeado no build do importador');
+must(hardener,"await import('./harden-work-import-smart-table.mjs')",'detecção inteligente encadeada após upload');
 must(fileUploadHardener,'10*1024*1024','limite de 10 MB no navegador');
 must(fileUploadHardener,"ext!=='xlsx'&&ext!=='xls'",'gate conjunto para formatos XLSX/XLS');
 must(fileUploadHardener,"ext==='csv'||ext==='tsv'",'leitura CSV/TSV local');
 must(fileUploadHardener,"XLSX.read(data,{type:'array',cellDates:true})",'parsing local do workbook XLSX/XLS');
 must(fileUploadHardener,"m.querySelector('#wia').click()",'arquivo reutiliza análise/mapeamento existente');
 if(fileUploadHardener.includes("api('work-items/import'"))throw new Error('Leitura do arquivo não pode importar diretamente; deve passar pela validação/prévia existente.');
+for(const [needle,label] of [
+  ['mapHeader','mapeamento inteligente por aliases'],
+  ['map.title<0||keys.length<3','cabeçalho exige coluna de demanda e contexto mínimo'],
+  ['structuralTitle','filtro de linhas auxiliares'],
+  ['cronograma por capacidade de horas','ignora título do cronograma'],
+  ['parametros','ignora parâmetros'],
+  ['resumo do cronograma','ignora resumo'],
+  ['result.taskCount','contagem de tarefas reais'],
+  ['result.ignored','contagem de linhas ignoradas'],
+  ['campos ausentes podem ser completados depois','preenchimento posterior explícito']
+])must(smartTableHardener,needle,label);
+if(smartTableHardener.includes("api('work-items/import'"))throw new Error('Smart-table não pode importar diretamente; deve apenas preparar a prévia existente.');
 must(mutationHardener,"await import('./harden-work-import.mjs')",'importador encadeado no build oficial');
 must(mutationValidator,"await import('./validate-work-import.mjs')",'validador encadeado ao gate de mutações');
 
-console.log('OK: Work Management + importador Excel aceitam colar ou selecionar .xlsx/.xls/.csv/.tsv, com leitura local, mapeamento flexível, dry-run, RBAC, auditoria, deduplicação e limites seguros.');
+console.log('OK: importador Excel detecta a tabela real dentro de planilhas com títulos/parâmetros/resumos, importa somente demandas candidatas, mantém apenas Título obrigatório e permite completar campos opcionais depois.');
