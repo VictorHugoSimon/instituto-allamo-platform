@@ -1,0 +1,89 @@
+name: MADRI - Seed Mapa Impacto Humano STAGE - One Shot
+
+on:
+  pull_request:
+    paths:
+      - 'data/madri/madri-human-impact-baseline-v01.json'
+      - 'scripts/seed-madri-human-impact-baseline.mjs'
+      - 'scripts/validate-madri-human-impact-baseline.mjs'
+      - '.github/workflows/madri-human-impact-seed-stage.yml'
+      - 'ops/stage/madri-human-impact-seed-authorized-2026-09-10.json'
+      - 'scripts/harden-madri-human-impact.mjs'
+      - 'scripts/validate-madri-human-impact.mjs'
+  push:
+    branches: [develop]
+    paths:
+      - 'ops/stage/madri-human-impact-seed-authorized-2026-09-10.json'
+      - 'data/madri/madri-human-impact-baseline-v01.json'
+      - 'scripts/seed-madri-human-impact-baseline.mjs'
+      - '.github/workflows/madri-human-impact-seed-stage.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madri-human-impact-stage-seed
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Validar baseline humano e contrato one-shot
+        run: node scripts/validate-madri-human-impact-baseline.mjs
+      - name: Validar build MADRI completo
+        run: npm run build:work
+
+  seed-stage:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - run: npm ci
+      - name: Validar pacote humano antes de qualquer acesso remoto
+        run: node scripts/validate-madri-human-impact-baseline.mjs
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Preflight Cloudflare
+        run: npx wrangler@4.124.0 whoami
+      - name: Dry-run do schema MADRI no Stage
+        run: node scripts/ensure-madri-governance-schema.mjs --env=stage
+      - name: Dry-run do baseline humano no Stage
+        run: node scripts/seed-madri-human-impact-baseline.mjs --env=stage
+      - name: Backup obrigatório do D1 Stage antes da escrita
+        run: node scripts/secure-d1-export.mjs --config wrangler.stage.toml --output "backup-stage-human-impact-${GITHUB_SHA}.sql"
+      - name: Guardar backup do Stage
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-stage-human-impact-backup-${{ github.sha }}
+          path: backup-stage-human-impact-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 14
+      - name: Garantir schema MADRI aditivo no Stage
+        run: node scripts/ensure-madri-governance-schema.mjs --env=stage --apply --confirm=APPLY-MADRI-GOV-STAGE
+      - name: Persistir baseline humano auditável no D1 Stage
+        run: node scripts/seed-madri-human-impact-baseline.mjs --env=stage --apply --confirm=SEED-MADRI-HUMAN-IMPACT-STAGE
+      - name: Revalidar idempotência e contagens
+        run: node scripts/seed-madri-human-impact-baseline.mjs --env=stage
+      - name: Resumo
+        run: |
+          echo "### MADRI · Mapa de Impacto Humano — STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Baseline: v0.1" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Registros esperados: 10 (HUM-001..HUM-010)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Horas: A medir" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Auditoria: HUMAN_IMPACT_BASELINE_SEED" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ambiente: STAGE exclusivamente" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup D1: obrigatório antes da escrita" >> "$GITHUB_STEP_SUMMARY"
