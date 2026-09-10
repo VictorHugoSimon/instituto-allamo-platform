@@ -1,0 +1,25 @@
+{
+  "operation": "madri-production-context-and-baseline-bootstrap",
+  "authorized": true,
+  "authorized_at": "2026-09-09",
+  "authorization_text": "Autorizo criar o contexto Madri + Implantação NUCCI ERP em Produção e carregar o baseline MADRI.",
+  "environment": "production",
+  "company": "Madri",
+  "company_id": "madri",
+  "project": "Implantação NUCCI ERP",
+  "pmo_scope": "MADRI_NUCCI",
+  "baseline": {
+    "actions": 18,
+    "requirements": 86,
+    "tests": 54,
+    "phases": 15,
+    "readiness": 17
+  },
+  "safety": {
+    "backup_before_write": true,
+    "insert_only_for_company_project": true,
+    "idempotent_business_seed": true,
+    "destructive_sql_allowed": false,
+    "other_tenants_out_of_scope": ["OPR", "Semeali", "Dual Clima"]
+  }
+}
