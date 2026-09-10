@@ -8,8 +8,8 @@
   "company_id": "madri",
   "project": "Implantação NUCCI ERP",
   "pmo_scope": "MADRI_NUCCI",
-  "attempt": 3,
-  "retry_reason": "Retry técnico controlado após identificar que o bootstrap produtivo encontrava work_items sem as extensões MADRI PMO exigidas pelo Plano Mestre, incluindo pmo_scope. A correção adiciona somente as nove colunas previstas, de forma idempotente, aditiva, backup-first e restrita ao D1 de Produção antes do contexto/baseline MADRI.",
+  "attempt": 4,
+  "retry_reason": "Retry técnico controlado para materializar a execução one-shot após a correção das extensões MADRI PMO. O PR #301 validou a correção e o deploy produtivo genérico ficou verde, porém a execução de bootstrap de Produção não foi materializada no push do merge. Esta tentativa altera somente o marcador autorizado para disparar o workflow dedicado, mantendo backup-first, operação aditiva/idempotente e isolamento MADRI_NUCCI.",
   "baseline": {
     "actions": 18,
     "requirements": 86,
