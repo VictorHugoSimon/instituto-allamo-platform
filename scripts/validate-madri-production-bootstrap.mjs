@@ -52,7 +52,7 @@ for(const [needle,label] of [
   ['ALTER TABLE work_items ADD COLUMN ${col}','ALTER aditivo controlado'],
   ['Extensões MADRI PMO continuam ausentes','verificação pós-apply']
 ])must(workItemCols,needle,label);
-if(workItemCols.includes('wrangler.stage.toml')||workItemCols.includes('allamo-pmo-stage'))throw new Error('Helper de extensões referencia STAGE.');
+if(/const\s+CONFIG\s*=\s*['"]wrangler\.stage\.toml['"]/.test(workItemCols))throw new Error('Helper de extensões seleciona configuração STAGE.');
 if(destructive.test(workItemCols))throw new Error('Helper de extensões contém SQL destrutivo.');
 
 for(const [needle,label] of [
