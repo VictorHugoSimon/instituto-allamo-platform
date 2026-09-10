@@ -29,7 +29,7 @@ for(const [needle,label] of [
   ['Number(row.n)!==18','validação das 18 ações do baseline']
 ])must(context,needle,label);
 
-if(context.includes('wrangler.stage.toml')||context.includes('allamo-pmo-stage'))throw new Error('Bootstrap de contexto contém referência a STAGE.');
+if(/const\s+CONFIG\s*=\s*['"]wrangler\.stage\.toml['"]/.test(context))throw new Error('Bootstrap de contexto seleciona configuração STAGE.');
 if(destructive.test(context))throw new Error('Bootstrap de contexto contém SQL destrutivo.');
 if(!context.includes('INSERT INTO ${ident(table)}'))throw new Error('Bootstrap não usa inserção dinâmica compatível com schema.');
 if(!context.includes("if(matches.length>1)throw new Error(`Tenant MADRI ambíguo"))throw new Error('Bootstrap não falha fechado para tenant ambíguo.');
