@@ -14,8 +14,6 @@ on:
       - '.github/workflows/madri-production-bootstrap-authorized.yml'
   push:
     branches: [main]
-    paths:
-      - 'ops/production/madri-bootstrap-authorized-2026-09-09.json'
 
 permissions:
   contents: read
@@ -41,7 +39,7 @@ jobs:
           node scripts/validate-madri-production-bootstrap.mjs
 
   bootstrap-production:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[MADRI_BOOTSTRAP_AUTHORIZED]') }}
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -129,4 +127,4 @@ jobs:
           echo '- Extensões work_items MADRI PMO: validadas/aplicadas de forma aditiva após o backup' >> "$GITHUB_STEP_SUMMARY"
           echo '- Backup D1 Produção: obrigatório, antes de qualquer escrita, retenção 30 dias' >> "$GITHUB_STEP_SUMMARY"
           echo '- Isolamento: nenhuma mutação OPR, Semeali ou outro tenant' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Execução automática somente no merge que adiciona o marcador autorizado em main' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Execução de Produção: somente em push explicitamente marcado com [MADRI_BOOTSTRAP_AUTHORIZED]' >> "$GITHUB_STEP_SUMMARY"
