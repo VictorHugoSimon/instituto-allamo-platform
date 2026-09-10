@@ -8,8 +8,8 @@
   "company_id": "madri",
   "project": "Implantação NUCCI ERP",
   "pmo_scope": "MADRI_NUCCI",
-  "attempt": 4,
-  "retry_reason": "Retry técnico controlado para materializar a execução one-shot após a correção das extensões MADRI PMO. O PR #301 validou a correção e o deploy produtivo genérico ficou verde, porém a execução de bootstrap de Produção não foi materializada no push do merge. Esta tentativa altera somente o marcador autorizado para disparar o workflow dedicado, mantendo backup-first, operação aditiva/idempotente e isolamento MADRI_NUCCI.",
+  "attempt": 5,
+  "retry_reason": "Retry técnico controlado após tornar o workflow dedicado executável por push explicitamente marcado. A alteração anterior instalou o gatilho seguro na main, mas o próprio commit que alterou o workflow não materializou sua execução. Esta tentativa modifica somente o marcador autorizado e usa a mensagem [MADRI_BOOTSTRAP_AUTHORIZED], preservando backup-first, operação aditiva/idempotente e isolamento MADRI_NUCCI.",
   "baseline": {
     "actions": 18,
     "requirements": 86,
