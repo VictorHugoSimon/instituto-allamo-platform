@@ -8,6 +8,8 @@
   "company_id": "madri",
   "project": "Implantação NUCCI ERP",
   "pmo_scope": "MADRI_NUCCI",
+  "attempt": 2,
+  "retry_reason": "A primeira tentativa foi abortada no dry-run, antes do backup e de qualquer escrita, por falso positivo ao detectar o binding deliberado de STAGE existente apenas em env.preview do wrangler.production.toml. Os bindings efetivos de Produção permanecem apontando exclusivamente para allamo-pmo.",
   "baseline": {
     "actions": 18,
     "requirements": 86,
