@@ -11,6 +11,8 @@ must("__portal_no_login:true",'identidade sintética do Portal sem login');
 must("user.__portal_no_login === true && request.method === 'DELETE'",'bloqueio de DELETE para identidade sem login');
 must("code:'authenticated_session_required'",'código explícito para ação destrutiva bloqueada');
 must("error:'Ação destrutiva exige sessão autenticada'",'mensagem operacional segura');
+if(worker.includes("code:'authenticated_onboarding_required'"))throw new Error('Onboarding ainda bloqueia a identidade PMO sintética dos hosts oficiais.');
+if(worker.includes('Onboarding exige sessão humana autenticada'))throw new Error('Mensagem legada de sessão humana ainda existe no onboarding.');
 
 must('// [allamo-onboarding-company-integrity]','hardening de onboarding de empresa');
 must("SELECT id FROM companies WHERE lower(trim(name)) = lower(trim(?)) LIMIT 1",'detecção de empresa duplicada por nome');
@@ -31,7 +33,6 @@ must("if (!['admin','pmo','gestor'].includes(user.role)) return json({ error: 'S
 for(const [needle,label] of [
   ['// [allamo-onboarding-company-request-guard]','gate de request_id da empresa'],
   ['// [allamo-onboarding-project-request-guard]','gate de request_id do projeto'],
-  ["code:'authenticated_onboarding_required'",'onboarding bloqueado para identidade sintética'],
   ["request.headers.get('idempotency-key')",'Idempotency-Key aceito pela API'],
   ["code:'idempotency_key_required'",'request_id obrigatório'],
   ["code:'idempotency_conflict'",'conflito de reutilização de request_id'],
@@ -67,4 +68,4 @@ if(!(projectGuard>=0&&projectReserve>projectGuard&&projectInsert>projectReserve)
 await import('./validate-onboarding-ui-idempotency.mjs');
 await import('./validate-work-import.mjs');
 
-console.log('OK: mutações protegidas; onboarding empresa→projeto e importação Excel→Work Management possuem sessão/RBAC, idempotência/deduplicação, auditoria e validação antes de gravar.');
+console.log('OK: onboarding e Work Management operam no modo oficial sem login com RBAC sintético PMO, idempotência/deduplicação e auditoria; DELETE destrutivo continua protegido.');
