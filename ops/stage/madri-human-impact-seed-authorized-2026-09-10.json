@@ -1,0 +1,10 @@
+{
+  "authorized": true,
+  "environment": "stage",
+  "scope": "MADRI_NUCCI",
+  "baseline": "madri-human-impact-v0.1",
+  "record_count": 10,
+  "source": "Mapa_Impacto_Humano_MADRI_v02.html + continuidade autorizada pelo usuário",
+  "policy": "INSERT OR IGNORE, sem overwrite destrutivo; horas permanecem A medir; dados OPR fora do escopo",
+  "created_at": "2026-09-10"
+}
