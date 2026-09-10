@@ -66,4 +66,5 @@ for(const required of ['allamoWorkNoLoginHost','allamoWorkImportNoLoginHost','aw
 fs.writeFileSync(workerFile,worker);
 fs.writeFileSync(indexFile,index);
 await import('./harden-work-import-file-upload.mjs');
-console.log('OK: Work Management e Importar Excel funcionam nos hosts oficiais sem login; botão é persistente, aceita upload direto e importação mantém RBAC/auditoria do backend.');
+await import('./harden-work-import-smart-table.mjs');
+console.log('OK: Work Management e Importar Excel funcionam nos hosts oficiais sem login; upload detecta a tabela real, ignora parâmetros/resumos e permite completar campos opcionais depois.');
