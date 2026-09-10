@@ -15,8 +15,13 @@ if(APPLY&&confirmArg!==CONFIRM){
 }
 for(const f of [CONFIG,MASTER_PLAN])if(!fs.existsSync(f))throw new Error(`Arquivo obrigatório ausente: ${f}`);
 const cfg=fs.readFileSync(CONFIG,'utf8');
-if(!cfg.includes('name = "allamo-pmo"'))throw new Error('wrangler.production.toml não aponta para o projeto allamo-pmo.');
-if(cfg.includes('allamo-pmo-stage'))throw new Error('Configuração produtiva contém referência indevida ao STAGE.');
+// wrangler.production.toml possui um bloco env.preview que deliberadamente aponta
+// para o D1 não produtivo. Validamos somente a raiz + env.production; preview não é
+// utilizado por este script porque todas as chamadas usam --config sem --env preview.
+const productiveCfg=cfg.split(/^\[env\.preview\]\s*$/m)[0];
+if(!/^name\s*=\s*"allamo-pmo"\s*$/m.test(productiveCfg))throw new Error('wrangler.production.toml não aponta para o projeto allamo-pmo.');
+if(/database_name\s*=\s*"allamo-pmo-stage"/m.test(productiveCfg))throw new Error('Bindings efetivos de Produção apontam indevidamente para o D1 de STAGE.');
+if(!/database_name\s*=\s*"allamo-pmo"/m.test(productiveCfg))throw new Error('Binding D1 de Produção allamo-pmo não localizado.');
 
 function run(args,{capture=true}={}){
   const exe=process.platform==='win32'?'npx.cmd':'npx';
