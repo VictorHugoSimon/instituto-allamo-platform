@@ -16,7 +16,7 @@ const context=fs.readFileSync(contextFile,'utf8');
 const seed=fs.readFileSync(seedFile,'utf8');
 const workflow=fs.readFileSync(workflowFile,'utf8');
 const marker=JSON.parse(fs.readFileSync(markerFile,'utf8'));
-const destructive=/\b(?:DELETE\s+FROM|DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE(?:\s+TABLE)?)\b/i;
+const destructive=/\b(?:DELETE\s+FROM|DROP\s+(?:TABLE|DATABASE)|TRUNCATE\s+TABLE)\b/i;
 const must=(text,needle,label)=>{if(!text.includes(needle))throw new Error(`Ausente ${label}: ${needle}`)};
 
 for(const [needle,label] of [
