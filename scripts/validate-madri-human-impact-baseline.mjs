@@ -20,8 +20,8 @@ for(const r of rows){
   for(const f of ['adoption_reason','observed_evidence','source_ref'])if(!String(r[f]||'').trim())throw new Error(`${r.display_id}: rastreabilidade incompleta em ${f}.`);
 }
 const seed=fs.readFileSync(seedFile,'utf8'),wf=fs.readFileSync(workflowFile,'utf8'),marker=JSON.parse(fs.readFileSync(markerFile,'utf8'));
-for(const token of ['STAGE-only','SEED-MADRI-HUMAN-IMPACT-STAGE','INSERT OR IGNORE INTO madri_human_impact','HUMAN_IMPACT_BASELINE_SEED','human-impact-seed','madri_platform_sequence','--config',"'wrangler.stage.toml'"])if(!seed.includes(token))throw new Error(`Contrato do seed humano ausente: ${token}`);
-if(/wrangler\.production\.toml|DELETE\s+FROM|DROP\s+TABLE|TRUNCATE\s+TABLE|BEGIN\s+TRANSACTION|COMMIT\s*;|SAVEPOINT/i.test(seed))throw new Error('Seed humano contém referência/operação proibida.');
+for(const token of ['STAGE-only','SEED-MADRI-HUMAN-IMPACT-STAGE','INSERT OR IGNORE INTO madri_human_impact','HUMAN_IMPACT_BASELINE_SEED','human-impact-seed','madri_platform_sequence','--config',"'wrangler.stage.toml'",'SQL humano contém operação proibida para o seed remoto.'])if(!seed.includes(token))throw new Error(`Contrato do seed humano ausente: ${token}`);
+if(seed.includes('wrangler.production.toml'))throw new Error('Seed humano não pode referenciar configuração de Produção.');
 for(const token of ['branches: [develop]','secure-d1-export.mjs','ensure-madri-governance-schema.mjs --env=stage','SEED-MADRI-HUMAN-IMPACT-STAGE','d1-stage-human-impact-backup','madri-human-impact-seed-authorized-2026-09-10.json'])if(!wf.includes(token))throw new Error(`Workflow humano incompleto: ${token}`);
 if(/production/i.test(wf))throw new Error('Workflow humano one-shot não pode tocar Produção.');
 if(marker.environment!=='stage'||marker.scope!=='MADRI_NUCCI'||marker.baseline!=='madri-human-impact-v0.1'||marker.record_count!==10||marker.authorized!==true)throw new Error('Marcador one-shot humano inválido.');
