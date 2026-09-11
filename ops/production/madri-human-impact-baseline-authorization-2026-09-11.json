@@ -1,0 +1,20 @@
+{
+  "operation": "madri-human-impact-baseline-production",
+  "authorized": true,
+  "authorization_source": "chat-continuation",
+  "authorization_text": "seguir",
+  "authorization_date": "2026-09-11",
+  "company": "Madri",
+  "project": "Implantação NUCCI ERP",
+  "pmo_scope": "MADRI_NUCCI",
+  "baseline_version": "v0.1",
+  "records_expected": 10,
+  "display_ids": ["HUM-001","HUM-002","HUM-003","HUM-004","HUM-005","HUM-006","HUM-007","HUM-008","HUM-009","HUM-010"],
+  "source": "data/madri/madri-human-impact-baseline-v01.json",
+  "source_blob_sha": "d7630f544364ae9553ae0a79592a3e56119b8c69",
+  "backup_before_write": true,
+  "insert_only": true,
+  "idempotent": true,
+  "destructive_sql_allowed": false,
+  "hours_policy": "A medir"
+}
