@@ -30,5 +30,20 @@ for(const [legacy] of replacements){
 }
 if(html.includes(legacyGradient)) throw new Error('Gradiente histórico do gráfico ainda presente.');
 
+const runtime=fs.readFileSync('src/portfolio-work-distribution.js','utf8');
+const start='<!-- BEGIN ALLAMO PORTFOLIO WORK DISTRIBUTION -->';
+const end='<!-- END ALLAMO PORTFOLIO WORK DISTRIBUTION -->';
+const block=`${start}\n<script>\n${runtime}\n</script>\n${end}`;
+if(html.includes(start)){
+  const a=html.indexOf(start),b=html.indexOf(end,a);
+  if(b<0) throw new Error('Marcador final do gráfico operacional ausente.');
+  html=html.slice(0,a)+block+html.slice(b+end.length);
+}else{
+  const at=html.lastIndexOf('</body>');
+  if(at<0) throw new Error('body externo do artefato não encontrado.');
+  html=html.slice(0,at)+block+'\n'+html.slice(at);
+}
+if(!html.includes('__allamoPortfolioWorkDistributionLoaded')) throw new Error('Runtime de demandas/tarefas não entrou no artefato.');
+
 fs.writeFileSync(file,html);
-console.log('OK: gráfico executivo inicia zerado e será preenchido somente pelos projetos reais.');
+console.log('OK: gráfico executivo inicia zerado e reflete demandas + tarefas reais por status, sem alterar o D1.');
