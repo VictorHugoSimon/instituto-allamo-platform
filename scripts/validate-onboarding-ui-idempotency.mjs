@@ -41,4 +41,6 @@ must(hardener,"closeModal(){ this.setState({ modal:null, formError:'', companyRe
 must(buildHook,"await import('./harden-onboarding-ui-idempotency.mjs')",'hardener da UI encadeado no build oficial');
 must(validationHook,"await import('./validate-onboarding-ui-idempotency.mjs')",'validador da UI encadeado no gate de mutações');
 
+await import('./validate-company-delete-and-global-sprints.mjs');
+
 console.log('OK: UI do onboarding funciona no modo oficial sem login, mantém Idempotency-Key, retry sem duplicação e integração aos hooks oficiais.');
