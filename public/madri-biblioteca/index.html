@@ -1,1 +1,79 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Biblioteca · MADRI</title><link rel="stylesheet" href="/madri/assets/platform.css"><style>.library-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.doccard{display:flex;flex-direction:column;gap:8px}.doccard .type{font-size:8px;text-transform:uppercase;color:var(--copper);font-weight:900;letter-spacing:.6px}.doccard a{margin-top:auto}@media(max-width:1000px){.library-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){.library-grid{grid-template-columns:1fr}}</style></head><body><div class="app"><aside class="sidebar" id="sidebar"></aside><div class="main"><header class="topbar"><div><h2 id="pageTitle"></h2><p id="pageSub"></p></div><div class="spacer"></div><a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/1wFwqNfuak-jv6ZYVzxL6JBnJwbz4Ldlc">Abrir pasta MADRI localizada</a></header><main class="content"><div id="messageArea"></div><section class="hero"><div class="eyebrow">Uma única porta de entrada</div><h2>Biblioteca MADRI</h2><p>Central de acesso aos documentos oficiais e materiais de apoio já localizados. Os arquivos permanecem no Google Drive; esta página organiza o acesso sem criar uma segunda cópia operacional.</p><div class="meta"><div><b>Drive</b><span>Fonte documental</span></div><div><b>A confirmar</b><span>Pasta canônica definitiva</span></div><div><b data-project-name>MADRI</b><span>Projeto</span></div></div></section><section class="section"><h3>Documentos principais</h3><div class="library-grid"><div class="card doccard"><span class="type">Blueprint · PDF</span><b>01 · Business Blueprint MADRI v1.0</b><p>Baseline inicial do desenho MADRI × NUCCI. A validação funcional continua em andamento.</p><a class="btn primary" target="_blank" rel="noopener" href="https://drive.google.com/file/d/19sL6D6CdJC53wUMenHZGw2aJi8N1argH/view?usp=drivesdk">Abrir Blueprint</a></div><div class="card doccard"><span class="type">RFP · Word</span><b>02 · SS-ERP-MAD-RFP Rev2.0</b><p>Documento MADRI do processo RFP.</p><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/document/d/1NbNTXw9yjn8xUBZP81KYNwLaS02gQ27a/edit?usp=drivesdk">Abrir DOCX</a></div><div class="card doccard"><span class="type">RFP · PDF</span><b>03 · SS-ERP-MAD-RFP Rev2.0</b><p>Versão PDF do documento MADRI.</p><a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/file/d/1UKQ47Bq0VOrYAlpoXSHuIzxtbV46Dtl2/view?usp=drivesdk">Abrir PDF</a></div><div class="card doccard"><span class="type">Status Report</span><b>04 · Status Report Executivo 27/08 · v9</b><p>Versão histórica do report executivo MADRI. O Status Report do Portal é a visão corrente.</p><a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/file/d/1GPb85zsw9_RAsuEkYjCXPEZCZX2o_BQS/view?usp=drivesdk">Abrir</a></div><div class="card doccard"><span class="type">PMO</span><b>05 · Perguntas e Respostas Status Report</b><p>Material de apoio às validações do PMO MADRI.</p><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/document/d/124CZZfCh6O5jFZezWCw6K2xQ1eyZrmZX/edit?usp=drivesdk">Abrir</a></div><div class="card doccard"><span class="type">PMO</span><b>06 · Checklist Status Report MADRI</b><p>Checklist respondido utilizado na evolução do report.</p><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/document/d/1MD9t2jbyVTJgELmOGDjRWOBPmdKNWwKw/edit?usp=drivesdk">Abrir</a></div><div class="card doccard"><span class="type">Agenda compartilhada</span><b>07 · Agendas Blueprint OPR / Madri</b><p>Planilha compartilhada entre projetos. Para MADRI, utilizar exclusivamente linhas e evidências MADRI.</p><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/1cmGrNlVXxiypW34Zj3mfXOzvv86ORjZdGZXbUPWhkoc/edit?usp=drivesdk">Abrir agenda</a></div></div></section><section class="section"><h3>Governança da biblioteca</h3><div class="grid2"><div class="card"><b>Pasta MADRI localizada</b><p>A pasta “01. Madri” foi encontrada no Drive e contém RFPs MADRI. Antes de tratá-la como pasta canônica definitiva, a governança deve validar se todos os materiais oficiais estão concentrados nela.</p><a class="btn primary" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/1wFwqNfuak-jv6ZYVzxL6JBnJwbz4Ldlc">Abrir pasta</a></div><div class="card"><b>Regra de isolamento</b><p>Documentos OPR não devem ser apresentados como MADRI. Materiais compartilhados precisam ser explicitamente identificados e filtrados pelo conteúdo MADRI.</p><a class="btn" href="/madri-documentos/">Abrir Documentos</a></div></div></section></main></div></div><script src="/madri/assets/platform.js"></script><script>document.addEventListener('DOMContentLoaded',()=>MADRIPlatform.init('Biblioteca','Biblioteca de Materiais · MADRI','Documentos, planilhas, atas e links oficiais do projeto').catch(e=>MADRIPlatform.showMessage(e.message,'error')))</script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Biblioteca · MADRI</title>
+  <link rel="stylesheet" href="/madri/assets/platform.css">
+  <style>
+    .library-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .doccard{display:flex;flex-direction:column;gap:8px}
+    .doccard .type{font-size:8px;text-transform:uppercase;color:var(--copper);font-weight:900;letter-spacing:.6px}
+    .doccard a{margin-top:auto}
+    .folder-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .scope-note{border-left:3px solid var(--copper);padding-left:12px}
+    @media(max-width:1100px){.folder-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:1000px){.library-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:650px){.library-grid,.folder-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <div><h2 id="pageTitle"></h2><p id="pageSub"></p></div>
+      <div class="spacer"></div>
+      <a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/118d2JXc_GG5Yhj1rVHAH1MkC-BpXjSbj">Abrir repositório mestre</a>
+    </header>
+    <main class="content">
+      <div id="messageArea"></div>
+      <section class="hero">
+        <div class="eyebrow">Uma única porta de entrada</div>
+        <h2>Biblioteca MADRI</h2>
+        <p>Central de acesso aos documentos oficiais e materiais de apoio já localizados. O Google Drive permanece como fonte documental; o Portal organiza a navegação sem criar uma segunda cópia operacional.</p>
+        <div class="meta">
+          <div><b>Drive</b><span>Fonte documental</span></div>
+          <div><b>Repositório mestre identificado</b><span>Projeto SS RFP ERP Madri &amp; OPR</span></div>
+          <div><b data-project-name>MADRI</b><span>Filtro obrigatório de conteúdo</span></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h3>Estrutura documental confirmada no Drive</h3>
+        <p class="scope-note">O repositório mestre é compartilhado entre MADRI e OPR. Nesta Biblioteca, somente materiais MADRI devem ser usados como evidência do projeto. Pastas compartilhadas são apresentadas com essa condição explicitamente.</p>
+        <div class="folder-grid">
+          <div class="card doccard"><span class="type">Compartilhado · Governança</span><b>03 · PMO</b><p>Documentos de PMO do projeto Madri/OPR. Usar somente conteúdo aplicável à MADRI.</p><a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/1ZKjJm4Qazf0tnOXkyhKnoNG220gn26LH">Abrir PMO</a></div>
+          <div class="card doccard"><span class="type">Compartilhado · Requisitos</span><b>08 · RFI</b><p>Materiais de RFI do processo de seleção. Validar a origem antes de vincular qualquer requisito à MADRI.</p><a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/1mN-6Y3NjAmjw2xmaIE8rT9ehyyVUpo6f">Abrir RFI</a></div>
+          <div class="card doccard"><span class="type">Compartilhado · Reports</span><b>09 · Status Report</b><p>Histórico de reports do programa. O Status Report corrente do Portal continua sendo a visão executiva oficial da MADRI.</p><a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/1quIZaVmpWMuXyc8NjAJFDlXOu2HAcRAk">Abrir Status Reports</a></div>
+          <div class="card doccard"><span class="type">MADRI · RFP</span><b>10 · RFP / 01 · Madri</b><p>Pasta específica da MADRI dentro da frente de RFP, separada da pasta OPR.</p><a class="btn primary" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/1wFwqNfuak-jv6ZYVzxL6JBnJwbz4Ldlc">Abrir RFP MADRI</a></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h3>Documentos principais MADRI</h3>
+        <div class="library-grid">
+          <div class="card doccard"><span class="type">Blueprint · PDF</span><b>01 · Business Blueprint MADRI v1.0</b><p>Baseline inicial do desenho MADRI × NUCCI. A validação funcional continua em andamento.</p><a class="btn primary" target="_blank" rel="noopener" href="https://drive.google.com/file/d/19sL6D6CdJC53wUMenHZGw2aJi8N1argH/view?usp=drivesdk">Abrir Blueprint</a></div>
+          <div class="card doccard"><span class="type">RFP · Word</span><b>02 · SS-ERP-MAD-RFP Rev2.0</b><p>Documento MADRI do processo RFP, localizado em 10 · RFP / 01 · Madri.</p><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/document/d/1NbNTXw9yjn8xUBZP81KYNwLaS02gQ27a/edit?usp=drivesdk">Abrir DOCX</a></div>
+          <div class="card doccard"><span class="type">RFP · PDF</span><b>03 · SS-ERP-MAD-RFP Rev2.0</b><p>Versão PDF do documento MADRI, no mesmo agrupamento de RFP.</p><a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/file/d/1UKQ47Bq0VOrYAlpoXSHuIzxtbV46Dtl2/view?usp=drivesdk">Abrir PDF</a></div>
+          <div class="card doccard"><span class="type">Status Report</span><b>04 · Status Report Executivo 27/08 · v9</b><p>Versão histórica do report executivo MADRI. O Status Report do Portal é a visão corrente.</p><a class="btn" target="_blank" rel="noopener" href="https://drive.google.com/file/d/1GPb85zsw9_RAsuEkYjCXPEZCZX2o_BQS/view?usp=drivesdk">Abrir</a></div>
+          <div class="card doccard"><span class="type">PMO</span><b>05 · Perguntas e Respostas Status Report</b><p>Material de apoio às validações do PMO MADRI.</p><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/document/d/124CZZfCh6O5jFZezWCw6K2xQ1eyZrmZX/edit?usp=drivesdk">Abrir</a></div>
+          <div class="card doccard"><span class="type">PMO</span><b>06 · Checklist Status Report MADRI</b><p>Checklist respondido utilizado na evolução do report.</p><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/document/d/1MD9t2jbyVTJgELmOGDjRWOBPmdKNWwKw/edit?usp=drivesdk">Abrir</a></div>
+          <div class="card doccard"><span class="type">Agenda compartilhada</span><b>07 · Agendas Blueprint OPR / Madri</b><p>Planilha compartilhada entre projetos. Para MADRI, utilizar exclusivamente linhas e evidências MADRI.</p><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/1cmGrNlVXxiypW34Zj3mfXOzvv86ORjZdGZXbUPWhkoc/edit?usp=drivesdk">Abrir agenda</a></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h3>Governança da biblioteca</h3>
+        <div class="grid2">
+          <div class="card"><b>Repositório mestre confirmado</b><p>O Drive possui o repositório “70. [TAP_031] [Projeto SS RFP ERP Madri &amp; OPR]”, estruturado por Kickoff, TAP, PMO, GMO, Backlog, EAP, Termo de Aceite, RFI, Status Report, RFP, Short List e TCO. A Biblioteca MADRI usa essa estrutura como localização documental, sem transformar conteúdo OPR em evidência MADRI.</p><a class="btn primary" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/118d2JXc_GG5Yhj1rVHAH1MkC-BpXjSbj">Abrir repositório mestre</a></div>
+          <div class="card"><b>Regra de isolamento</b><p>Documentos OPR não devem ser apresentados como MADRI. Materiais compartilhados precisam ser explicitamente identificados e filtrados pelo conteúdo MADRI. Evidências operacionais continuam vinculadas ao tenant MADRI + projeto Implantação NUCCI ERP.</p><a class="btn" href="/madri-documentos/">Abrir Documentos</a></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<script src="/madri/assets/platform.js"></script>
+<script>document.addEventListener('DOMContentLoaded',()=>MADRIPlatform.init('Biblioteca','Biblioteca de Materiais · MADRI','Documentos, planilhas, atas e links oficiais do projeto').catch(e=>MADRIPlatform.showMessage(e.message,'error')))</script>
+</body>
+</html>
