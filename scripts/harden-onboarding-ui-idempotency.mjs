@@ -93,3 +93,5 @@ if(changed){
 }else{
   console.log('OK: nenhum patch adicional necessário.');
 }
+
+await import('./harden-company-delete-and-global-sprints.mjs');
