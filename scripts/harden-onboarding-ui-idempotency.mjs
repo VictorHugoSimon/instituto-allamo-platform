@@ -61,7 +61,6 @@ if(!template.includes(marker)){
   console.log('OK: UI de onboarding já contém idempotência explícita.');
 }
 
-// Migração de builds que já receberam a regra antiga de sessão humana.
 for(const legacy of [
   "if(!this.state.token) throw new Error('Onboarding exige sessão humana autenticada. Faça login para cadastrar empresa.'); ",
   "if(!this.state.token) throw new Error('Onboarding exige sessão humana autenticada. Faça login para cadastrar projeto.'); "
@@ -93,3 +92,6 @@ if(changed){
 }else{
   console.log('OK: nenhum patch adicional necessário.');
 }
+
+await import('./normalize-work-sprint-declaration.mjs');
+await import('./harden-company-delete-and-global-sprints.mjs');
