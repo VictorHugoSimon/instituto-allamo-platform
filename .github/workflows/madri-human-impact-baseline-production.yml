@@ -31,8 +31,6 @@ jobs:
         with: { node-version: '24', cache: npm }
       - name: Instalar dependências travadas
         run: npm ci
-      - name: Validar baseline humano sem escrita
-        run: node scripts/seed-madri-human-impact-baseline-production.mjs
       - name: Preparar autenticação Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -42,6 +40,8 @@ jobs:
         run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
       - name: Preflight Cloudflare
         run: npx wrangler@4.124.0 whoami
+      - name: Validar baseline humano sem escrita
+        run: node scripts/seed-madri-human-impact-baseline-production.mjs
       - name: Backup obrigatório do D1 Produção antes do baseline humano
         run: node scripts/secure-d1-export.mjs --config wrangler.production.toml --output "backup-production-madri-human-impact-${GITHUB_SHA}.sql"
       - name: Guardar backup produtivo
