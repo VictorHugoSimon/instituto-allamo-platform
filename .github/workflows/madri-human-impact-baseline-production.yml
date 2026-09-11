@@ -1,0 +1,78 @@
+name: MADRI Human Impact Baseline PRODUCTION - Authorized
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite SEED-MADRI-HUMAN-IMPACT-PRODUCTION para autorizar o seed humano em Produção'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: madri-human-impact-baseline-production
+  cancel-in-progress: false
+
+jobs:
+  seed-human-impact-production:
+    if: ${{ contains(github.event.head_commit.message, '[MADRI_HUMAN_BASELINE_AUTHORIZED]') || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'SEED-MADRI-HUMAN-IMPACT-PRODUCTION') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout autorizado
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm }
+      - name: Instalar dependências travadas
+        run: npm ci
+      - name: Validar baseline humano sem escrita
+        run: node scripts/seed-madri-human-impact-baseline-production.mjs
+      - name: Preparar autenticação Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node sallamos-ai/scripts/prepare-cloudflare-auth.mjs
+      - name: Preflight Cloudflare
+        run: npx wrangler@4.124.0 whoami
+      - name: Backup obrigatório do D1 Produção antes do baseline humano
+        run: node scripts/secure-d1-export.mjs --config wrangler.production.toml --output "backup-production-madri-human-impact-${GITHUB_SHA}.sql"
+      - name: Guardar backup produtivo
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-production-before-madri-human-impact-${{ github.sha }}
+          path: backup-production-madri-human-impact-${{ github.sha }}.sql
+          if-no-files-found: error
+          retention-days: 30
+      - name: Dry-run remoto do baseline humano
+        run: node scripts/seed-madri-human-impact-baseline-production.mjs
+      - name: Aplicar baseline humano MADRI em Produção
+        run: node scripts/seed-madri-human-impact-baseline-production.mjs --apply --confirm=SEED-MADRI-HUMAN-IMPACT-PRODUCTION
+      - name: Validar readback idempotente pós-seed
+        run: node scripts/seed-madri-human-impact-baseline-production.mjs
+      - name: Registrar sucesso no commit
+        if: success()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=success -f context=madri/human-impact-baseline-production -f description='10 registros HUM-001..010 validados no D1 Produção'
+      - name: Registrar falha no commit
+        if: failure()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context=madri/human-impact-baseline-production -f description='Seed humano MADRI abortado ou incompleto; verificar logs e backup'
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### MADRI · Impacto Humano · Produção" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Escopo: Madri / Implantação NUCCI ERP / MADRI_NUCCI" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Registros esperados: HUM-001..HUM-010" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fonte: baseline v0.1 homologado em STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Política de horas: A medir" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Escrita: somente INSERT OR IGNORE + auditoria + sequência" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backup D1: obrigatório antes da escrita" >> "$GITHUB_STEP_SUMMARY"
+          echo "- DELETE/DROP/TRUNCATE: proibidos" >> "$GITHUB_STEP_SUMMARY"
