@@ -61,8 +61,11 @@ must(builder.includes('privateBundle'),'PMO privado + Governance usam bloco can�
 
 const library=read('public/madri-biblioteca/index.html');
 must(library.includes('NUCCI')||library.includes('MADRI'),'Biblioteca contém contexto MADRI');
-must(library.includes('1wFwqNfuak-jv6ZYVzxL6JBnJwbz4Ldlc'),'Biblioteca aponta para pasta MADRI localizada');
-must(library.includes('A confirmar'),'Biblioteca não declara pasta canônica sem validação');
+must(library.includes('118d2JXc_GG5Yhj1rVHAH1MkC-BpXjSbj'),'Biblioteca aponta para o repositório mestre verificado no Drive');
+must(library.includes('1wFwqNfuak-jv6ZYVzxL6JBnJwbz4Ldlc'),'Biblioteca preserva a pasta específica RFP / 01. Madri');
+must(/repositório[^<]{0,80}compartilhado|compartilhado[^<]{0,80}repositório/i.test(library),'Biblioteca identifica explicitamente o repositório compartilhado MADRI/OPR');
+must(library.includes('Documentos OPR não devem ser apresentados como MADRI'),'Biblioteca impede uso de documentos OPR como evidência MADRI');
+must(library.includes('Implantação NUCCI ERP'),'Biblioteca mantém vínculo explícito com o projeto MADRI/NUCCI');
 
 if(process.exitCode)process.exit(process.exitCode);
-console.log('MADRI × padrão OPR: rotas, Design System, D1, CRUD, testes, Status Report e isolamento validados.');
+console.log('MADRI × padrão OPR: rotas, Design System, D1, CRUD, testes, Status Report, Biblioteca e isolamento validados.');
