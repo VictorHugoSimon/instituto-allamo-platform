@@ -58,7 +58,7 @@ must(onboardingHardener,"await import('./normalize-work-sprint-declaration.mjs')
 must(onboardingHardener,"await import('./harden-company-delete-and-global-sprints.mjs')",'hardener encadeado no build real');
 must(onboardingValidator,"await import('./validate-company-delete-and-global-sprints.mjs')",'validador encadeado no gate real');
 
-must(hardener,"company_id='__unassigned__'",'hardener preserva itens sem empresa');
+must(hardener,"const WM_UNASSIGNED='__unassigned__';",'hardener declara sentinela Sem empresa');
 must(hardener,"company_id===WM_MULTI",'hardener implementa escopo multiempresa');
 
 console.log('OK: empresa pode ser excluída sem perder tarefas; itens passam para Sem empresa; Sprint global aceita tarefas de várias empresas com RBAC e tenant de origem preservados.');
