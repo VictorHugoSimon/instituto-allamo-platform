@@ -3,6 +3,8 @@ import fs from 'node:fs';
 const worker=fs.readFileSync('public/_worker.js','utf8');
 const index=fs.readFileSync('public/index.html','utf8');
 const hardener=fs.readFileSync('scripts/harden-company-delete-and-global-sprints.mjs','utf8');
+const onboardingHardener=fs.readFileSync('scripts/harden-onboarding-ui-idempotency.mjs','utf8');
+const onboardingValidator=fs.readFileSync('scripts/validate-onboarding-ui-idempotency.mjs','utf8');
 
 const must=(haystack,needle,label)=>{if(!haystack.includes(needle))throw new Error(`Ausente ${label}: ${needle}`)};
 
@@ -27,7 +29,9 @@ for(const [needle,label] of [
 ]) must(worker,needle,label);
 
 const companyDeleteStart=worker.indexOf('// [allamo-company-delete-retain-work]');
-const companyDeleteEnd=worker.indexOf("if (path === 'projects' && request.method === 'GET')",companyDeleteStart);
+const workBlockStart=worker.indexOf('// BEGIN ALLAMO WORK MANAGEMENT',companyDeleteStart);
+const projectsGet=worker.indexOf("if (path === 'projects' && request.method === 'GET')",companyDeleteStart);
+const companyDeleteEnd=workBlockStart>=0&&(projectsGet<0||workBlockStart<projectsGet)?workBlockStart:projectsGet;
 const companyDeleteBlock=worker.slice(companyDeleteStart,companyDeleteEnd);
 if(companyDeleteBlock.includes('DELETE FROM work_items WHERE company_id'))throw new Error('Exclusão de empresa ainda apaga work_items.');
 if(!companyDeleteBlock.includes("DELETE FROM companies WHERE id = ?"))throw new Error('Empresa deixou de ser removida do cadastro.');
@@ -50,13 +54,9 @@ for(const [needle,label] of [
 
 if(index.includes('Projetos, demandas e a área dela deixam de aparecer.'))throw new Error('Confirmação antiga e destrutiva de empresa ainda está ativa.');
 
-for(const [needle,label] of [
-  ["await import('./harden-company-delete-and-global-sprints.mjs')",'hardener encadeado no build'],
-  ["await import('./validate-company-delete-and-global-sprints.mjs')",'validador encadeado no gate']
-]){
-  const src=label.includes('hardener')?fs.readFileSync('scripts/harden-no-login-mutation-safety.mjs','utf8'):fs.readFileSync('scripts/validate-no-login-mutation-safety.mjs','utf8');
-  must(src,needle,label);
-}
+must(onboardingHardener,"await import('./normalize-work-sprint-declaration.mjs')",'normalizador encadeado antes do hardener');
+must(onboardingHardener,"await import('./harden-company-delete-and-global-sprints.mjs')",'hardener encadeado no build real');
+must(onboardingValidator,"await import('./validate-company-delete-and-global-sprints.mjs')",'validador encadeado no gate real');
 
 must(hardener,"company_id='__unassigned__'",'hardener preserva itens sem empresa');
 must(hardener,"company_id===WM_MULTI",'hardener implementa escopo multiempresa');
