@@ -8,7 +8,7 @@
     {label:'Entender e planejar',items:[['/madri-blueprint/','Blueprint','02 · Blueprint'],['/madri-plano-de-acao/','Plano de Ação','03 · Plano de Ação'],['/madri-requisitos/','Requisitos','04 · Requisitos']]},
     {label:'Executar e controlar',items:[['/madri-integracoes/','Integrações','05 · Integrações'],['/madri-riscos/','Riscos','06 · Riscos'],['/madri-mapa-implantacao/','Mapa Mestre','07 · Mapa Mestre']]},
     {label:'Validar e decidir',items:[['/madri-plano-testes/','Testes','08 · Testes'],['/madri-defeitos/','Defeitos','09 · Defeitos'],['/madri-readiness/','Readiness','10 · Readiness'],['/madri-decisoes/','Decisões','11 · Decisões']]},
-    {label:'Gestão da mudança',items:[['/madri-impacto-humano/','Impacto Humano','Mapa de Impacto Humano']]},
+    {label:'Gestão da mudança',items:[['/madri-impacto-humano/','Impacto Humano','Mapa de Impacto Humano'],['/madri-impacto-humano-report/','Report Impacto Humano','Report Executivo · Impacto Humano']]},
     {label:'Governança e conhecimento',items:[['/madri-status-report/','Status Report','12 · Status Report'],['/madri-pop/','POP','13 · POP'],['/madri-documentos/','Documentos','14 · Documentos'],['/madri-biblioteca/','Biblioteca','15 · Biblioteca / Drive']]}
   ];
   const routes=navGroups.flatMap(g=>g.items.map(([url,key,label])=>[url,label,key]));
