@@ -1,232 +1,196 @@
 # OPR — Pacote de Governança Semanal W37
 
 **Período:** 07/09/2026 a 13/09/2026  
-**Atualização:** 08/09/2026  
+**Atualização:** 14/09/2026  
 **Projeto:** implementação Nucci · OPR  
-**Status:** Em validação
+**Status:** Consolidado documentalmente · validações funcionais continuam abertas
 
-## 1. Resumo executivo da reunião de 08/09
+## 1. Resumo executivo da semana
 
-A reunião aprofundou a frente de **Frota e Manutenção** e mostrou que o AS-IS atual é fortemente descentralizado: cada base mantém controles próprios, principalmente em Excel, e a informação operacional é disseminada por WhatsApp/e-mail. Não existe hoje uma visão sistêmica única e em tempo real de veículo disponível, veículo em manutenção, manutenção preventiva futura, início/fim efetivo da parada e tempo total de indisponibilidade.
+A semana W37 ampliou o Blueprint da OPR de forma relevante. O levantamento saiu do foco predominantemente operacional e avançou por três frentes principais: **Frota/Manutenção (08/09)**, **Financeiro (10/09)** e **Fiscal/Contábil (11/09)**. O resultado é uma visão mais completa do fluxo ponta a ponta, com dependências entre Operação, Frota, Compras, Estoque, Financeiro, Fiscal, Contabilidade, RH e integrações bancárias/municipais.
 
-O TO-BE demonstrado organiza o processo em ordem de manutenção com estados, histórico, cotação/aprovação, execução, anexos, dashboards por base e visão de disponibilidade. A demonstração foi tratada como **referência funcional**, não como aceite automático: campos, regras, tempos de atenção, bloqueios, alçadas e customizações precisam ser homologados pela OPR.
+O ganho central da semana foi transformar controles hoje distribuídos em Excel, WhatsApp, e-mail, relatórios auxiliares e sistemas legados em requisitos de workflow, rastreabilidade, aprovação, auditoria, integração e homologação.
 
-Também surgiram requisitos concretos para **checklist, pneus, abastecimento, despesas, multas, licenciamento/certificações e integração com Compras/Estoque/Financeiro/RH**.
+No plano técnico, o tenant OPR de STAGE foi restaurado isoladamente em 09/09 a partir do backup validado de 03/09, preservando o escopo OPR e executando smokes reais de POP e plataforma. A restauração validou a empresa OPR, o projeto ID 3 e 24 ações existentes no snapshot, sem DELETE e sem UPDATE em MADRI, Dual ou Semeali.
 
-## 2. O que houve de novo
+## 2. Evolução do Blueprint na semana
 
-### 2.1 Manutenção passou de controle local para workflow integrado
+### 2.1 Frota e Manutenção — 08/09
 
-Novo entendimento confirmado:
+O AS-IS foi caracterizado como descentralizado por base, com forte dependência de planilhas, WhatsApp e e-mail para disponibilidade, preventiva, corretiva e acompanhamento de veículos.
 
-- cada base controla hoje sua manutenção de forma descentralizada;
-- Excel/WhatsApp/e-mail são usados para comunicar indisponibilidade e acompanhamento;
-- não há gestão centralizada de início/fim da manutenção nem de tempo parado;
-- preventiva existe de forma básica e precisa de planejamento por veículo/modelo/km/horímetro;
-- o sistema deve controlar preventiva, corretiva e emergencial;
-- o planejamento não deve utilizar veículo indisponível ou bloqueado por manutenção;
-- múltiplas ordens podem existir para o mesmo veículo/fornecedor;
-- histórico de atualização precisa alimentar dashboards de gestão por exceção;
-- tempos/cores de atenção devem ser configuráveis e homologados, sem valores presumidos.
+O TO-BE deve contemplar:
 
-### 2.2 Checklist ganhou papel de gate operacional
+- agenda única de veículo e indisponibilidade;
+- preventiva, corretiva e emergencial;
+- ordem de manutenção com status, previsão, início/fim real e histórico;
+- checklist como gate operacional;
+- integração com Compras e Estoque quando houver falta de peça;
+- gestão de pneus com rastreabilidade;
+- abastecimento com hodômetro/horímetro e evidência;
+- despesas, multas e aprovações;
+- licenciamento/certificações e elegibilidade do veículo;
+- dashboards por base e gestão por exceção.
 
-O checklist deixa de ser apenas formulário e passa a ser requisito funcional de controle:
+A demonstração de solução permanece como referência funcional; regras, alçadas, tempos, bloqueios e campos exigem homologação OPR.
 
-- modelos diferentes por tipo de veículo/operação;
-- campos sim/não ou conformidade configuráveis;
-- foto e observação obrigatórias quando aplicável;
-- não conformidade pode gerar ordem de manutenção automaticamente;
-- bloqueio do veículo/viagem deve depender da criticidade/regra homologada;
-- recorrência pode ser configurada quando existir regra operacional validada;
-- evidência deve ficar ligada ao veículo, motorista, data/hora e checklist.
+### 2.2 Financeiro — 10/09
 
-### 2.3 Manutenção precisa integrar Compras e Estoque
+O Financeiro passou a ter um desenho específico de AS-IS/TO-BE, cobrindo Contas a Receber, Contas a Pagar, bancos, conciliação, fluxo de caixa, folha/pagamentos, adiantamentos, terceiros/agregados e fechamento.
 
-Quando uma ordem exigir peça/equipamento sem disponibilidade:
+Principais achados:
 
-**Manutenção → Solicitação de compra → Cotação/Aprovação → Compra → Entrada em estoque → Retorno para execução da manutenção.**
+- recebimentos parciais, complementos, descontos e divergências precisam manter vínculo com o documento original;
+- o Financeiro não deve reconstruir manualmente a origem de gasto/receita que deveria nascer na área geradora;
+- pagamentos e recebimentos devem ter aprovação, anexos, rateio, centro de custo e histórico;
+- títulos em aberto precisam de saneamento antes da migração;
+- a virada deve ter corte/congelamento e reconciliação quantidade × valor;
+- CNAB/remessa-retorno deve ser priorizado onde disponível, com APIs bancárias como evolução/alternativa;
+- Pix exige controle de permissão e medidas antifraude;
+- “quitado” e “conciliado” não são sinônimos e precisam ser tratados separadamente;
+- fechamento mensal deve bloquear retroativos; reabertura exige autorização, justificativa e auditoria.
 
-A matriz de alçadas deve ser configurável. Valores mencionados na reunião foram apenas exemplos e não constituem decisão.
+### 2.3 Fiscal e Contábil — 11/09
 
-### 2.4 Gestão de pneus deixou de ser backlog genérico
+A frente Fiscal/Contábil aprofundou regras que não podem ser derivadas por analogia com outra empresa ou município.
 
-A demonstração apresentou requisitos suficientes para uma frente própria:
+Foram consolidados requisitos para:
 
-- inventário de pneus;
-- posição por veículo/eixo;
-- fabricante/modelo/identificação;
-- validade quando aplicável;
-- profundidade de sulco;
-- calibragem;
-- status normal/atenção/perigo;
-- troca;
-- rodízio;
-- reparo/recapagem/vulcanização;
-- descarte;
-- rastreabilidade de pneu retirado e instalado;
-- geração de OS;
-- vínculo com veículo, motorista e km;
-- possibilidade futura de integração com sensores/telemetria.
+- contabilização por unidade emissora, conta de receita/imposto e centro de custo;
+- distinção entre competência, fato gerador e data de emissão/autorização;
+- reconciliação com planilhas/fechamentos históricos validados;
+- NFS-e por município/unidade/serviço, com layouts, autenticação, códigos, retenções, cancelamento/substituição e contingência;
+- entrada documental com segregação entre conferência operacional/física e auditoria fiscal;
+- apuração tributária, retenções, créditos e obrigações acessórias;
+- integração/exportação para Domínio e reconciliação contábil;
+- pagamentos a agregados/terceiros diferenciando PF/PJ, RPA/folha, NFS-e e retenções aplicáveis;
+- matriz de cenários fiscais para homologação antes de congelar parametrização;
+- calendário de fechamento e controle de reabertura auditável.
 
-A principal restrição é de **adoção/capacidade operacional**: sem responsável e disciplina de atualização, o módulo perde valor.
-
-### 2.5 Abastecimento foi parcialmente detalhado
-
-Requisitos levantados:
-
-- ticket de abastecimento;
-- placa;
-- data/hora;
-- combustível;
-- hodômetro;
-- litros;
-- tarifa/valor;
-- foto/evidência;
-- validação de inconsistência de quilometragem;
-- atualização do km do veículo a partir de fontes confiáveis;
-- capacidade do tanque;
-- odômetro e horímetro;
-- consumo/média por veículo e motorista;
-- fornecedores e forma de pagamento;
-- dashboard de consumo e alertas de preventiva por km.
-
-Combustível ainda precisa de sessão específica para fechar regra OPR, fonte de dados e integração.
-
-### 2.6 Despesas e multas viraram fluxo de governança financeira
-
-Foi identificado o need de distinguir **manutenção** de **despesa já ocorrida**, com suporte a:
-
-- despesa individual por veículo;
-- despesa consolidada para várias placas;
-- fatura de rastreamento, lavagem, locação e outros serviços;
-- documento fiscal/anexo;
-- fornecedor/contrato;
-- centro de custo;
-- integração financeira/fluxo de caixa após validação.
-
-Para multas:
-
-- número/notificação;
-- órgão/autuador;
-- infração;
-- data/hora/local;
-- placa;
-- condutor;
-- evidências/documentos;
-- recurso quando aplicável;
-- encaminhamento ao Financeiro;
-- comunicação com RH.
-
-Qualquer desconto em remuneração ou responsabilização do colaborador exige validação formal de RH/Jurídico.
-
-### 2.7 Compliance veicular ganhou requisito próprio
-
-O cadastro de veículo deve controlar:
-
-- licenciamento;
-- exercício/vencimento;
-- anexos;
-- alertas prévios;
-- certificações/documentos por operação/cliente;
-- elegibilidade do veículo para determinada viagem.
-
-O catálogo definitivo de documentos e bloqueios permanece A CONFIRMAR.
+A referência MADRI pode ser reaproveitada somente como estrutura metodológica; contas, regras, resultados, documentos e evidências precisam ser OPR.
 
 ## 3. Impacto no Plano de Ação
 
-### Ações existentes atualizadas
+### Ações existentes aprofundadas
 
-- **PA-022 — Frota / Manutenção:** expandido para workflow completo, preventiva, disponibilidade, checklist, Compras/Estoque, tempo parado e dashboard por base.
-- **PA-017 — Solução integrada / fornecedor:** demonstração de 08/09 registrada como evidência funcional; falta homologar regras OPR.
-- **PA-026 — Próximos levantamentos:** Manutenção/Frota avançou; Combustível e demais regras seguem em andamento.
+- **PA-011 / Faturamento e Conciliação:** baixa parcial, complemento, desconto, divergência e vínculo documental.
+- **PA-013 / Receita e Competência:** competência × fato gerador × emissão, agora conectado a Fiscal/Contábil.
+- **PA-022 / Frota e Manutenção:** workflow completo, checklist, peças, pneus, disponibilidade e dashboards.
+- **PA-026 / Blueprint / Próximos levantamentos:** sequência ampliada com Financeiro e Fiscal/Contábil.
 
-### Novas ações registradas
+### Novas frentes registradas nos manifests da semana
 
-- **A17 — Gestão do ciclo de vida de pneus** — novo escopo funcional.
-- **A18 — Despesas, multas e aprovações da frota** — nova frente Financeiro/RH.
-- **A19 — Licenciamento, certificações e elegibilidade veicular** — nova frente de compliance.
+- gestão do ciclo de vida de pneus;
+- despesas, multas e aprovações da frota;
+- licenciamento/certificações e elegibilidade veicular;
+- workflow financeiro ponta a ponta de Contas a Receber/Pagar;
+- saneamento e migração de títulos financeiros em aberto;
+- integração bancária, CNAB/Pix e conciliação;
+- fechamento financeiro e trilha de auditoria;
+- pagamento/conciliação de agregados, terceiros, Target e motorista PX;
+- matriz NFS-e/obrigações por município;
+- workflow de entrada/conferência/auditoria fiscal;
+- matriz de cenários fiscais e homologação tributária.
 
-Os IDs PA definitivos serão os atribuídos pelo sincronizador no STAGE; não devem ser presumidos antes da execução do pipeline.
+Os responsáveis formais e prazos permanecem **PENDENTE DE VALIDAÇÃO** quando não definidos explicitamente.
 
-## 4. Delta de requisitos/RFI — W37
+## 4. Delta controlado para a RFI
 
-Os itens abaixo são deltas controlados para reconciliação com a RFI oficial de 880 requisitos. Não alteram automaticamente a baseline.
+Os deltas abaixo não substituem a baseline oficial de 880 requisitos. Devem ser reconciliados contra a RFI e classificados como **já existe / ampliar / novo / backlog / rejeitado**.
+
+### Deltas 08/09 — Frota/Manutenção
+
+Mantêm-se os itens **RFI-D035 a RFI-D055**, já registrados anteriormente para manutenção, checklist, pneus, combustível, despesas, multas, compliance e documentos.
+
+### Deltas 10–11/09 — Financeiro, Fiscal e Contábil
 
 | ID | Módulo | Requisito proposto | Situação |
 |---|---|---|---|
-| RFI-D035 | Frota/Oficina | Centralizar disponibilidade e manutenção por base em tempo real | A reconciliar |
-| RFI-D036 | Oficina | Planejar preventiva por veículo/modelo/km/horímetro/plano configurável | A reconciliar |
-| RFI-D037 | Oficina | Controlar OS com status, previsão, início/fim real, tempo parado e histórico | A reconciliar |
-| RFI-D038 | Oficina/Compras | Gerar solicitação de compra quando peça não estiver disponível | A reconciliar |
-| RFI-D039 | Compras/Oficina | Aplicar matriz configurável de alçadas de orçamento/aprovação | A reconciliar |
-| RFI-D040 | Frota/Mobile | Checklist configurável por classe/operação com foto/observação | A reconciliar |
-| RFI-D041 | Frota/Oficina | Não conformidade de checklist gera OS e bloqueio conforme regra homologada | A reconciliar |
-| RFI-D042 | Oficina | Suportar múltiplas OS por veículo/fornecedor e histórico consolidado | A reconciliar |
-| RFI-D043 | BI/Oficina | Dashboard por base/unidade com status e tempo desde última atualização | A reconciliar |
-| RFI-D044 | Pneus | Inventário, posição, identificação, sulco, calibragem e status do pneu | A reconciliar |
-| RFI-D045 | Pneus/Oficina | Troca, rodízio, reparo, descarte e OS com rastreabilidade do pneu | A reconciliar |
-| RFI-D046 | Integrações/Frota | Integrar sensores/telemetria de pneus quando disponível | Evolução técnica |
-| RFI-D047 | Combustível | Registrar ticket, placa, hodômetro, litros, tarifa, valor e evidência | A reconciliar |
-| RFI-D048 | Combustível/Frota | Validar inconsistências de hodômetro/horímetro entre fontes | A reconciliar |
-| RFI-D049 | BI/Combustível | Indicadores de consumo por veículo/motorista e preventiva por km | A reconciliar |
-| RFI-D050 | Despesas | Registrar despesas individuais e consolidadas por placas | A reconciliar |
-| RFI-D051 | Multas/RH/Financeiro | Fluxo de multa com condutor, documentos, recurso e encaminhamento | A reconciliar |
-| RFI-D052 | Frota/Compliance | Licenciamento/certificações com vencimento, alerta e elegibilidade | A reconciliar |
-| RFI-D053 | Fornecedores/Documentos | Manter contratos, documentos, homologação e forma de pagamento | A reconciliar |
-| RFI-D054 | Oficina/Documentos | Anexar documentos, fotos e vídeos à manutenção/OS | A reconciliar |
-| RFI-D055 | Frota | Manter km/horímetro mestre com regra de precedência e histórico de divergência | A reconciliar |
+| RFI-D056 | Financeiro | Workflow integrado de Contas a Receber/Pagar desde a origem até aprovação, quitação e conciliação | A reconciliar |
+| RFI-D057 | Financeiro | Suportar baixa parcial, saldo em aberto, suspensão, renegociação, complemento e histórico | A reconciliar |
+| RFI-D058 | Migração/Financeiro | Saneamento, corte, congelamento e reconciliação de títulos na migração | A reconciliar |
+| RFI-D059 | Bancos | CNAB/remessa-retorno para pagamentos e cobranças com rastreabilidade | A reconciliar |
+| RFI-D060 | Bancos/Pix | Controle de Pix por cadastro/permissão e mecanismos antifraude | A reconciliar |
+| RFI-D061 | Financeiro | Distinguir título quitado de efetivamente conciliado com extrato | A reconciliar |
+| RFI-D062 | Financeiro/Contábil | Fechamento por competência com bloqueio de retroativos e reabertura auditada | A reconciliar |
+| RFI-D063 | Controladoria/Fiscal | Tratar competência, fato gerador e data de emissão/autorização separadamente | A reconciliar |
+| RFI-D064 | Contábil | Contabilização por unidade, conta, imposto, centro de custo e natureza operacional | A reconciliar |
+| RFI-D065 | Contábil/Bancos | Reconciliar ERP, extrato, planilha de débito/crédito e integração com Domínio | A reconciliar |
+| RFI-D066 | Fiscal/NFS-e | Parametrização versionada por município, unidade e serviço | A reconciliar |
+| RFI-D067 | Fiscal | Controlar retenções, créditos, apuração e obrigações acessórias por regra validada | A reconciliar |
+| RFI-D068 | Compras/Fiscal | Workflow entrada → conferência física/quantitativa → auditoria fiscal → aprovação/rejeição | A reconciliar |
+| RFI-D069 | Fiscal/Testes | Matriz de cenários tributários e homologação ponta a ponta com evidência OPR | A reconciliar |
+| RFI-D070 | Financeiro/Fiscal/RH | Diferenciar pagamento a PF/PJ, RPA/folha, NFS-e e retenções aplicáveis | A reconciliar |
+| RFI-D071 | Fiscal/Contábil | Calendário de fechamento multiunidade/CNPJ e critérios de corte/reabertura | A reconciliar |
+| RFI-D072 | Governança/Auditoria | Histórico de alteração de regra, usuário, data, campo, justificativa e aprovação | A reconciliar |
 
-## 5. Riscos atualizados
+## 5. Evento técnico de STAGE — restore OPR de 09/09
 
-| Risco | Impacto | Resposta proposta |
+O workflow **OPR STAGE - Restore Isolado do Backup Validado** foi concluído com sucesso.
+
+Evidências técnicas registradas:
+
+- backup obrigatório do D1 imediatamente antes da aplicação;
+- fonte: backup D1 validado de 03/09;
+- restore preparado com **439 INSERT OR IGNORE em 21 tabelas**;
+- projeto OPR validado como **ID 3**;
+- pós-validação retornou **24 ações OPR** no snapshot;
+- nenhuma rotina de DELETE foi utilizada;
+- MADRI, Dual e Semeali não foram atualizadas pelo restore;
+- smoke do POP OPR passou;
+- smoke da plataforma OPR passou com requisitos, riscos, integrações, testes, defeitos, documentos, readiness, Status Report, persistência e isolamento.
+
+O restore deve ser tratado como evento técnico de recuperação controlada, não como alteração funcional do projeto.
+
+## 6. Riscos atualizados
+
+| Risco | Impacto | Resposta |
 |---|---|---|
-| Veículo ser planejado enquanto está indisponível | Alto | Agenda única e bloqueio por status homologado |
-| Preventiva continuar descentralizada | Alto | Centralizar plano e alertas por veículo |
-| Checklist existir sem tratativa da não conformidade | Alto | OS automática e workflow de responsável |
-| Alçada excessivamente baixa travar operação | Alto | Matriz de alçada por valor/categoria/base aprovada pela gestão |
-| Alçada inexistente permitir gasto sem controle | Alto | Aprovação rastreável e auditoria |
-| Km divergente entre viagem/abastecimento/manutenção | Alto | Regra de precedência + log de divergência |
-| Gestão de pneus sem responsável | Alto | Definir owner e escopo mínimo antes de implantação |
-| Multa/desconto tratado sem validação trabalhista | Alto | Gate RH/Jurídico |
-| Documento veicular vencido em operação | Alto | Alertas + elegibilidade documental |
-| Automatizar regra demonstrada sem aceite OPR | Alto | Demonstração é referência, não baseline aprovada |
+| Parametrizar regra financeira/fiscal sem evidência OPR | Alto | Homologação com casos reais e aceite do usuário-chave |
+| Migrar “sujeira” do legado para o novo sistema | Alto | Saneamento + ensaio + reconciliação antes do cutover |
+| Quitação bancária ser tratada como conciliação | Alto | Estados separados e validação por extrato |
+| Alteração retroativa após fechamento | Alto | Bloqueio + reabertura autorizada + trilha de auditoria |
+| Regra municipal de NFS-e ficar desatualizada | Alto | Matriz versionada por município + monitoramento + contingência |
+| Fiscal assumir conferência física que pertence à operação | Alto | RACI e workflow segregando conferência e auditoria tributária |
+| Regra de PF/PJ/retenção ser generalizada | Alto | Validação Fiscal/RH/Contábil por cenário |
+| Workflow demonstrado virar baseline sem aceite | Alto | Demonstração = referência, não aprovação |
+| Tenant OPR ficar indisponível no STAGE | Alto | Backup, restore isolado, pós-validação e smokes recorrentes |
 
-## 6. Pendências para decisão
+## 7. Pendências para decisão
 
-- responsável formal por Frota/Manutenção;
-- responsável pela gestão de pneus;
+- responsáveis formais por Financeiro, Fiscal/Contábil, Frota/Manutenção e Pneus;
 - matriz de alçadas e aprovadores;
-- critérios de bloqueio por checklist;
-- tempos/cores de atenção do dashboard;
-- plano preventivo por tipo/modelo de veículo;
-- fonte mestre de km/horímetro;
-- integração real de abastecimento;
-- fluxo contábil/financeiro de despesas consolidadas;
-- política de multas e eventual desconto, com RH/Jurídico;
-- catálogo de licenças/certificações por operação;
-- critérios de homologação de fornecedores.
+- calendário oficial de fechamento e SLA;
+- bancos/contas/convênios e layouts CNAB/API;
+- política formal de Pix e antifraude;
+- layout de migração e critério de reconciliação;
+- lista de municípios/unidades e provedores NFS-e;
+- plano de contas, centros de custo e regras de contabilização;
+- documentos/regras para PF/PJ/agregados/terceiros;
+- planilha de cenários fiscais e amostras reais para homologação;
+- continuidade dos workshops mencionados para 14/09 e 16/09 — **A CONFIRMAR** até evidência de realização.
 
-## 7. Próximos passos
+## 8. Próximos passos
 
-1. Continuação de **Combustível** indicada para 09/09/2026 — confirmar agenda e fechar AS-IS/TO-BE.
-2. Validar **Frota/Manutenção** com usuário-chave e congelar regras de OS, checklist, bloqueio e disponibilidade.
-3. Definir **matriz de alçadas** com gestão/Financeiro.
-4. Definir owner e escopo de **Pneus**.
-5. Workshop **Despesas/Multas** com Financeiro + RH/Jurídico.
-6. Inventariar **licenças/certificações** da frota.
-7. Reconciliar RFI-D035 a RFI-D055 contra os 880 requisitos oficiais.
-8. Derivar casos de teste para manutenção, checklist, pneus, combustível e compliance.
+1. Confirmar e registrar as sessões de continuidade de Fiscal/Contábil.
+2. Consolidar BPMN Financeiro e Fiscal/Contábil.
+3. Obter amostras reais de títulos, extratos, CNAB, NFS-e, documentos de entrada e fechamentos.
+4. Definir matriz de alçadas e regras de fechamento/reabertura.
+5. Preparar ensaio de migração financeira com reconciliação.
+6. Construir matriz NFS-e por município e matriz de cenários fiscais.
+7. Reconciliar RFI-D035 a RFI-D072 contra os 880 requisitos oficiais.
+8. Derivar casos SIT/UAT/E2E para Frota, Financeiro, Fiscal e Contábil.
+9. Manter STAGE com backup e smoke OPR antes/depois de mudanças estruturais.
 
-## 8. Critério de encerramento da frente
+## 9. Critério de encerramento das frentes
 
-A frente Frota/Manutenção só deve ser marcada como concluída quando houver:
+Nenhuma frente deve ser marcada como concluída apenas porque o workshop ocorreu. O gate mínimo permanece:
 
 - AS-IS validado;
 - TO-BE validado;
 - responsáveis definidos;
 - requisitos/gaps reconciliados;
 - integrações identificadas;
-- regras de bloqueio/alçada aprovadas;
+- regras e alçadas aprovadas;
 - casos de teste definidos;
 - evidência/aceite do usuário-chave.
