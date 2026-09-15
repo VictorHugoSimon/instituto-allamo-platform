@@ -2,13 +2,16 @@
   if(window.__allamoPortfolioWorkDistributionLoaded)return;
   window.__allamoPortfolioWorkDistributionLoaded=true;
 
-  const ACTIONABLE_TYPES=new Set(['DEMANDA','STORY','TASK','SUBTASK','BUG','INCIDENT','MELHORIA','AÇÃO','REQUISITO']);
+  const DEMAND_TYPES=new Set(['DEMANDA']);
+  const TASK_TYPES=new Set(['STORY','TASK','SUBTASK','BUG','INCIDENT','MELHORIA','AÇÃO','REQUISITO']);
+  const ACTIONABLE_TYPES=new Set([...DEMAND_TYPES,...TASK_TYPES]);
   const COLORS={running:'#2f67a5',backlog:'#98a2b3',done:'#16865c',cancelled:'#b42318',other:'#7c3aed'};
   const LABELS={running:'Em andamento',backlog:'Backlog',done:'Completo',cancelled:'Cancelado',other:'Outros'};
   const ORDER=['running','backlog','done','cancelled','other'];
   let lastIssues=null,lastWork=null,lastRender=0,refreshing=false;
 
   const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+  const typeOf=item=>String(item?.item_type||'').trim().toUpperCase();
   function bucket(value){
     const s=norm(value);
     if(/cancel/.test(s))return'cancelled';
@@ -46,7 +49,11 @@
 
     const issues=Array.isArray(lastIssues)?lastIssues:[];
     const allWork=Array.isArray(lastWork)?lastWork:[];
-    const work=allWork.filter(item=>ACTIONABLE_TYPES.has(String(item.item_type||'').toUpperCase()));
+    const work=allWork.filter(item=>ACTIONABLE_TYPES.has(typeOf(item)));
+    const workDemands=work.filter(item=>DEMAND_TYPES.has(typeOf(item)));
+    const tasks=work.filter(item=>TASK_TYPES.has(typeOf(item)));
+    const demandCount=issues.length+workDemands.length;
+    const taskCount=tasks.length;
     const counts={running:0,backlog:0,done:0,cancelled:0,other:0};
     for(const item of issues)counts[bucket(item.status)]++;
     for(const item of work)counts[bucket(item.status)]++;
@@ -85,8 +92,10 @@
 
     if(dom.subtitle){
       const partial=(lastIssues===null||lastWork===null)?' · fonte parcial':'';
-      dom.subtitle.textContent=`Status de demandas e tarefas · ${issues.length} demandas · ${work.length} itens de trabalho${partial}`;
+      dom.subtitle.textContent=`Status de demandas e tarefas · ${demandCount} demandas · ${taskCount} tarefas${partial}`;
     }
+    dom.card.dataset.allamoPortfolioDistribution='demandas-tarefas';
+    dom.card.setAttribute('aria-label',`Distribuição de ${total} demandas e tarefas por status`);
     lastRender=Date.now();
     return true;
   }
@@ -103,6 +112,8 @@
   const observer=new MutationObserver(()=>{if(locate())render()});
   observer.observe(document.documentElement,{childList:true,subtree:true});
   window.addEventListener('focus',()=>refresh(true));
+  window.addEventListener('allamo:work-items-changed',()=>refresh(true));
+  window.addEventListener('allamo:issues-changed',()=>refresh(true));
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh(true)});
   setInterval(()=>refresh(false),30000);
   setTimeout(()=>refresh(true),250);
