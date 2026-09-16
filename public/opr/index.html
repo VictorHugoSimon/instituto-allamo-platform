@@ -1,6 +1,101 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Portal de Governança · OPR</title><link rel="stylesheet" href="/opr/assets/platform.css"><style>.journey{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}.journey .card{position:relative}.journey .step{font-size:8px;color:var(--copper);font-weight:950;text-transform:uppercase}.journey a{text-decoration:none;color:inherit}.module-group{margin-top:14px}.module-group h4{margin:0 0 8px;font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.5px}@media(max-width:1100px){.journey{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.journey{grid-template-columns:1fr 1fr}}@media(max-width:480px){.journey{grid-template-columns:1fr}}</style></head><body><div class="app"><aside class="sidebar" id="sidebar"></aside><div class="main"><header class="topbar"><div><h2 id="pageTitle">Portal OPR</h2><p id="pageSub">Governança integrada do projeto</p></div><div class="spacer"></div><a class="btn" href="/opr-biblioteca/">Biblioteca</a><button class="btn" onclick="load()">Atualizar</button></header><main class="content"><div id="messageArea"></div><section class="hero"><div class="eyebrow">OPR · Instituto Államo · PMO</div><h2>Portal Único de Governança</h2><p>Uma única entrada para navegar por toda a jornada do projeto. Cada módulo possui URL permanente, mas todos compartilham a mesma base OPR e o mesmo menu lateral.</p><div class="meta"><div><b data-project-name>OPR</b><span>Projeto</span></div><div><b id="overall">A confirmar</b><span>Status geral derivado</span></div><div><b id="gono">A confirmar</b><span>Readiness Go/No-Go</span></div><div><b id="generated">—</b><span>Última leitura</span></div></div></section><div class="kpis" id="kpis"></div><section class="section"><h3>Sequência recomendada de navegação</h3><p>Siga da esquerda para a direita: entender o negócio, transformar em ação, controlar execução, validar e registrar a governança.</p><div class="journey"><a class="card" href="/opr-blueprint/"><span class="step">02</span><b>Blueprint</b><p>AS-IS e TO-BE.</p></a><a class="card" href="/opr-plano-de-acao/"><span class="step">03</span><b>Plano de Ação</b><p>Ações, responsáveis e prazos.</p></a><a class="card" href="/opr-requisitos/"><span class="step">04</span><b>Requisitos</b><p>Necessidades, gaps e cobertura.</p></a><a class="card" href="/opr-integracoes/"><span class="step">05</span><b>Integrações</b><p>Interfaces e contingências.</p></a><a class="card" href="/opr-riscos/"><span class="step">06</span><b>Riscos</b><p>Impacto, mitigação e resposta.</p></a><a class="card" href="/opr-mapa-implantacao/"><span class="step">07</span><b>Mapa Mestre</b><p>Fases, gates e rastreabilidade.</p></a><a class="card" href="/opr-plano-testes/"><span class="step">08</span><b>Testes</b><p>SIT, UAT e E2E.</p></a><a class="card" href="/opr-defeitos/"><span class="step">09</span><b>Defeitos</b><p>Correção e reteste.</p></a><a class="card" href="/opr-readiness/"><span class="step">10</span><b>Readiness</b><p>Condições de Go/No-Go.</p></a><a class="card" href="/opr-decisoes/"><span class="step">11</span><b>Decisões</b><p>Registro decisório rastreável.</p></a><a class="card" href="/opr-status-report/"><span class="step">12</span><b>Status Report</b><p>Visão executiva derivada.</p></a><a class="card" href="/opr-pop/"><span class="step">13</span><b>POP</b><p>Regras de governança.</p></a><a class="card" href="/opr-documentos/"><span class="step">14</span><b>Documentos</b><p>Versões e evidências.</p></a><a class="card" href="/opr-biblioteca/"><span class="step">15</span><b>Biblioteca</b><p>Drive e materiais consolidados.</p></a></div></section><div class="grid2"><section class="section"><h3>Ações críticas em aberto</h3><div id="critical" class="empty">Carregando...</div></section><section class="section"><h3>Decisões e bloqueios</h3><div id="decisions" class="empty">Carregando...</div></section></div><div class="grid2"><section class="section"><h3>Integrações em atenção</h3><div id="integrations" class="empty">Carregando...</div></section><section class="section"><h3>Testes P1 / Readiness</h3><div id="tests" class="empty">Carregando...</div></section></div></main></div></div><script src="/opr/assets/platform.js"></script><script>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portal de Governança · OPR</title>
+<link rel="stylesheet" href="/opr/assets/platform.css">
+<style>
+.cockpitHero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:14px;margin-bottom:14px}
+.cockpitMain{background:linear-gradient(135deg,#172033,#24324b);color:#fff;border-radius:18px;padding:24px;box-shadow:0 14px 34px #0f172a14;min-height:190px;position:relative;overflow:hidden}
+.cockpitMain:after{content:"";position:absolute;width:230px;height:230px;border-radius:50%;right:-100px;top:-120px;background:radial-gradient(circle,#b88b7830,transparent 70%)}
+.cockpitMain .eyebrow{font-size:9px;text-transform:uppercase;letter-spacing:1.7px;color:#a8b1c1;font-weight:900;position:relative;z-index:1}
+.cockpitMain h2{font-size:28px;line-height:1.12;margin:8px 0 7px;position:relative;z-index:1}
+.cockpitMain p{font-size:11px;line-height:1.6;color:#cbd5e1;max-width:790px;margin:0;position:relative;z-index:1}
+.cockpitMeta{display:flex;gap:24px;flex-wrap:wrap;margin-top:24px;position:relative;z-index:1}.cockpitMeta b{display:block;font-size:18px}.cockpitMeta span{display:block;color:#94a3b8;font-size:9px;margin-top:2px}
+.progressCard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 10px 30px #0f172a0b;display:grid;grid-template-columns:122px 1fr;gap:18px;align-items:center}
+.ring{width:116px;height:116px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#198754 0deg,#e8ecf1 0);position:relative}.ring:after{content:"";position:absolute;inset:11px;background:#fff;border-radius:50%}.ringText{position:relative;z-index:2;text-align:center}.ringText b{font-size:25px;display:block}.ringText span{font-size:8px;color:var(--muted);text-transform:uppercase;font-weight:900}.progressCopy h3{margin:0 0 7px;font-size:13px}.progressCopy p{margin:0;color:var(--muted);font-size:9.5px;line-height:1.5}.progressCopy .statusline{margin-top:11px;display:flex;gap:6px;flex-wrap:wrap}
+.kpiDeck{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:0 0 16px}.executiveKpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 5px 20px #0f172a08}.executiveKpi small{display:block;color:var(--muted);font-size:8.5px;font-weight:900;text-transform:uppercase}.executiveKpi b{font-size:24px;display:block;margin-top:3px}.executiveKpi span{font-size:8.7px;color:#94a3b8}.executiveKpi.good{border-top:3px solid #198754}.executiveKpi.warn{border-top:3px solid #d79020}.executiveKpi.crit{border-top:3px solid #c94747}.executiveKpi.info{border-top:3px solid #356fa6}
+.journeySection{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:0 6px 22px #0f172a07}.journeyHead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}.journeyHead h3{margin:0;font-size:13px}.journeyHead p{margin:3px 0 0;font-size:9.5px;color:var(--muted)}.journeyHint{font-size:8px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.6px}.journey{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.journey a{border:1px solid var(--line);background:#fbfcfd;border-radius:12px;padding:11px;text-decoration:none;color:inherit;transition:.15s;min-height:84px}.journey a:hover{transform:translateY(-1px);border-color:#c9d4e1;background:#fff;box-shadow:0 7px 18px #0f172a09}.journey .step{font-size:8px;color:#356fa6;font-weight:950;text-transform:uppercase}.journey b{font-size:10.5px;display:block;margin-top:4px}.journey p{font-size:8.6px;color:var(--muted);margin:4px 0 0;line-height:1.35}
+.sectionGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:13px}.executivePanel{background:#fff;border:1px solid var(--line);border-radius:15px;padding:15px;box-shadow:0 5px 20px #0f172a07}.executivePanelHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}.executivePanelHead h3{margin:0;font-size:12px}.executivePanelHead a{font-size:8.5px;font-weight:900;color:#356fa6;text-decoration:none}.executivePanel .card{margin-top:7px;box-shadow:none}.quickBar{display:flex;gap:8px;flex-wrap:wrap}.quickBar a{font-size:9px;text-decoration:none;color:#334155;border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 9px;font-weight:850}.quickBar a:hover{background:#f8fafc}
+@media(max-width:1180px){.cockpitHero{grid-template-columns:1fr}.kpiDeck{grid-template-columns:repeat(3,1fr)}.journey{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.kpiDeck{grid-template-columns:1fr 1fr}.journey{grid-template-columns:1fr 1fr}.sectionGrid{grid-template-columns:1fr}.progressCard{grid-template-columns:100px 1fr}.ring{width:96px;height:96px}.cockpitMain h2{font-size:23px}}
+@media(max-width:480px){.kpiDeck,.journey{grid-template-columns:1fr}.progressCard{grid-template-columns:1fr;text-align:center}.ring{margin:auto}.quickBar{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar" id="sidebar"></aside>
+<div class="main">
+<header class="topbar">
+  <div><h2 id="pageTitle">Portal OPR</h2><p id="pageSub">Governança integrada do projeto</p></div>
+  <div class="spacer"></div>
+  <div class="quickBar"><a href="/opr-plano-de-acao/">Plano</a><a href="/opr-status-report/">Status Report</a><a href="/opr-biblioteca/">Biblioteca</a></div>
+  <button class="btn" onclick="load()">Atualizar</button>
+</header>
+<main class="content"><div id="messageArea"></div>
+<section class="cockpitHero">
+  <div class="cockpitMain">
+    <div class="eyebrow">OPR · Instituto Államo · PMO</div>
+    <h2>Portal Único de Governança</h2>
+    <p>Visão executiva e operacional da implantação. A navegação 01–15 organiza a jornada sem substituir os layouts próprios de cada módulo. Dados, ações, requisitos, testes e evidências permanecem na mesma base OPR.</p>
+    <div class="cockpitMeta">
+      <div><b data-project-name>OPR</b><span>Projeto</span></div>
+      <div><b id="overall">A confirmar</b><span>Status geral derivado</span></div>
+      <div><b id="gono">A confirmar</b><span>Readiness Go / No-Go</span></div>
+      <div><b id="generated">—</b><span>Última leitura</span></div>
+    </div>
+  </div>
+  <div class="progressCard">
+    <div class="ring" id="actionRing"><div class="ringText"><b id="donePct">N/D</b><span>ações concluídas</span></div></div>
+    <div class="progressCopy"><h3>Execução do Plano</h3><p>Indicador operacional calculado sobre as ações do Plano Mestre. Não representa percentual oficial de avanço do projeto.</p><div class="statusline"><span id="planStatus" class="pill">Carregando</span><span id="gateStatus" class="pill">Gate a confirmar</span></div></div>
+  </div>
+</section>
+<div class="kpiDeck" id="kpis"></div>
+<section class="journeySection">
+  <div class="journeyHead"><div><h3>Jornada de governança</h3><p>Entre pelo assunto desejado ou siga a sequência recomendada de execução.</p></div><span class="journeyHint">01 Visão Geral → 15 Biblioteca</span></div>
+  <div class="journey">
+    <a href="/opr-blueprint/"><span class="step">02</span><b>Blueprint</b><p>AS-IS, TO-BE e processos.</p></a>
+    <a href="/opr-plano-de-acao/"><span class="step">03</span><b>Plano de Ação</b><p>Ações, responsáveis e prazos.</p></a>
+    <a href="/opr-requisitos/"><span class="step">04</span><b>Requisitos</b><p>Necessidades, cobertura e gaps.</p></a>
+    <a href="/opr-integracoes/"><span class="step">05</span><b>Integrações</b><p>Interfaces, arquivos e contingência.</p></a>
+    <a href="/opr-riscos/"><span class="step">06</span><b>Riscos</b><p>Impacto, probabilidade e resposta.</p></a>
+    <a href="/opr-mapa-implantacao/"><span class="step">07</span><b>Mapa Mestre</b><p>Fases, gates e rastreabilidade.</p></a>
+    <a href="/opr-plano-testes/"><span class="step">08</span><b>Testes</b><p>SIT, UAT, E2E e evidências.</p></a>
+    <a href="/opr-defeitos/"><span class="step">09</span><b>Defeitos</b><p>Correção, severidade e reteste.</p></a>
+    <a href="/opr-readiness/"><span class="step">10</span><b>Readiness</b><p>Condições de Go / No-Go.</p></a>
+    <a href="/opr-decisoes/"><span class="step">11</span><b>Decisões</b><p>Registro decisório rastreável.</p></a>
+    <a href="/opr-status-report/"><span class="step">12</span><b>Status Report</b><p>Visão executiva derivada.</p></a>
+    <a href="/opr-pop/"><span class="step">13</span><b>POP</b><p>Regras e procedimentos de governança.</p></a>
+    <a href="/opr-documentos/"><span class="step">14</span><b>Documentos</b><p>Versões, evidências e referências.</p></a>
+    <a href="/opr-biblioteca/"><span class="step">15</span><b>Biblioteca</b><p>Materiais e Drive consolidado.</p></a>
+  </div>
+</section>
+<div class="sectionGrid">
+  <section class="executivePanel"><div class="executivePanelHead"><h3>Ações críticas em aberto</h3><a href="/opr-plano-de-acao/">Abrir Plano →</a></div><div id="critical" class="empty">Carregando...</div></section>
+  <section class="executivePanel"><div class="executivePanelHead"><h3>Decisões e bloqueios</h3><a href="/opr-decisoes/">Abrir Decisões →</a></div><div id="decisions" class="empty">Carregando...</div></section>
+  <section class="executivePanel"><div class="executivePanelHead"><h3>Integrações em atenção</h3><a href="/opr-integracoes/">Abrir Integrações →</a></div><div id="integrations" class="empty">Carregando...</div></section>
+  <section class="executivePanel"><div class="executivePanelHead"><h3>Testes P1 / Readiness</h3><a href="/opr-plano-testes/">Abrir Testes →</a></div><div id="tests" class="empty">Carregando...</div></section>
+</div>
+</main></div></div>
+<script src="/opr/assets/platform.js"></script>
+<script>
 let project;const P=()=>OPRPlatform;
-function itemList(rows,fn){return rows&&rows.length?rows.slice(0,6).map(fn).join(''):'<div class="empty">Nenhum item registrado.</div>'}
-async function load(){try{project=await P().init('Portal','Portal Único de Governança · OPR','Navegação sequencial, URLs permanentes e fonte única no D1');const d=await P().api('/api/opr-platform/status-report?project='+encodeURIComponent(project.id)),s=d.summary;document.getElementById('overall').innerHTML=P().badge(s.overall_status);document.getElementById('gono').textContent=s.go_no_go;document.getElementById('generated').textContent=new Date(d.generated_at).toLocaleString('pt-BR');document.getElementById('kpis').innerHTML=[['Ações',s.actions.total,`${s.actions.done} concluídas`,''],['Atrasadas',s.actions.late,'prazo formal vencido',s.actions.late?'crit':'good'],['Requisitos',s.requirements.total,`${s.requirements.gaps} gaps/DEV/INT`,''],['Integrações',s.integrations.total,`${s.integrations.blocked} bloqueadas`,s.integrations.blocked?'crit':''],['Testes',s.tests.total,`${s.tests.p1_blockers} P1 bloqueadores`,s.tests.p1_blockers?'crit':''],['Riscos',s.risks.open,`${s.risks.critical} críticos`,s.risks.critical?'warn':'']].map(x=>`<div class="kpi ${x[3]}"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]}</small></div>`).join('');document.getElementById('critical').innerHTML=itemList(d.critical_actions,r=>`<div class="card"><b>${P().esc(r.display_id||r.id)} · ${P().esc(r.action)}</b><p>${P().esc(r.responsible)} · ${P().esc(r.due_date||'Prazo A confirmar')} · ${P().badge(r.status)}</p></div>`);document.getElementById('decisions').innerHTML=itemList(d.decisions,r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.decision)}</b><p>${P().esc(r.owner)} · ${P().esc(r.due_date||'Prazo A confirmar')}</p></div>`);document.getElementById('integrations').innerHTML=itemList(d.integrations.filter(x=>x.status!=='Homologado'&&x.status!=='Produção'),r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.name)}</b><p>${P().badge(r.status)} · ${P().esc(r.source_system)} → ${P().esc(r.target_system)}</p></div>`);document.getElementById('tests').innerHTML=itemList(d.tests.filter(x=>x.priority==='P1'||x.status==='Bloqueado'||x.status==='Reprovado'),r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.scenario)}</b><p>${P().badge(r.priority)} ${P().badge(r.status)}</p></div>`)}catch(e){P().showMessage(e.message,'error')}}
+function itemList(rows,fn){return rows&&rows.length?rows.slice(0,5).map(fn).join(''):'<div class="empty">Nenhum item registrado.</div>'}
+function safePct(s){if(s.actions&&s.actions.operational_completion_pct!==null&&s.actions.operational_completion_pct!==undefined)return Math.max(0,Math.min(100,Number(s.actions.operational_completion_pct)||0));if(s.actions&&Number(s.actions.total)>0)return Math.round((Number(s.actions.done)||0)/Number(s.actions.total)*100);return null}
+async function load(){try{
+  project=await P().init('Portal','Portal Único de Governança · OPR','Cockpit executivo, navegação 01–15 e fonte única no D1');
+  const d=await P().api('/api/opr-platform/status-report?project='+encodeURIComponent(project.id)),s=d.summary,pct=safePct(s);
+  document.getElementById('overall').innerHTML=P().badge(s.overall_status);document.getElementById('gono').textContent=s.go_no_go;document.getElementById('generated').textContent=new Date(d.generated_at).toLocaleString('pt-BR');
+  document.getElementById('donePct').textContent=pct===null?'N/D':pct+'%';document.getElementById('actionRing').style.background=pct===null?'conic-gradient(#e8ecf1 0deg,#e8ecf1 0)':'conic-gradient(#198754 '+(pct*3.6)+'deg,#e8ecf1 0)';
+  document.getElementById('planStatus').outerHTML=P().badge(s.overall_status).replace('<span','<span id="planStatus"');document.getElementById('gateStatus').textContent='Go / No-Go: '+(s.go_no_go||'A confirmar');
+  const data=[['Ações',s.actions.total,`${s.actions.done} concluídas`,'info'],['Atrasadas',s.actions.late,'prazo formal vencido',s.actions.late?'crit':'good'],['Requisitos',s.requirements.total,`${s.requirements.gaps} gaps / DEV / INT`,'info'],['Integrações',s.integrations.total,`${s.integrations.blocked} bloqueadas`,s.integrations.blocked?'crit':'good'],['Testes',s.tests.total,`${s.tests.p1_blockers} P1 bloqueadores`,s.tests.p1_blockers?'crit':'good'],['Riscos',s.risks.open,`${s.risks.critical} críticos`,s.risks.critical?'warn':'good']];
+  document.getElementById('kpis').innerHTML=data.map(x=>`<div class="executiveKpi ${x[3]}"><small>${x[0]}</small><b>${x[1]}</b><span>${x[2]}</span></div>`).join('');
+  document.getElementById('critical').innerHTML=itemList(d.critical_actions,r=>`<div class="card"><b>${P().esc(r.display_id||r.id)} · ${P().esc(r.action)}</b><p>${P().esc(r.responsible||'PENDENTE DE VALIDAÇÃO')} · ${P().esc(r.due_date||'Prazo A confirmar')} · ${P().badge(r.status)}</p></div>`);
+  document.getElementById('decisions').innerHTML=itemList(d.decisions,r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.decision)}</b><p>${P().esc(r.owner||'PENDENTE DE VALIDAÇÃO')} · ${P().esc(r.due_date||'Prazo A confirmar')}</p></div>`);
+  document.getElementById('integrations').innerHTML=itemList((d.integrations||[]).filter(x=>x.status!=='Homologado'&&x.status!=='Produção'),r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.name)}</b><p>${P().badge(r.status)} · ${P().esc(r.source_system)} → ${P().esc(r.target_system)}</p></div>`);
+  document.getElementById('tests').innerHTML=itemList((d.tests||[]).filter(x=>x.priority==='P1'||x.status==='Bloqueado'||x.status==='Reprovado'),r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.scenario)}</b><p>${P().badge(r.priority)} ${P().badge(r.status)}</p></div>`);
+}catch(e){P().showMessage(e.message,'error')}}
 document.addEventListener('DOMContentLoaded',load);
-</script></body></html>
+</script>
+</body></html>
