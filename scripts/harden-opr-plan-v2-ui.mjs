@@ -27,6 +27,12 @@ const required=[
 ];
 for(const [token,label] of required)if(!s.includes(token))throw new Error(`Plano OPR rico incompleto: ${label}`);
 
+// Compatibilidade com os gates legados do pipeline. O marcador v2 identifica o contrato
+// funcional preservado; o marcador rich identifica a nova composição visual canônica.
+if(!s.includes('data-opr-plan-v2="1"')){
+  s=s.replace('<meta data-opr-plan-rich="1">','<meta data-opr-plan-rich="1"><meta data-opr-plan-v2="1">');
+}
+
 // O Plano e o POP possuem navegação local própria. A navegação 01–15 entra somente como
 // launcher/drawer não invasivo, preservando o layout e os submenus do módulo.
 const bridge='<script src="/opr/assets/legacy-global-nav.js"></script>';
