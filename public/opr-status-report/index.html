@@ -3,66 +3,142 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Status Report · OPR</title>
+<title>Status Report Executivo · OPR</title>
 <link rel="stylesheet" href="/opr/assets/platform.css">
 <style>
-.report-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.report-tab{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;font-size:10px;font-weight:900;cursor:pointer}.report-tab.on{background:var(--char);color:#fff;border-color:var(--char)}.report-panel{display:none}.report-panel.on{display:block}.flowline{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}.flowstep{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:9px;font-weight:850;text-align:center}.flowstep:not(:last-child)::after{content:'→';float:right;color:var(--copper)}.report-table{width:100%;border-collapse:collapse;font-size:9.5px}.report-table th,.report-table td{padding:9px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}.report-table th{font-size:8px;text-transform:uppercase;color:var(--muted);background:#faf9f7}@media(max-width:850px){.flowline{grid-template-columns:1fr 1fr}.report-tabs{overflow:auto;flex-wrap:nowrap}.report-tab{white-space:nowrap}}@media(max-width:520px){.flowline{grid-template-columns:1fr}}
+:root{--report-nav:236px;--report-bg:#f4f3f0;--report-card:#fff;--report-line:#dedbd5;--report-ink:#302f39;--report-muted:#6f6b73;--report-accent:#b88b78}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--report-bg);color:var(--report-ink)}
+.report-shell{min-height:100vh;display:grid;grid-template-columns:var(--report-nav) minmax(0,1fr)}
+.report-nav{position:sticky;top:0;height:100vh;overflow:auto;background:#302f39;color:#fff;padding:24px 16px 20px}
+.report-brand{padding:0 8px 18px;border-bottom:1px solid rgba(255,255,255,.14);margin-bottom:16px}.report-brand .eyebrow{color:#d9c7bf}.report-brand h1{font-size:24px;margin:6px 0 4px}.report-brand p{font-size:10px;line-height:1.5;color:#c9c5cb;margin:0}
+.report-nav a{display:flex;gap:10px;align-items:center;color:#efedf0;text-decoration:none;padding:10px 9px;border-radius:8px;font-size:10px;font-weight:800;margin:3px 0}.report-nav a:hover,.report-nav a:focus{background:rgba(255,255,255,.08);outline:none}.report-nav a.active{background:#b88b78;color:#fff}.report-nav .num{width:22px;font-size:9px;color:#d8d3da}.report-nav a.active .num{color:#fff}
+.report-nav-foot{margin-top:18px;padding:14px 8px;border-top:1px solid rgba(255,255,255,.14);font-size:9px;line-height:1.55;color:#c9c5cb}
+.report-main{min-width:0}.report-top{position:sticky;top:0;z-index:20;background:rgba(244,243,240,.96);backdrop-filter:blur(9px);border-bottom:1px solid var(--report-line);padding:13px 24px;display:flex;gap:14px;align-items:center}.report-top h2{font-size:15px;margin:0}.report-top p{font-size:9px;color:var(--report-muted);margin:3px 0 0}.report-top .spacer{flex:1}
+.report-content{padding:24px;max-width:1480px;margin:0 auto}.report-section{scroll-margin-top:82px;margin:0 0 22px}.report-section>.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin:0 0 10px}.report-section h3{margin:0;font-size:15px}.report-section .section-head p{margin:0;font-size:9px;color:var(--report-muted);text-align:right}
+.report-hero{background:linear-gradient(135deg,#302f39,#4a4752);color:#fff;border-radius:18px;padding:26px;margin-bottom:18px}.report-hero .eyebrow{color:#dbc8bf}.report-hero h2{font-size:26px;margin:8px 0}.report-hero p{max-width:920px;font-size:11px;line-height:1.6;color:#ece8ed}.report-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}.report-meta>div{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px}.report-meta b{display:block;font-size:14px}.report-meta span{font-size:8px;color:#d7d3d9;text-transform:uppercase;letter-spacing:.06em}
+.report-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.report-kpi{background:#fff;border:1px solid var(--report-line);border-radius:13px;padding:14px}.report-kpi span{display:block;font-size:8px;text-transform:uppercase;color:var(--report-muted);letter-spacing:.04em}.report-kpi b{display:block;font-size:21px;margin:5px 0 2px}.report-kpi small{font-size:8px;color:var(--report-muted)}
+.report-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.report-card{background:#fff;border:1px solid var(--report-line);border-radius:13px;padding:14px}.report-card h4{font-size:11px;margin:0 0 6px}.report-card p{font-size:9px;line-height:1.5;margin:5px 0;color:#55515a}.report-card .line{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px}
+.report-tablewrap{overflow:auto;background:#fff;border:1px solid var(--report-line);border-radius:13px}.report-table{width:100%;border-collapse:collapse;font-size:9.5px;min-width:780px}.report-table th,.report-table td{padding:10px;border-bottom:1px solid var(--report-line);vertical-align:top;text-align:left}.report-table th{font-size:8px;text-transform:uppercase;color:var(--report-muted);background:#faf9f7;position:sticky;top:0}.report-table tr:last-child td{border-bottom:0}
+.report-flow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.report-flow div{background:#fff;border:1px solid var(--report-line);border-radius:12px;padding:11px;text-align:center;font-size:8.5px;font-weight:850;position:relative}.report-flow div:not(:last-child)::after{content:'→';position:absolute;right:-8px;top:50%;transform:translateY(-50%);color:var(--report-accent);font-size:14px;z-index:2}
+.report-empty{background:#fff;border:1px dashed var(--report-line);border-radius:12px;padding:16px;font-size:9px;color:var(--report-muted)}
+.report-note{background:#fff8f4;border:1px solid #e7cfc3;border-radius:12px;padding:12px;font-size:9px;line-height:1.55;margin-top:10px}
+.report-actions{display:flex;gap:7px;flex-wrap:wrap}.report-btn{border:1px solid var(--report-line);background:#fff;border-radius:9px;padding:9px 11px;font-size:9px;font-weight:800;cursor:pointer;text-decoration:none;color:var(--report-ink)}.report-btn.primary{background:#302f39;color:#fff;border-color:#302f39}
+@media(max-width:1000px){.report-shell{grid-template-columns:1fr}.report-nav{position:relative;height:auto;display:flex;gap:6px;overflow:auto;padding:12px}.report-brand,.report-nav-foot{display:none}.report-nav a{min-width:max-content}.report-main{min-width:0}.report-meta,.report-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.report-flow{grid-template-columns:repeat(3,minmax(0,1fr))}.report-flow div::after{display:none}}
+@media(max-width:640px){.report-content{padding:14px}.report-top{padding:10px 14px;align-items:flex-start;flex-wrap:wrap}.report-grid2,.report-meta,.report-kpis{grid-template-columns:1fr}.report-flow{grid-template-columns:1fr 1fr}.report-section>.section-head{align-items:flex-start;flex-direction:column}.report-section .section-head p{text-align:left}}
+@media print{.report-nav,.report-top{display:none!important}.report-shell{display:block}.report-content{padding:0;max-width:none}.report-section{break-inside:avoid;margin-bottom:16px}.report-card,.report-tablewrap,.report-hero,.report-kpi{box-shadow:none}.report-hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}.report-btn{display:none!important}}
 </style>
 </head>
 <body>
-<div class="app">
-<aside class="sidebar" id="sidebar"></aside>
-<div class="main">
-<header class="topbar"><div><h2 id="pageTitle"></h2><p id="pageSub"></p></div><div class="spacer"></div><button class="btn" onclick="load()">Atualizar</button><button class="btn" onclick="window.print()">Imprimir</button></header>
-<main class="content"><div id="messageArea"></div>
-<div class="report-tabs" role="tablist" aria-label="Status Report OPR">
-<button class="report-tab on" data-panel="executivo">1 · Executivo</button>
-<button class="report-tab" data-panel="atencoes">2 · Atenções & Decisões</button>
-<button class="report-tab" data-panel="marcos">3 · Próximos Marcos</button>
-<button class="report-tab" data-panel="cadencia">4 · Cadência & Governança</button>
+<div class="report-shell">
+  <aside class="report-nav" aria-label="Seções do Status Report">
+    <div class="report-brand"><div class="eyebrow">Instituto Államo · PMO</div><h1>OPR</h1><p>Status Report Executivo independente. Esta navegação pertence somente ao relatório.</p></div>
+    <a href="#visao-geral"><span class="num">01</span>Visão Geral</a>
+    <a href="#escopo"><span class="num">02</span>Evolução do Escopo</a>
+    <a href="#integracoes"><span class="num">03</span>Integrações & Responsabilidades</a>
+    <a href="#plano"><span class="num">04</span>Plano de Ação</a>
+    <a href="#critico"><span class="num">05</span>Caminho Crítico & Dependências</a>
+    <a href="#cadencia"><span class="num">06</span>Cadência & Governança</a>
+    <a href="#riscos"><span class="num">07</span>Riscos</a>
+    <a href="#indicadores"><span class="num">08</span>Indicadores OPR</a>
+    <a href="#proximos"><span class="num">09</span>Próximos Passos</a>
+    <div class="report-nav-foot">Fonte executiva derivada do Plano de Ação, Requisitos, Integrações, Riscos, Testes, Readiness e Cadência. Sem exposição de Linear, SLA/chamados ou horas individuais.</div>
+  </aside>
+
+  <div class="report-main">
+    <header class="report-top">
+      <div><h2>Status Report Executivo · OPR</h2><p id="reportSubtitle">Carregando dados atuais...</p></div>
+      <div class="spacer"></div>
+      <div class="report-actions"><button class="report-btn" onclick="loadReport()">Atualizar</button><button class="report-btn" onclick="window.print()">Imprimir / PDF</button><a class="report-btn primary" href="/opr-plano-de-acao/">Abrir Plano de Ação</a></div>
+    </header>
+
+    <main class="report-content">
+      <div id="messageArea"></div>
+
+      <section class="report-section" id="visao-geral">
+        <div class="report-hero">
+          <div class="eyebrow">01 · Executive Overview</div>
+          <h2>Onde estamos?</h2>
+          <p id="where">Carregando visão executiva...</p>
+          <div class="report-meta">
+            <div><b id="overall">A confirmar</b><span>Status geral</span></div>
+            <div><b id="gono">A confirmar</b><span>Go / No-Go</span></div>
+            <div><b id="nextMilestone">A confirmar</b><span>Próximo marco</span></div>
+            <div><b id="generated">—</b><span>Atualizado</span></div>
+          </div>
+        </div>
+        <div class="report-kpis" id="overviewKpis"></div>
+        <div class="report-note" id="executiveRule">O relatório não apresenta percentual de avanço geral sem baseline e evidência suficientes.</div>
+      </section>
+
+      <section class="report-section" id="escopo">
+        <div class="section-head"><div><div class="eyebrow">02 · Scope Evolution</div><h3>Evolução do Escopo</h3></div><p>Requisitos, cobertura, gaps e fases registradas.</p></div>
+        <div class="report-kpis" id="scopeKpis"></div>
+        <div class="report-grid2" style="margin-top:12px"><div class="report-card"><h4>Jornada de rastreabilidade</h4><div class="report-flow" style="margin-top:10px"><div>Requisito</div><div>Gap</div><div>STD/CFG/DEV/INT</div><div>Ação</div><div>Teste</div><div>Aceite</div></div></div><div class="report-card"><h4>Gaps / requisitos em atenção</h4><div id="scopeAttention"></div></div></div>
+      </section>
+
+      <section class="report-section" id="integracoes">
+        <div class="section-head"><div><div class="eyebrow">03 · Integrations & Responsibilities</div><h3>Integrações & Responsabilidades</h3></div><p>Origem, destino, status, responsável e pendência.</p></div>
+        <div class="report-tablewrap"><table class="report-table"><thead><tr><th>Integração</th><th>Origem</th><th>Destino</th><th>Responsável</th><th>Status</th><th>Pendência / Próximo passo</th></tr></thead><tbody id="integrationRows"></tbody></table></div>
+      </section>
+
+      <section class="report-section" id="plano">
+        <div class="section-head"><div><div class="eyebrow">04 · Action Plan</div><h3>Plano de Ação</h3></div><p>Visão executiva das ações; o Plano Mestre permanece como fonte operacional.</p></div>
+        <div class="report-kpis" id="actionKpis"></div>
+        <div class="report-grid2" style="margin-top:12px"><div class="report-card"><h4>Ações que exigem atenção</h4><div id="criticalActions"></div></div><div class="report-card"><h4>Decisões necessárias</h4><div id="decisionCards"></div></div></div>
+      </section>
+
+      <section class="report-section" id="critico">
+        <div class="section-head"><div><div class="eyebrow">05 · Critical Path & Dependencies</div><h3>Caminho Crítico & Dependências</h3></div><p>Somente bloqueadores e dependências com impacto comprovável.</p></div>
+        <div class="report-tablewrap"><table class="report-table"><thead><tr><th>Ação</th><th>Status</th><th>Responsável</th><th>Prazo</th><th>Dependência</th><th>Impacto</th><th>Próximo passo</th></tr></thead><tbody id="criticalRows"></tbody></table></div>
+      </section>
+
+      <section class="report-section" id="cadencia">
+        <div class="section-head"><div><div class="eyebrow">06 · Cadence & Governance</div><h3>Cadência & Governança</h3></div><p>Reuniões, objetivo, resultado e próximo passo.</p></div>
+        <div class="report-tablewrap"><table class="report-table"><thead><tr><th>Data / Período</th><th>Agenda</th><th>Participantes / Responsável</th><th>Status</th><th>Objetivo / Resultado</th><th>Próximo passo</th></tr></thead><tbody id="cadenceRows"></tbody></table></div>
+      </section>
+
+      <section class="report-section" id="riscos">
+        <div class="section-head"><div><div class="eyebrow">07 · Risks</div><h3>Riscos</h3></div><p>Impacto, probabilidade, responsável e mitigação.</p></div>
+        <div class="report-tablewrap"><table class="report-table"><thead><tr><th>Risco</th><th>Severidade</th><th>Status</th><th>Responsável</th><th>Mitigação</th></tr></thead><tbody id="riskRows"></tbody></table></div>
+      </section>
+
+      <section class="report-section" id="indicadores">
+        <div class="section-head"><div><div class="eyebrow">08 · OPR Indicators</div><h3>Indicadores OPR</h3></div><p>Somente indicadores calculáveis a partir da base atual.</p></div>
+        <div class="report-kpis" id="indicatorKpis"></div>
+        <div class="report-grid2" style="margin-top:12px"><div class="report-card"><h4>Testes / bloqueios</h4><div id="testCards"></div></div><div class="report-card"><h4>Readiness / Go-Live</h4><div id="readinessCards"></div></div></div>
+      </section>
+
+      <section class="report-section" id="proximos">
+        <div class="section-head"><div><div class="eyebrow">09 · Next Steps</div><h3>Próximos Passos</h3></div><p>7 dias, 15 dias e próximo marco, somente quando houver evidência.</p></div>
+        <div class="report-grid2"><div class="report-card"><h4>Próximas ações priorizadas</h4><div id="nextActionCards"></div></div><div class="report-card"><h4>Próximos marcos</h4><div id="milestoneCards"></div></div></div>
+      </section>
+    </main>
+  </div>
 </div>
-<section class="report-panel on" id="executivo">
-<section class="hero"><div class="eyebrow">Visão executiva · derivada da base operacional OPR</div><h2>Onde estamos?</h2><p id="where">Carregando...</p><div class="meta"><div><b id="overall">A confirmar</b><span>Status geral</span></div><div><b id="gono">A confirmar</b><span>Go / No-Go</span></div><div><b id="operational">N/D</b><span>Indicador operacional</span></div><div><b id="generated">—</b><span>Atualizado</span></div></div></section>
-<div class="kpis" id="actionKpis"></div>
-<section class="section"><h3>Fluxo de governança</h3><div class="flowline"><div class="flowstep">Demanda</div><div class="flowstep">Plano de Ação</div><div class="flowstep">Responsável + Prazo</div><div class="flowstep">Acompanhamento</div><div class="flowstep">Evidência</div><div class="flowstep">Status Report</div></div></section>
-<section class="section"><h3>Regra de leitura</h3><p id="rules"></p></section>
-</section>
-<section class="report-panel" id="atencoes">
-<div class="grid2"><section class="section"><h3>Atrasos / ações críticas</h3><div id="critical"></div></section><section class="section"><h3>Decisões necessárias</h3><div id="decisions"></div></section></div>
-<div class="grid2"><section class="section"><h3>Riscos gerenciais</h3><div id="risks"></div></section><section class="section"><h3>Integrações críticas</h3><div id="integrations"></div></section></div>
-<div class="grid2"><section class="section"><h3>Testes P1 / bloqueios</h3><div id="tests"></div></section><section class="section"><h3>Readiness / Go-Live</h3><div id="readiness"></div></section></div>
-</section>
-<section class="report-panel" id="marcos">
-<section class="section"><h3>Próximos Marcos</h3><div class="tablewrap"><table class="report-table"><thead><tr><th>Período</th><th>Marco</th><th>Condição de entrada</th><th>Status</th><th>Responsabilidade</th><th>Próximo passo</th></tr></thead><tbody id="milestoneRows"></tbody></table></div></section>
-</section>
-<section class="report-panel" id="cadencia">
-<section class="section"><h3>Cadência & Governança</h3><div class="tablewrap"><table class="report-table"><thead><tr><th>Data / Período</th><th>Agenda</th><th>Participantes / Responsável</th><th>Status</th><th>Objetivo / Resultado</th><th>Próximo Passo</th></tr></thead><tbody id="cadenceRows"></tbody></table></div></section>
-</section>
-</main></div></div>
+
 <script src="/opr/assets/platform.js"></script>
 <script>
-const P=()=>OPRPlatform;let project;
+const P=()=>window.OPRPlatform;let project=null,reportData=null,requirements=[];
 const $=id=>document.getElementById(id);
-function cards(rows,fn){return rows&&rows.length?rows.map(fn).join(''):'<div class="empty">Nenhum item gerencial relevante.</div>'}
-function tab(id,btn){document.querySelectorAll('.report-panel').forEach(x=>x.classList.toggle('on',x.id===id));document.querySelectorAll('.report-tab').forEach(x=>x.classList.toggle('on',x===btn))}
-document.querySelectorAll('.report-tab').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.panel,b)));
-function actionKpis(a){const data=[['Total de ações',a.total,''],['Planejado',a.planned,''],['Em andamento',a.running,'warn'],['Atrasado',a.late,'crit'],['Concluído',a.done,'good']];$('actionKpis').innerHTML=data.map(x=>`<div class="kpi ${x[2]}"><span>${x[0]}</span><b>${x[1]}</b><small>Plano de Ação OPR</small></div>`).join('')}
-async function load(){try{
- project=await P().init('Status Report','Status Report Executivo · OPR','O Plano de Ação é a fonte da verdade; o Report é somente a visão executiva dessa verdade.');
- const d=await P().api('/api/opr-platform/status-report?project='+encodeURIComponent(project.id)),s=d.summary;
- $('overall').innerHTML=P().badge(s.overall_status);$('gono').textContent=s.go_no_go;$('operational').textContent=P().operationalProgress(s.actions.operational_completion_pct);$('generated').textContent=new Date(d.generated_at).toLocaleString('pt-BR');
- $('where').textContent=`O Plano possui ${s.actions.total} ações rastreadas: ${s.actions.planned} planejadas, ${s.actions.running} em andamento, ${s.actions.late} atrasadas por prazo formal e ${s.actions.done} concluídas. Nenhum percentual é apresentado como avanço real do projeto.`;
- actionKpis(s.actions);
- $('critical').innerHTML=cards(d.critical_actions,r=>`<div class="card"><b>${P().esc(r.display_id||r.id)} · ${P().esc(r.action)}</b><p>${P().badge(r.status)} · ${P().esc(r.responsible||'PENDENTE DE VALIDAÇÃO')} · ${P().esc(r.due_date||'Prazo A confirmar')}</p><p><b>Impacto:</b> ${P().esc(r.impact||'A confirmar')}<br><b>Próximo passo:</b> ${P().esc(r.next_step||'A confirmar')}</p></div>`);
- $('decisions').innerHTML=cards(d.decisions,r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.decision)}</b><p>${P().esc(r.owner||'PENDENTE DE VALIDAÇÃO')} · ${P().esc(r.due_date||'Prazo A confirmar')} · ${P().badge(r.status)}</p></div>`);
- $('risks').innerHTML=cards(d.risks.filter(r=>['Crítico','Critico','Alto','Alta','Sev1'].includes(r.severity)||r.status!=='Encerrado').slice(0,12),r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.description)}</b><p>${P().badge(r.severity)} ${P().badge(r.status)} · ${P().esc(r.owner||'PENDENTE DE VALIDAÇÃO')}</p><p>${P().esc(r.mitigation||'Mitigação A confirmar')}</p></div>`);
- $('integrations').innerHTML=cards(d.integrations.filter(r=>['Bloqueado','Em desenvolvimento','Pronto para teste'].includes(r.status)).slice(0,12),r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.name)}</b><p>${P().esc(r.source_system)} → ${P().esc(r.target_system)} · ${P().badge(r.status)}</p></div>`);
- $('tests').innerHTML=cards(d.tests.filter(r=>r.priority==='P1'||['Bloqueado','Reprovado'].includes(r.status)).slice(0,12),r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.scenario)}</b><p>${P().badge(r.priority)} ${P().badge(r.status)} · ${P().esc(r.owner||'PENDENTE DE VALIDAÇÃO')}</p></div>`);
- $('readiness').innerHTML=cards(d.readiness.filter(r=>Number(r.blocking)||r.status!=='Atendido').slice(0,12),r=>`<div class="card"><b>${P().esc(r.display_id)} · ${P().esc(r.category)}</b><p>${P().badge(r.status)} · ${P().esc(r.owner||'PENDENTE DE VALIDAÇÃO')}${Number(r.blocking)?' · BLOQUEADOR':''}</p></div>`);
- $('milestoneRows').innerHTML=(d.phases||[]).map(r=>`<tr><td>${P().esc(r.period||'A confirmar')}</td><td><b>${P().esc(r.display_id||'')} · ${P().esc(r.name)}</b></td><td>${P().esc(r.input_text||'A confirmar')}</td><td>${P().badge(r.status)}</td><td>${P().esc(r.owner||'PENDENTE DE VALIDAÇÃO')}</td><td>${P().esc(r.next_step||r.gate||'A confirmar')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhum marco validado.</td></tr>';
- $('cadenceRows').innerHTML=(d.cadence||[]).map(r=>`<tr><td>${P().esc(r.period||'A confirmar')}</td><td><b>${P().esc(r.agenda||'A confirmar')}</b></td><td>${P().esc(r.participants||'PENDENTE DE VALIDAÇÃO')}</td><td>${P().badge(r.status)}</td><td>${P().esc(r.objective||r.result||'A confirmar')}</td><td>${P().esc(r.result_next_step||'A confirmar')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhuma cadência registrada.</td></tr>';
- $('rules').textContent=(d.rules?.progress||'')+' '+(d.rules?.go_live||'');
-}catch(e){P().showMessage(e.message,'error')}}
-document.addEventListener('DOMContentLoaded',load);
+const esc=v=>P().esc(v);
+function empty(text='Nenhum item relevante registrado.'){return `<div class="report-empty">${esc(text)}</div>`}
+function cards(rows,fn){return rows&&rows.length?rows.map(fn).join(''):empty()}
+function kpis(target,items){$(target).innerHTML=items.map(([label,value,small])=>`<div class="report-kpi"><span>${esc(label)}</span><b>${esc(value)}</b><small>${esc(small||'')}</small></div>`).join('')}
+function badge(v){return P().badge(v||'A confirmar')}
+function fmtDate(v){if(!v)return 'A confirmar';try{return new Date(v).toLocaleDateString('pt-BR')}catch{return v}}
+function setActiveNav(){const links=[...document.querySelectorAll('.report-nav a')];const ids=links.map(a=>a.getAttribute('href').slice(1));const obs=new IntersectionObserver(entries=>{const visible=entries.filter(e=>e.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];if(!visible)return;links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+visible.target.id))},{rootMargin:'-20% 0px -68% 0px',threshold:[0,.2,.6]});ids.forEach(id=>{const el=document.getElementById(id);if(el)obs.observe(el)})}
+async function loadRequirements(){try{const rows=await P().api('/api/opr-platform/requirements?project='+encodeURIComponent(project.id));return Array.isArray(rows)?rows:[]}catch{return []}}
+function renderScope(){const total=requirements.length;const gaps=requirements.filter(r=>['Gap','Novo requisito','Não localizado','Coberto parcialmente'].includes(r.coverage_status));const covered=requirements.filter(r=>r.coverage_status==='Coberto').length;const dev=requirements.filter(r=>r.classification==='DEV').length;const ints=requirements.filter(r=>r.classification==='INT').length;kpis('scopeKpis',[['Requisitos registrados',total,'Base OPR'],['Cobertos',covered,'Cobertura registrada'],['Gaps / atenção',gaps.length,'Inclui parcial/não localizado'],['DEV',dev,'Classificação registrada'],['INT',ints,'Classificação registrada']]);$('scopeAttention').innerHTML=cards(gaps.slice(0,8),r=>`<div class="report-card" style="padding:10px;margin:7px 0"><h4>${esc(r.display_id||'')} · ${esc(r.requirement||'Requisito')}</h4><p>${badge(r.coverage_status)} ${badge(r.classification||'A confirmar')} · ${esc(r.owner||'PENDENTE DE VALIDAÇÃO')}</p><p><b>Gap:</b> ${esc(r.gap||'A confirmar')}</p></div>`)}
+function renderOverview(d){const s=d.summary||{},a=s.actions||{},phases=d.phases||[];const nextPhase=phases.find(r=>!['Concluído','Concluido','Encerrado'].includes(r.status));$('overall').innerHTML=badge(s.overall_status);$('gono').textContent=s.go_no_go||'A confirmar';$('nextMilestone').textContent=nextPhase?.name||'A confirmar';$('generated').textContent=d.generated_at?new Date(d.generated_at).toLocaleString('pt-BR'):'—';$('where').textContent=`O Plano possui ${a.total??0} ações rastreadas: ${a.planned??0} planejadas, ${a.running??0} em andamento, ${a.late??0} atrasadas por prazo formal e ${a.done??0} concluídas. O Status Report é derivado da base e não substitui o Plano Mestre.`;kpis('overviewKpis',[['Ações',a.total??0,'Plano Mestre'],['Em andamento',a.running??0,'Execução'],['Atrasadas',a.late??0,'Prazo formal'],['Concluídas',a.done??0,'Com status registrado'],['Decisões abertas',(d.decisions||[]).filter(x=>!['Tomada','Concluída','Concluida','Encerrada'].includes(x.status)).length,'Governança']]);$('executiveRule').textContent=(d.rules?.progress||'Sem baseline suficiente, não há percentual geral de avanço.')+' '+(d.rules?.go_live||'Go/No-Go depende de critérios e evidências de readiness.')}
+function renderIntegrations(d){const rows=d.integrations||[];$('integrationRows').innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.display_id||'')} · ${esc(r.name||'A confirmar')}</b></td><td>${esc(r.source_system||'A confirmar')}</td><td>${esc(r.target_system||'A confirmar')}</td><td>${esc(r.owner||'PENDENTE DE VALIDAÇÃO')}</td><td>${badge(r.status)}</td><td>${esc(r.pending||r.next_step||r.notes||'A confirmar')}</td></tr>`).join(''):`<tr><td colspan="6">${empty('Nenhuma integração registrada.')}</td></tr>`}
+function renderPlan(d){const s=d.summary||{},a=s.actions||{};kpis('actionKpis',[['Total',a.total??0,'Ações'],['Planejado',a.planned??0,''],['Em andamento',a.running??0,''],['Atrasado',a.late??0,'Prazo formal'],['Concluído',a.done??0,'']]);$('criticalActions').innerHTML=cards((d.critical_actions||[]).slice(0,8),r=>`<div class="report-card" style="padding:10px;margin:7px 0"><h4>${esc(r.display_id||r.id)} · ${esc(r.action)}</h4><p>${badge(r.status)} · ${esc(r.responsible||'PENDENTE DE VALIDAÇÃO')} · ${esc(r.due_date||'Prazo A confirmar')}</p><p><b>Próximo passo:</b> ${esc(r.next_step||'A confirmar')}</p></div>`);$('decisionCards').innerHTML=cards((d.decisions||[]).filter(r=>!['Tomada','Concluída','Concluida','Encerrada'].includes(r.status)).slice(0,8),r=>`<div class="report-card" style="padding:10px;margin:7px 0"><h4>${esc(r.display_id||'')} · ${esc(r.decision||'Decisão')}</h4><p>${badge(r.status)} · ${esc(r.owner||'PENDENTE DE VALIDAÇÃO')} · ${esc(r.due_date||'Prazo A confirmar')}</p></div>`)}
+function renderCritical(d){const rows=(d.critical_actions||[]).filter(r=>Number(r.critical_path)||r.dependency||['Bloqueado','Atrasado'].includes(r.status));$('criticalRows').innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.display_id||r.id)} · ${esc(r.action)}</b></td><td>${badge(r.status)}</td><td>${esc(r.responsible||'PENDENTE DE VALIDAÇÃO')}</td><td>${esc(r.due_date||'A confirmar')}</td><td>${esc(r.dependency||'A confirmar')}</td><td>${esc(r.impact||'A confirmar')}</td><td>${esc(r.next_step||'A confirmar')}</td></tr>`).join(''):`<tr><td colspan="7">${empty('Nenhum caminho crítico comprovado na base atual.')}</td></tr>`}
+function renderCadence(d){const rows=d.cadence||[];$('cadenceRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.period||'A confirmar')}</td><td><b>${esc(r.agenda||'A confirmar')}</b></td><td>${esc(r.participants||'PENDENTE DE VALIDAÇÃO')}</td><td>${badge(r.status)}</td><td>${esc(r.objective||r.result||'A confirmar')}</td><td>${esc(r.result_next_step||'A confirmar')}</td></tr>`).join(''):`<tr><td colspan="6">${empty('Nenhuma cadência registrada.')}</td></tr>`}
+function renderRisks(d){const rows=(d.risks||[]).filter(r=>r.status!=='Encerrado');$('riskRows').innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.display_id||'')} · ${esc(r.description||'Risco')}</b></td><td>${badge(r.severity)}</td><td>${badge(r.status)}</td><td>${esc(r.owner||'PENDENTE DE VALIDAÇÃO')}</td><td>${esc(r.mitigation||'A confirmar')}</td></tr>`).join(''):`<tr><td colspan="5">${empty('Nenhum risco aberto registrado.')}</td></tr>`}
+function renderIndicators(d){const ints=d.integrations||[],tests=d.tests||[],read=d.readiness||[];const blockedInts=ints.filter(r=>['Bloqueado','Em desenvolvimento','Pronto para teste'].includes(r.status)).length;const p1=tests.filter(r=>r.priority==='P1').length;const p1Blocked=tests.filter(r=>r.priority==='P1'&&['Bloqueado','Reprovado'].includes(r.status)).length;const blockers=read.filter(r=>Number(r.blocking)&&r.status!=='Atendido').length;kpis('indicatorKpis',[['Integrações',ints.length,'Registradas'],['Integrações em atenção',blockedInts,'Bloqueio/dev/teste'],['Testes P1',p1,'Registrados'],['P1 bloqueado/reprovado',p1Blocked,'Qualidade'],['Readiness bloqueadores',blockers,'Go-Live']]);$('testCards').innerHTML=cards(tests.filter(r=>r.priority==='P1'||['Bloqueado','Reprovado'].includes(r.status)).slice(0,8),r=>`<div class="report-card" style="padding:10px;margin:7px 0"><h4>${esc(r.display_id||'')} · ${esc(r.scenario||'Teste')}</h4><p>${badge(r.priority)} ${badge(r.status)} · ${esc(r.owner||'PENDENTE DE VALIDAÇÃO')}</p></div>`);$('readinessCards').innerHTML=cards(read.filter(r=>Number(r.blocking)||r.status!=='Atendido').slice(0,8),r=>`<div class="report-card" style="padding:10px;margin:7px 0"><h4>${esc(r.display_id||'')} · ${esc(r.category||'Readiness')}</h4><p>${badge(r.status)} · ${esc(r.owner||'PENDENTE DE VALIDAÇÃO')}${Number(r.blocking)?' · BLOQUEADOR':''}</p></div>`)}
+function renderNext(d){const actions=(d.critical_actions||[]).filter(r=>r.next_step).slice(0,8);$('nextActionCards').innerHTML=cards(actions,r=>`<div class="report-card" style="padding:10px;margin:7px 0"><h4>${esc(r.display_id||r.id)} · ${esc(r.action)}</h4><p><b>Próximo passo:</b> ${esc(r.next_step)}</p><p>${esc(r.responsible||'PENDENTE DE VALIDAÇÃO')} · ${esc(r.due_date||'Prazo A confirmar')}</p></div>`);const phases=(d.phases||[]).filter(r=>!['Concluído','Concluido','Encerrado'].includes(r.status)).slice(0,8);$('milestoneCards').innerHTML=cards(phases,r=>`<div class="report-card" style="padding:10px;margin:7px 0"><h4>${esc(r.display_id||'')} · ${esc(r.name||'Marco')}</h4><p>${badge(r.status)} · ${esc(r.period||'Período A confirmar')}</p><p><b>Gate / próximo passo:</b> ${esc(r.next_step||r.gate||'A confirmar')}</p></div>`)}
+async function loadReport(){try{$('reportSubtitle').textContent='Atualizando dados da OPR...';project=await P().resolveProject();const [d,reqs]=await Promise.all([P().api('/api/opr-platform/status-report?project='+encodeURIComponent(project.id)),loadRequirements()]);reportData=d;requirements=reqs;renderOverview(d);renderScope();renderIntegrations(d);renderPlan(d);renderCritical(d);renderCadence(d);renderRisks(d);renderIndicators(d);renderNext(d);$('reportSubtitle').textContent=`Projeto: ${project.name||'OPR'} · dados derivados da base operacional OPR`;}catch(e){P().showMessage(e.message,'error');$('reportSubtitle').textContent='Falha ao carregar os dados atuais.'}}
+document.addEventListener('DOMContentLoaded',()=>{setActiveNav();loadReport()});
 </script>
-</body></html>
+</body>
+</html>
